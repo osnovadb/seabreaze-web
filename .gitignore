@@ -1,0 +1,8 @@
+node_modules
+.next
+.env*
+dev-uploads/
+dev-files/
+TEST-ACCESS.md
+
+*.tsbuildinfo
