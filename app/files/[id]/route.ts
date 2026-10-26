@@ -22,6 +22,11 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const cs = clientScope(c.user)
     ok = !!(await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, cd.client_id]))
   }
+  // Документы к заявке партнёра — владельцу и проверяющим её рынка (руководитель рынка, менеджер)
+  if (!ok) {
+    const ap = await one<{ market: string }>('select a.market from portal.application_files af join portal.agent_applications a on a.id = af.application_id where af.file_id = $1', [params.id])
+    if (ap) ok = c.user.role === 'owner' || (['market_head', 'seller'].includes(c.user.role) && c.user.market === ap.market)
+  }
   // Картинки разметки (генплан, фасады, поэтажные планы) — тем, кому виден проект
   if (!ok) {
     const img = await one<{ project_id: string }>(`select project_id from portal.genplans where file_id = $1

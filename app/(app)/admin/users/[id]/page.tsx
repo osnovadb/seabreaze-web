@@ -22,6 +22,9 @@ export default async function UserCard({ params }: { params: { id: string } }) {
   const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','market_head','owner') ${owner ? '' : 'and market = $1'} order by name`, owner ? [] : [c.user.market])
   const work = await one<{ clients: number; bookings: number }>(`select (select count(*)::int from portal.clients where owner_id = $1 and stage not in ('lost','handed')) clients,
     (select count(*)::int from portal.bookings where agent_id = $1 and status in ('requested','confirmed')) bookings`, [u.id])
+  // Заявка, из которой создан доступ, и её документы (разрешение маклера, выписка)
+  const app = await one<{ id: string; created_at: string; license: string | null }>('select id, created_at, license from portal.agent_applications where user_id = $1', [u.id])
+  const docs = app ? await q<{ file_id: string; filename: string }>('select af.file_id, f.filename from portal.application_files af join portal.files f on f.id = af.file_id where af.application_id = $1 order by af.created_at', [app.id]) : []
   const log = await q<{ action: string; created_at: string; who: string | null }>(`select a.action, a.created_at, w.name who from portal.audit a left join portal.users w on w.id = a.user_id
     where (a.entity = 'user' and a.entity_id in ($1, $2)) or a.user_id = $3 order by a.id desc limit 15`, [u.id, u.email, u.id])
   return (
@@ -50,6 +53,14 @@ export default async function UserCard({ params }: { params: { id: string } }) {
             </div>
           )}
           {u.id === c.real.id && <div className="card small muted">{T('Свой пароль и PIN меняйте в профиле.')} <Link className="bronze" href="/profile">{T('Профиль')} →</Link></div>}
+          {app && (
+            <div className="card">
+              <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Заявка и документы')}</div><Link className="small bronze" href={`/admin/agents/app/${app.id}`}>{T('Открыть заявку')} →</Link></div>
+              <div className="small muted mt8">{T('заявка от {d}', { d: dateTime(L, app.created_at) })}{app.license ? ' · ' + app.license : ''}</div>
+              {docs.length === 0 && <div className="small muted mt8">{T('Документы не приложены.')}</div>}
+              {docs.map((d) => <a key={d.file_id} className="kv" href={`/files/${d.file_id}`} target="_blank" rel="noopener"><span style={{ color: 'var(--ink)' }}>{d.filename}</span><span className="small">↗</span></a>)}
+            </div>
+          )}
           <div className="card">
             <div className="h3">{T('Журнал')}</div>
             {log.length === 0 && <div className="small muted">—</div>}

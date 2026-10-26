@@ -7,10 +7,11 @@ import { one } from './db'
 export const MAX_FILE = 25 * 1024 * 1024
 const OK_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'mp4', 'mov', 'heic']
 
-export async function storeFile(file: File, userId: string) {
+// userId = null — загрузка без входа (документы к заявке партнёра): там свои, более узкие типы и размер
+export async function storeFile(file: File, userId: string | null, opts?: { exts?: string[]; max?: number }) {
   const ext = (file.name.split('.').pop() || '').toLowerCase()
-  if (!OK_EXT.includes(ext)) throw new Error('type')
-  if (file.size > MAX_FILE) throw new Error('size')
+  if (!(opts?.exts || OK_EXT).includes(ext)) throw new Error('type')
+  if (file.size > (opts?.max || MAX_FILE)) throw new Error('size')
   const id = crypto.randomUUID()
   const disk = `${id}.${ext}`
   await fs.writeFile(path.join(process.env.FILES_DIR || './dev-files', disk), Buffer.from(await file.arrayBuffer()), { mode: 0o640 })

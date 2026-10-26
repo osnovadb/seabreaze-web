@@ -30,6 +30,7 @@ export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
       </div>
       <label className="field"><span>{T('Рынок')}</span><select className="in" name="market" defaultValue={market}><option value="DE">{T('Германия, Австрия, Швейцария')}</option><option value="IL">{T('Израиль')}</option></select></label>
       {F('channels', 'Как будете продавать', 'Своя база, соцсети, партнёры, мероприятия…')}
+      <label className="field"><span>{T('Документы: разрешение §34c GewO или лицензия маклера, выписка из реестра')}</span><input className="in" type="file" name="docs" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" style={{ paddingTop: 6 }} /><span className="tiny muted">{T('PDF или фото, до 3 файлов по 10 МБ. Можно прислать позже куратору.')}</span></label>
       <label className="check"><input type="checkbox" name="consent" /> <span>{T('Согласен с условиями программы и')} <Link className="bronze" href="/legal/privacy" target="_blank">{T('политикой конфиденциальности')}</Link></span></label>
       <Submit lang={lang} />
     </form>

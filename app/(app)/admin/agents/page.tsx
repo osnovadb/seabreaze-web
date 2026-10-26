@@ -14,7 +14,7 @@ export default async function Agents() {
   if (!canReviewAgents(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const own = c.user.role === 'owner'
-  const apps = await q<any>(`select * from portal.agent_applications ${own ? '' : 'where market = $1'} order by case status when 'new' then 0 when 'review' then 1 when 'contract' then 2 else 3 end, created_at desc`, own ? [] : [c.user.market])
+  const apps = await q<any>(`select a.*, (select count(*)::int from portal.application_files af where af.application_id = a.id) nfiles from portal.agent_applications a ${own ? '' : 'where market = $1'} order by case status when 'new' then 0 when 'review' then 1 when 'contract' then 2 else 3 end, created_at desc`, own ? [] : [c.user.market])
   const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','market_head','owner') ${own ? '' : 'and market = $1'} order by name`, own ? [] : [c.user.market])
   const canAccess = ['owner', 'market_head'].includes(c.user.role)
   const agents = await q<{ id: string; name: string; email: string; role: string; market: string; agency: string | null; curator: string | null; license_note: string | null; contract_signed_at: string | null; clients: number; bookings: number; deals: number }>(
@@ -33,7 +33,7 @@ export default async function Agents() {
           <thead><tr>{['Заявитель', 'Рынок', 'Лицензия маклера', 'Объём / каналы', 'Дата', 'Статус', 'Решение'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{apps.map((a) => (
             <tr key={a.id}>
-              <td><b>{a.name}</b>{a.company && <div className="small">{a.company}</div>}<div className="tiny muted">{T(a.kind === 'agency' ? 'Агентство' : 'Частный агент')} · {a.email} · {a.city} · {a.languages}</div></td>
+              <td><Link href={`/admin/agents/app/${a.id}`}><b>{a.name}</b></Link>{Number(a.nfiles) > 0 && <span className="tiny muted"> · 📎 {a.nfiles}</span>}{a.company && <div className="small">{a.company}</div>}<div className="tiny muted">{T(a.kind === 'agency' ? 'Агентство' : 'Частный агент')} · {a.email} · {a.city} · {a.languages}</div></td>
               <td>{a.market}</td><td className="small">{a.license || '—'}</td><td className="small">{a.volume}<div className="tiny muted">{a.channels}</div></td>
               <td className="small muted">{date(L, a.created_at)}</td><td><Pill kind={st[a.status][1]}>{T(st[a.status][0])}</Pill></td>
               <td><form action={reviewApplication} className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input type="hidden" name="id" value={a.id} />

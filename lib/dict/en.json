@@ -1082,5 +1082,19 @@
 "юг": "south",
 "юго-запад": "south-west",
 "запад": "west",
-"северо-запад": "north-west"
+"северо-запад": "north-west",
+"PDF или фото, до 3 файлов по 10 МБ. Можно прислать позже куратору.": "PDF or photo, up to 3 files of 10 MB. You can also send them to your account manager later.",
+"Документы не приложены.": "No documents attached.",
+"Документы не приложены. Попросите прислать разрешение и выписку — и добавьте сюда.": "No documents attached. Ask for the licence and registry extract — and add them here.",
+"Документы — PDF или фото (JPG, PNG, HEIC)": "Documents must be PDF or photos (JPG, PNG, HEIC)",
+"Документы: разрешение §34c GewO или лицензия маклера, выписка из реестра": "Documents: §34c GewO permit or broker licence, registry extract",
+"Доступ создаётся после проверки: статус «договор» или «одобрена».": "Access is created after review: status “contract” or “approved”.",
+"Заявка и документы": "Application and documents",
+"Итог созвона, проверка лицензии, причина отказа…": "Call outcome, licence check, reason for rejection…",
+"Не больше 3 файлов": "No more than 3 files",
+"Открыть заявку": "Open application",
+"Партнёры и заявки": "Partners and applications",
+"Проверял": "Reviewed by",
+"Файл больше 10 МБ": "The file exceeds 10 MB",
+"заявка от {d}": "application of {d}"
 }

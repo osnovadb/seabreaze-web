@@ -381,10 +381,32 @@ export async function applyAgent(_: unknown, f: FormData) {
   if (!s(f, 'name') || !s(f, 'email')) return { error: 'Нужны имя и e-mail' }
   if (!f.get('consent')) return { error: 'Нужно согласие с условиями и обработкой данных' }
   const market = ['DE', 'IL', 'GLOBAL'].includes(s(f, 'market')) ? s(f, 'market') : 'DE'
-  await q(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+  // Документы к заявке (разрешение маклера, выписка): без входа, поэтому до 3 файлов по 10 МБ, только PDF и фото
+  const docs = f.getAll('docs').filter(isFile)
+  const DOC = { exts: ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic'], max: 10 * 1024 * 1024 }
+  if (docs.length > 3) return { error: 'Не больше 3 файлов' }
+  if (docs.some((d) => !DOC.exts.includes((d.name.split('.').pop() || '').toLowerCase()))) return { error: 'Документы — PDF или фото (JPG, PNG, HEIC)' }
+  if (docs.some((d) => d.size > DOC.max)) return { error: 'Файл больше 10 МБ' }
+  const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
     [s(f, 'kind') === 'agency' ? 'agency' : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market])
+  for (const d of docs) await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [app!.id, await storeFile(d, null, DOC)])
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
-  for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', '/admin/agents', { n: s(f, 'name') })
+  for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
+  return { ok: true }
+}
+// Документ к заявке, полученный позже (по почте, у куратора) — добавляет проверяющий
+export async function addApplicationFile(_: unknown, f: FormData) {
+  const c = await writeCtx()
+  if (!canReviewAgents(c.user.role)) return { error: t(c.lang, 'Нет прав') }
+  const a = await one<{ id: string; market: string }>('select id, market from portal.agent_applications where id = $1', [s(f, 'id')])
+  if (!a || (c.user.role !== 'owner' && a.market !== c.user.market)) return { error: t(c.lang, 'Нет прав') }
+  const file = f.get('file')
+  if (!isFile(file)) return { error: t(c.lang, 'Выберите файл') }
+  try { await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [a.id, await storeFile(file, c.user.id)]) } catch (e: any) {
+    return { error: t(c.lang, e?.message === 'size' ? 'Файл больше 25 МБ — дайте ссылку на облако' : 'Такой тип файла не поддерживается') }
+  }
+  await audit(c.real.id, 'application.file', 'application', a.id, null, c.impersonating ? c.user.id : null)
+  revalidatePath(`/admin/agents/app/${a.id}`)
   return { ok: true }
 }
 export async function reviewApplication(f: FormData) {
@@ -395,7 +417,7 @@ export async function reviewApplication(f: FormData) {
   // Не владелец разбирает только заявки своего рынка
   await q(`update portal.agent_applications set status = $2, note = coalesce(nullif($3, ''), note), reviewed_by = $4 where id = $1 and ($5 = 'owner' or market = $6)`, [id, status, s(f, 'note'), c.user.id, c.user.role, c.user.market])
   await audit(c.real.id, 'application.' + status, 'application', id)
-  revalidatePath('/admin/agents')
+  revalidatePath('/admin/agents'); revalidatePath(`/admin/agents/app/${id}`)
 }
 
 /* ── Условия проекта ── */

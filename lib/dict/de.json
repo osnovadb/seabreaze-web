@@ -1082,5 +1082,19 @@
 "юг": "Süden",
 "юго-запад": "Südwesten",
 "запад": "Westen",
-"северо-запад": "Nordwesten"
+"северо-запад": "Nordwesten",
+"PDF или фото, до 3 файлов по 10 МБ. Можно прислать позже куратору.": "PDF oder Foto, bis zu 3 Dateien à 10 MB. Sie können sie auch später Ihrem Betreuer senden.",
+"Документы не приложены.": "Keine Dokumente angehängt.",
+"Документы не приложены. Попросите прислать разрешение и выписку — и добавьте сюда.": "Keine Dokumente angehängt. Bitten Sie um Erlaubnis und Registerauszug — und fügen Sie sie hier hinzu.",
+"Документы — PDF или фото (JPG, PNG, HEIC)": "Dokumente als PDF oder Foto (JPG, PNG, HEIC)",
+"Документы: разрешение §34c GewO или лицензия маклера, выписка из реестра": "Dokumente: Erlaubnis nach §34c GewO oder Maklerlizenz, Registerauszug",
+"Доступ создаётся после проверки: статус «договор» или «одобрена».": "Der Zugang wird nach der Prüfung angelegt: Status „Vertrag“ oder „freigegeben“.",
+"Заявка и документы": "Bewerbung und Dokumente",
+"Итог созвона, проверка лицензии, причина отказа…": "Ergebnis des Gesprächs, Lizenzprüfung, Ablehnungsgrund…",
+"Не больше 3 файлов": "Höchstens 3 Dateien",
+"Открыть заявку": "Bewerbung öffnen",
+"Партнёры и заявки": "Partner und Bewerbungen",
+"Проверял": "Geprüft von",
+"Файл больше 10 МБ": "Datei größer als 10 MB",
+"заявка от {d}": "Bewerbung vom {d}"
 }
