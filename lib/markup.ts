@@ -101,7 +101,8 @@ export async function saveFloorPlan(_: unknown, f: FormData) {
 export async function saveRisers(_: unknown, f: FormData) {
   const c = await owner()
   const pid = s(f, 'project'), bid = s(f, 'building')
-  const units = await q<{ id: string; number: string; floor: number }>('select id, number, floor from units where building_id = $1', [bid])
+  const units = await q<{ id: string; number: string; floor: number; view_side: string | null }>('select id, number, floor, view_side from units where building_id = $1', [bid])
+  const prev = new Map((await q<{ riser: string; view_side: string | null }>('select riser, view_side from portal.riser_info where building_id = $1', [bid])).map((x) => [x.riser, x.view_side]))
   const risers = Array.from(new Set(units.map((u) => riser(u))))
   const VIEWS = ['sea', 'marina', 'park', 'yard', 'city', 'mixed'], DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
   let n = 0
@@ -109,7 +110,8 @@ export async function saveRisers(_: unknown, f: FormData) {
     const v = VIEWS.includes(s(f, 'v_' + r)) ? s(f, 'v_' + r) : null, d = DIRS.includes(s(f, 'd_' + r)) ? s(f, 'd_' + r) : null
     await q(`insert into portal.riser_info (building_id, riser, view_side, direction, note) values ($1,$2,$3,$4,$5)
       on conflict (building_id, riser) do update set view_side = $3, direction = $4, note = $5`, [bid, r, v, d, s(f, 'n_' + r) || null])
-    const ids = units.filter((u) => riser(u) === r).map((u) => u.id)
+    // Квартиры со своим видом (не пустым и не равным прежнему виду стояка) не трогаем: это этажи с другой нарезкой
+    const ids = units.filter((u) => riser(u) === r && (u.view_side == null || u.view_side === (prev.get(r) ?? null))).map((u) => u.id)
     if (ids.length) { await q('update units set view_side = $2 where id = any($1) and view_side is distinct from $2', [ids, v]); n += ids.length }
   }
   await audit(c.real.id, 'markup.risers', 'building', bid, { risers: risers.length }, c.impersonating ? c.user.id : null)

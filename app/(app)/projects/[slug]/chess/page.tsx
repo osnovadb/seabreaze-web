@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, dateTime, pct } from '@/lib/i18n'
-import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, riser, VIEW_NAME, DIR_NAME } from '@/lib/catalog'
+import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, orientOf, orientText, VIEW_NAME } from '@/lib/catalog'
 import { ViewTabs } from '@/components/ViewTabs'
 import { seesSource, isExternal, canBook } from '@/lib/perm'
 import { one } from '@/lib/db'
@@ -26,10 +26,10 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const sync = seesSource(c.user.role) ? await one<{ at: string; src: string }>(`select max(u.synced_at) at, min(u.source_id) src from units u where u.building_id = $1`, [b.id]) : null
   // Ориентация стояков: фильтр «вид из окон» и строка в карточке квартиры
   const ri = await riserInfo(b.id)
-  const views = Array.from(new Set(Array.from(ri.values()).map((x) => x.view_side).filter(Boolean))) as string[]
+  const views = Array.from(new Set(units.map((u) => orientOf(u, ri).view).filter(Boolean))) as string[]
   const view = views.includes(searchParams.v || '') ? searchParams.v : undefined
-  const match = view ? new Set(units.filter((u) => ri.get(riser(u))?.view_side === view).map((u) => u.id)) : undefined
-  const orient = (u: (typeof units)[number]) => { const i = ri.get(riser(u)); return i && (i.view_side || i.direction) ? [i.view_side ? T(VIEW_NAME[i.view_side]) : '', i.direction ? T('окна на {d}', { d: T(DIR_NAME[i.direction]) }) : ''].filter(Boolean).join(' · ') : undefined }
+  const match = view ? new Set(units.filter((u) => orientOf(u, ri).view === view).map((u) => u.id)) : undefined
+  const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri)) || undefined
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
   const sel = units.find((u) => u.id === searchParams.u && codeFor(u, c.user, mode) !== 'X')
   const selBooking = sel?.booking_id && mode === 'team' ? await one<{ client: string; agent: string; ends_at: string }>(`select cl.name client, us.name agent, b.ends_at from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [sel.booking_id]) : null

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, m2, date, dateTime } from '@/lib/i18n'
-import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, riser, VIEW_NAME, DIR_NAME } from '@/lib/catalog'
+import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { PlanList } from '@/components/PlanList'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
@@ -37,7 +37,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const inSel = await q<{ id: string; client: string }>(`select s.id, cl.name client from portal.selection_items si join portal.selections s on s.id = si.selection_id join portal.clients cl on cl.id = s.client_id where si.unit_id = $1 and (${ext ? 's.user_id = $2' : 'true'})`, ext ? [u.id, c.user.id] : [u.id])
   const bk = u.booking_id ? (await q<{ client: string; agent: string; status: string; ends_at: string; final_price: number }>(`select cl.name client, us.name agent, b.status, b.ends_at, b.final_price::float from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [u.booking_id]))[0] : null
   const plans = await plansFor(u.project_id, u.building_id)
-  const ri = (await riserInfo(u.building_id)).get(riser(u))
+  const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]
   return (
     <>
@@ -64,7 +64,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
               <div className="kv"><span>{T('Комнаты')}</span><span>{u.rooms ?? '—'}</span></div>
               <div className="kv"><span>{T('Этаж')}</span><span>{u.floor}</span></div>
               {u.layout_code && <div className="kv"><span>{T('Планировка')}</span><span>{u.layout_code}</span></div>}
-              {ri && (ri.view_side || ri.direction) && <div className="kv"><span>{T('Вид из окон')}</span><span>{[ri.view_side ? T(VIEW_NAME[ri.view_side]) : '', ri.direction ? T('окна на {d}', { d: T(DIR_NAME[ri.direction]) }) : '', ri.note || ''].filter(Boolean).join(' · ')}</span></div>}
+              {oriText && <div className="kv"><span>{T('Вид из окон')}</span><span>{oriText}</span></div>}
               <div className="kv"><span>{T('Отделка')}</span><span>{T('без ремонта')}</span></div>
               <div className="kv"><span>{T('Сдача')}</span><span>{u.delivery || T('уточняется у застройщика')}</span></div>
             </div>

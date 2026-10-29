@@ -2,6 +2,7 @@ import { q, one } from './db'
 import type { User } from './auth'
 import { seesAllStatuses } from './perm'
 import { PLAN_COLS, type Plan } from './plans'
+import { t, type Lang } from './i18n'
 
 export type Project = { sales_status: string; id: string; slug: string; name: string; status: string; delivery: string | null; city: string | null; location: string | null; developer: string; units: number; free: number; min_usd: number | null; buildings: number }
 export type Building = { id: string; name: string; external_id: string | null; floors_total: number | null; delivery: string | null; units: number; free: number; min_usd: number | null; sort: number }
@@ -10,7 +11,7 @@ export type Unit = {
   rooms: number | null; area: number; ext_area: number | null; plot_area: number | null; status: string; external_status: string | null; price: number | null
   usd: number | null; currency: string; plan_file: string | null; layout_code: string | null; synced_at: string; source_id: string
   booking_id: string | null; booking_status: string | null; booking_agent: string | null; booking_ends: string | null; deal_id: string | null
-  hidden: boolean; sales_status: string; locked: string[]; delivery: string | null
+  hidden: boolean; sales_status: string; locked: string[]; delivery: string | null; view_side: string | null
 }
 // Код статуса в шахматке: F свободно, B бронь застройщика, S продано, N не в продаже, SB квота SeaBreeze,
 // O наша бронь, M моя бронь, D наша сделка, X недоступно (для агента и показа)
@@ -31,7 +32,7 @@ const UNIT_SELECT = `
     u.area_total_m2::float as area, u.area_external_m2::float as ext_area, u.plot_area_m2::float as plot_area, u.status, u.external_status,
     u.price_list::float as price, (${toUsdSql})::float as usd, u.price_currency as currency, l.plan_file, l.code as layout_code, u.synced_at, u.source_id,
     bk.id as booking_id, bk.status as booking_status, bk.agent_id as booking_agent, bk.ends_at as booking_ends, dl.id as deal_id,
-    exists (select 1 from portal.unit_hidden h where h.unit_id = u.id) as hidden, b.delivery,
+    exists (select 1 from portal.unit_hidden h where h.unit_id = u.id) as hidden, b.delivery, u.view_side,
     (select coalesce(array_agg(x), '{}') from jsonb_array_elements_text(u.locked_fields) x) as locked, coalesce(ps.sales_status, 'draft') as sales_status
   from units u
   left join portal.project_settings ps on ps.project_id = u.project_id
@@ -135,6 +136,16 @@ export async function riserInfo(buildingId: string) {
   const rows = await q<RiserInfo & { riser: string }>('select riser, view_side, direction, note from portal.riser_info where building_id = $1', [buildingId])
   return new Map(rows.map((r) => [r.riser, r]))
 }
+// Ориентация конкретной квартиры. Вид квартиры (units.view_side) главнее стояка: на этажах с другой нарезкой
+// (1–2-й, 12-й у Premium) тот же номер стояка стоит в другом месте плана. Сторону света и примечание стояка
+// показываем, только если вид квартиры с ним совпадает.
+export function orientOf(u: { number: string; floor: number; view_side: string | null }, ri: Map<string, RiserInfo>) {
+  const r = ri.get(riser(u)), view = u.view_side ?? r?.view_side ?? null
+  const same = !!r && (!u.view_side || r.view_side === u.view_side)
+  return { view, direction: same ? r!.direction : null, note: same ? r!.note : null }
+}
+export const orientText = (lang: Lang, o: ReturnType<typeof orientOf>) =>
+  [o.view ? t(lang, VIEW_NAME[o.view]) : '', o.direction ? t(lang, 'окна на {d}', { d: t(lang, DIR_NAME[o.direction]) }) : ''].filter(Boolean).join(' · ')
 export const VIEW_NAME: Record<string, string> = { sea: 'на море', marina: 'на марину', park: 'на парк', yard: 'во двор', city: 'на улицу', mixed: 'на две стороны' }
 export const DIR_NAME: Record<string, string> = { N: 'север', NE: 'северо-восток', E: 'восток', SE: 'юго-восток', S: 'юг', SW: 'юго-запад', W: 'запад', NW: 'северо-запад' }
 

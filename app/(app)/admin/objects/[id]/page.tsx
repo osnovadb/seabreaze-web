@@ -331,7 +331,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   async function Orient() {
     const b = blocks.find((x) => x.id === searchParams.b) || blocks[0]
     if (!b) return <div className="card muted">{T('Сначала добавьте блок.')}</div>
-    const us = await q<{ number: string; floor: number; area: number | null; unit_type: string }>('select number, floor, area_total_m2::float area, unit_type from units where building_id = $1', [b.id])
+    const us = await q<{ number: string; floor: number; area: number | null; unit_type: string; view_side: string | null }>('select number, floor, area_total_m2::float area, unit_type, view_side from units where building_id = $1', [b.id])
     const info = await q<{ riser: string; view_side: string | null; direction: string | null; note: string | null }>('select riser, view_side, direction, note from portal.riser_info where building_id = $1', [b.id])
     const rs = Array.from(new Set(us.map((u) => riserOf(u)))).sort((a, b2) => (parseInt(a) || 0) - (parseInt(b2) || 0) || a.localeCompare(b2))
     const VIEWS: [string, string][] = [['', '—'], ['yard', 'во двор'], ['city', 'на улицу / город'], ['sea', 'на море'], ['marina', 'на марину'], ['park', 'на парк'], ['mixed', 'на две стороны']]
@@ -342,17 +342,17 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         <ActionForm action={saveRisers} lang={L} className="card stack" style={{ gap: 6 }} okText={T('Сохранено · квартир обновлено')}>
           <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="building" value={b.id} />
           <div className="objhead" style={{ gridTemplateColumns: '.6fr 1.4fr 1.2fr .8fr 1.6fr' }}>{['Стояк', 'Квартиры', 'Вид из окон', 'Сторона', 'Примечание'].map((h) => <span key={h}>{T(h)}</span>)}</div>
-          {rs.map((r) => { const xs = us.filter((u) => riserOf(u) === r); const i = info.find((x) => x.riser === r); const areas = xs.map((x) => x.area || 0).filter(Boolean); return (
+          {rs.map((r) => { const xs = us.filter((u) => riserOf(u) === r); const i = info.find((x) => x.riser === r); const areas = xs.map((x) => x.area || 0).filter(Boolean); const own = xs.filter((x) => x.view_side && x.view_side !== (i?.view_side ?? null)).map((x) => x.floor).sort((a, b2) => a - b2); return (
             <div key={r} className="objrow" style={{ gridTemplateColumns: '.6fr 1.4fr 1.2fr .8fr 1.6fr' }}>
               <b>{r}</b>
-              <span className="tiny muted">{xs.length} · {xs[0]?.unit_type}{areas.length ? ` · ${Math.min(...areas)}–${Math.max(...areas)} m²` : ''}</span>
+              <span className="tiny muted">{xs.length} · {xs[0]?.unit_type}{areas.length ? ` · ${Math.min(...areas)}–${Math.max(...areas)} m²` : ''}{own.length ? <><br />{T('свой вид: этажи {f}', { f: own.join(', ') })}</> : null}</span>
               <select className="in" name={'v_' + r} defaultValue={i?.view_side || ''}>{VIEWS.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
               <select className="in" name={'d_' + r} defaultValue={i?.direction || ''}>{DIRS.map((k) => <option key={k} value={k}>{k || '—'}</option>)}</select>
               <input className="in" name={'n_' + r} defaultValue={i?.note || ''} placeholder={T('угловая, вид на бассейн…')} />
             </div>
           ) })}
           <div><button className="btn btn--p">{T('Сохранить ориентацию')}</button></div>
-          <div className="tiny muted">{T('Ориентация задаётся на стояк — все квартиры стояка смотрят в одну сторону. Вид из окон пишется и в каталог: его видят сайты и фильтр «вид» в портале. Данные берём из поэтажных планов и кабинета Profitbase застройщика.')}</div>
+          <div className="tiny muted">{T('Ориентация задаётся на стояк — все квартиры стояка смотрят в одну сторону. Вид из окон пишется и в каталог: его видят сайты и фильтр «вид» в портале. Данные берём из поэтажных планов и кабинета Profitbase застройщика.')} {T('Если на каком-то этаже нарезка другая и квартира с тем же номером стоит в другом месте, у неё свой вид — сохранение стояка его не перезапишет.')}</div>
         </ActionForm>
       </div>
     )

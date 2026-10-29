@@ -1096,5 +1096,7 @@
 "Партнёры и заявки": "Partners and applications",
 "Проверял": "Reviewed by",
 "Файл больше 10 МБ": "The file exceeds 10 MB",
-"заявка от {d}": "application of {d}"
+"заявка от {d}": "application of {d}",
+"свой вид: этажи {f}": "own view: floors {f}",
+"Если на каком-то этаже нарезка другая и квартира с тем же номером стоит в другом месте, у неё свой вид — сохранение стояка его не перезапишет.": "If a floor is laid out differently and an apartment with the same number sits elsewhere, it keeps its own view — saving the riser will not overwrite it."
 }

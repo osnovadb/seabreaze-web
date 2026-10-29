@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t } from '@/lib/i18n'
-import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riserInfo, riser, VIEW_NAME, DIR_NAME } from '@/lib/catalog'
+import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { canBook } from '@/lib/perm'
 import { Top, Legend } from '@/components/ui'
 import { FacadeView } from '@/components/FacadeView'
@@ -26,8 +26,7 @@ export default async function Facade({ params, searchParams }: { params: { slug:
   const mode = viewMode(c.user, false)
   const sel = units.find((u) => u.id === searchParams.u && codeFor(u, c.user, mode) !== 'X')
   const selBooking = sel?.booking_id && mode === 'team' ? await one<{ client: string; agent: string; ends_at: string }>(`select cl.name client, us.name agent, b.ends_at from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [sel.booking_id]) : null
-  const ri = sel ? (await riserInfo(b.id)).get(riser(sel)) : undefined
-  const orient = ri && (ri.view_side || ri.direction) ? [ri.view_side ? T(VIEW_NAME[ri.view_side]) : '', ri.direction ? T('окна на {d}', { d: T(DIR_NAME[ri.direction]) }) : ''].filter(Boolean).join(' · ') : undefined
+  const orient = sel ? orientText(L, orientOf(sel, await riserInfo(b.id))) || undefined : undefined
   const qs = (o: Record<string, string>) => '?' + new URLSearchParams({ b: b.id, ...(f ? { s: f.id } : {}), ...(sel ? { u: sel.id } : {}), ...o }).toString()
   return (
     <>

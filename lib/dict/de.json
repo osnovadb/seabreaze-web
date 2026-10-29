@@ -1096,5 +1096,7 @@
 "Партнёры и заявки": "Partner und Bewerbungen",
 "Проверял": "Geprüft von",
 "Файл больше 10 МБ": "Datei größer als 10 MB",
-"заявка от {d}": "Bewerbung vom {d}"
+"заявка от {d}": "Bewerbung vom {d}",
+"свой вид: этажи {f}": "eigener Ausblick: Etagen {f}",
+"Если на каком-то этаже нарезка другая и квартира с тем же номером стоит в другом месте, у неё свой вид — сохранение стояка его не перезапишет.": "Ist eine Etage anders aufgeteilt und liegt eine Wohnung mit derselben Nummer woanders, behält sie ihren eigenen Ausblick — das Speichern des Strangs überschreibt ihn nicht."
 }

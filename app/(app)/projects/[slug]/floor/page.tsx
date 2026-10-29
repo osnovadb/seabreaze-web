@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
-import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riser, planUrl, unitNo, riserInfo, VIEW_NAME, DIR_NAME } from '@/lib/catalog'
+import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riser, planUrl, unitNo, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { one } from '@/lib/db'
 import { polyStr } from '@/lib/geom'
 import { ViewTabs } from '@/components/ViewTabs'
@@ -27,7 +27,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
   const plan = await one<{ file_id: string; north_deg: number; cells: { riser: string; points: number[][] }[] }>('select file_id, north_deg, cells from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by floor_to - floor_from limit 1', [b.id, f])
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
   const ri = await riserInfo(b.id)
-  const orient = (u: (typeof units)[number]) => { const i = ri.get(riser(u)); return i && (i.view_side || i.direction) ? [i.view_side ? T(VIEW_NAME[i.view_side]) : '', i.direction ? T('окна на {d}', { d: T(DIR_NAME[i.direction]) }) : ''].filter(Boolean).join(' · ') : '' }
+  const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri))
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [b.name, `/projects/${p.slug}/chess?b=${b.id}`], [T('Этаж {f}', { f })]]}
@@ -84,7 +84,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
           <div className="card">
             <div className="h3">{unitNo(sel)} · {T(codeFor(sel, c.user, mode) === 'F' ? 'свободно' : 'занято')}</div>
             <div className="small muted">{T('{r} комн.', { r: sel.rooms ?? '' })} · {m2(L, sel.area)} · {T('{f} этаж', { f: sel.floor })}</div>
-            {orient(sel) && <div className="small mt8">{T('Вид из окон')}: <b>{orient(sel)}</b>{ri.get(riser(sel))?.note ? ' · ' + ri.get(riser(sel))!.note : ''}</div>}
+            {orient(sel) && <div className="small mt8">{T('Вид из окон')}: <b>{orient(sel)}</b>{orientOf(sel, ri).note ? ' · ' + orientOf(sel, ri).note : ''}</div>}
             {planUrl(sel.plan_file) && <div className="planbox mt16"><img src={planUrl(sel.plan_file)!} alt="" style={{ maxHeight: 340 }} /></div>}
             {sel.usd && <div className="big mt16">{usd(L, sel.usd)}</div>}
             <Link className="btn btn--p btn--block mt16" href={`/units/${sel.id}`}>{T('Карточка квартиры')}</Link>
