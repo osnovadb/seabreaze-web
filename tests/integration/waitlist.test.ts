@@ -64,6 +64,25 @@ test('партнёр по скрытой квартире не уведомля�
   await setPause(0); tick()
   assert.equal((await wl())[0].active, true, 'скрытая — партнёр не уведомлён')
 })
+test('скрыть квартиру в админке: партнёры убраны из очереди с уведомлением, команда остаётся', { skip: SKIP }, async () => {
+  await db.query('delete from portal.waitlist where unit_id=$1', [UNIT])
+  await db.query('delete from portal.unit_hidden where unit_id=$1', [UNIT])
+  await db.query(`insert into portal.waitlist (unit_id, user_id, client_id) values ($1,$2,$3), ($1,$4,$5)`, [UNIT, SOPHIE, MICHAEL, MARTIN, DIRK])
+  const o = await login(U.owner)
+  const path0 = `/admin/objects/${BR}?tab=units&b=00000000-0000-0000-0000-0000000000b1&fl=3`
+  const f = forms((await page(o, path0)).html).find((x) => x.fields.some(([k, v]) => k === 'id' && v === UNIT) && x.fields.some(([k]) => k === 'hidden_set'))
+  assert.ok(f, 'форма квартиры с «скрыть» в админке объекта')
+  const before = await db.query(`select status, price_list::float p from units where id=$1`, [UNIT])
+  await submit(o, path0, f!, { hidden: "1" })
+  assert.equal((await db.query('select count(*)::int n from portal.unit_hidden where unit_id=$1', [UNIT])).rows[0].n, 1, 'квартира скрыта')
+  const w = (await db.query(`select user_id, active from portal.waitlist where unit_id=$1`, [UNIT])).rows
+  assert.equal(w.find((x) => x.user_id === SOPHIE)?.active, false, 'партнёр остался в очереди')
+  assert.equal(w.find((x) => x.user_id === MARTIN)?.active, true, 'продавца убрали из очереди')
+  const n = (await db.query(`select link from portal.notifications where user_id=$1 and kind='waitlist' and text like 'Квартира {u} снята%' and created_at > now() - interval '5 minutes'`, [SOPHIE])).rows
+  assert.equal(n.length, 1, 'партнёр не уведомлён'); assert.equal(n[0].link, '/waitlist')
+  assert.deepEqual((await db.query(`select status, price_list::float p from units where id=$1`, [UNIT])).rows, before.rows, 'сохранение формы изменило квартиру')
+  await db.query(`delete from portal.notifications where user_id=$1 and text like 'Квартира {u} снята%'`, [SOPHIE])
+})
 test('сохранённый поиск: «2 комнаты» — это 2 комнаты, как в каталоге; max в тыс. $ с пересчётом AZN', { skip: SKIP }, async () => {
   await db.query(`insert into portal.saved_searches (user_id, name, filters) values ($1,'QA 2к ≤ 1500k',$2)`, [MARTIN, { project: BR, rooms: 2, max: 1500, outdoor: null }])
   tick() // первая проверка только запоминает
