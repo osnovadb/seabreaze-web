@@ -29,7 +29,7 @@ export function TourForm({ lang, clientId, clientLang }: { lang: Lang; clientId:
   )
 }
 
-const KINDS: [string, string][] = [['passport', 'паспорт'], ['kyc', 'KYC'], ['booking', 'бронь'], ['contract', 'договор'], ['payment', 'платёж'], ['other', 'другое']]
+const KINDS: [string, string][] = [['passport', 'паспорт'], ['address', 'подтверждение адреса'], ['funds', 'происхождение средств'], ['kyc', 'KYC'], ['booking', 'бронь'], ['contract', 'договор'], ['payment', 'платёж'], ['other', 'другое']]
 export function DocUpload({ lang, clientId, team }: { lang: Lang; clientId: string; team: boolean }) {
   const T = (s: string) => t(lang, s)
   const [st, act] = useFormState(uploadClientDoc, null)

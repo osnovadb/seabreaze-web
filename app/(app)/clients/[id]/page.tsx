@@ -10,9 +10,10 @@ import { StageStepper } from '@/components/StageStepper'
 import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { split, type SplitCond } from '@/lib/money'
+import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
 
-const DOC_KINDS: Record<string, string> = { passport: 'паспорт', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
-import { addActivity, saveQualification, addTask, toggleTask, setKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
+const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
+import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 
 export default async function ClientCard({ params }: { params: { id: string } }) {
   const c = await requireCtx()
@@ -33,6 +34,9 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const fixMain = fixes[0]
   const docs = await q<{ id: string; file_id: string; kind: string; note: string | null; internal: boolean; created_by: string; created_at: string; filename: string }>(`select d.id, d.file_id, d.kind, d.note, d.internal, d.created_by, d.created_at, f.filename from portal.client_documents d join portal.files f on f.id = d.file_id where d.client_id = $1 ${ext ? 'and not d.internal' : ''} order by d.created_at desc`, [cl.id])
   const tours = acts.filter((a) => a.text.startsWith('Заявка на тур')).slice(0, 5)
+  const docKinds = Array.from(new Set(docs.map((d) => d.kind)))
+  const kycMiss = kycMissing(docKinds, cl)
+  const kycLocked = cl.kyc_status === 'pending' || (cl.kyc_status === 'passed' && !canReviewKyc(c.user.role))
   // Ожидаемая комиссия: партнёру — его доля, команде — наш доход; по активным броням (снимок условий) и сделкам в работе
   const activeB = await q<{ snapshot: SplitCond; price_list: number; discount_pct: number; agent_role: string }>(`select b.snapshot, b.price_list::float, b.discount_pct::float, u.role agent_role from portal.bookings b join portal.users u on u.id = b.agent_id where b.client_id = $1 and b.status in ('requested','confirmed')`, [cl.id])
   const dealSum = await one<{ d: number }>(`select coalesce(sum(case when $2 then agent_amount else our_amount end), 0)::float d from portal.deals where client_id = $1 and stage not in ('cancelled','paid_out')`, [cl.id, ext])
@@ -45,7 +49,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
           <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((AGENT_STAGES[agentIdx] || ['', cl.stage])[1]) : stageName(L, cl.stage)}</Pill>
           <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>
           {fixMain && <Pill kind={fixMain.status === 'approved' ? 'ok' : fixMain.status === 'rejected' ? 'bad' : 'warn'}>{T('Фиксация у застройщика')}: {T(fixMain.status === 'approved' ? 'одобрена' : fixMain.status === 'rejected' ? 'отклонена' : 'ждём ответ')}</Pill>}
-          {!ext && <Pill kind={cl.kyc_status === 'passed' ? 'ok' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill>}
+          <Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill>
           <span className="small muted">{cl.reg_no}{!ext ? ` · ${T('владелец')}: ${cl.owner_name}` : ''}</span>
         </span>}
         right={<>
@@ -151,14 +155,35 @@ export default async function ClientCard({ params }: { params: { id: string } })
                 )
               })}
             </div>
-            {!ext && (
-              <form action={setKyc} className="card stack" style={{ gap: 8 }}>
-                <div className="h3" style={{ margin: 0 }}>KYC</div>
+            <div className="card stack" style={{ gap: 8 }}>
+              <div className="between"><div className="h3" style={{ margin: 0 }}>KYC</div><Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>{T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill></div>
+              {KYC_DOCS.map((k) => <div key={k} className="kv"><span>{T(KYC_DOC_NAMES[k])}</span><span className={docKinds.includes(k) ? 'okc' : 'muted'}>{docKinds.includes(k) ? '✓' : T('нет')}</span></div>)}
+              <form action={saveKycData} className="stack" style={{ gap: 6 }}>
                 <input type="hidden" name="client" value={cl.id} />
-                <div className="small muted">{T('В MVP — вручную: документы проверяет команда, отметка в карточке.')}</div>
-                <div className="row"><select className="in" name="kyc" defaultValue={cl.kyc_status} style={{ flex: 1 }}>{[['none', 'не начат'], ['pending', 'на проверке'], ['passed', 'пройден'], ['rejected', 'отказ']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select><button className="btn">{T('Сохранить')}</button></div>
+                <div className="row" style={{ gap: 6 }}>
+                  <label className="field" style={{ flex: 1 }}><span>{T('Гражданство')}</span><input className="in" name="citizenship" defaultValue={cl.kyc_citizenship || ''} disabled={kycLocked} /></label>
+                  <label className="field" style={{ flex: 1 }}><span>{T('Налоговое резидентство')}</span><input className="in" name="tax_residence" defaultValue={cl.kyc_tax_residence || ''} disabled={kycLocked} /></label>
+                </div>
+                <label className="field"><span>{T('Публичное должностное лицо (PEP)')}</span>
+                  <select className="in" name="pep" defaultValue={cl.kyc_pep == null ? '' : cl.kyc_pep ? 'yes' : 'no'} disabled={kycLocked}><option value="">—</option><option value="no">{T('нет')}</option><option value="yes">{T('да')}</option></select></label>
+                {!kycLocked && <div><button className="btn btn--sm">{T('Сохранить анкету')}</button></div>}
               </form>
-            )}
+              {cl.kyc_status === 'rejected' && cl.kyc_note && <div className="err small">{T('Причина отказа')}: {cl.kyc_note}</div>}
+              {['none', 'rejected'].includes(cl.kyc_status) && (kycMiss.length
+                ? <div className="tiny muted">{T('Для отправки на проверку не хватает')}: {kycMiss.map((m) => T(m)).join(', ')}</div>
+                : <form action={submitKyc}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--p btn--block">{T('Отправить на проверку KYC')}</button></form>)}
+              {cl.kyc_status === 'pending' && !canReviewKyc(c.user.role) && <div className="tiny muted">{T('Офис в Баку проверит документы и примет решение.')}</div>}
+              {canReviewKyc(c.user.role) && cl.kyc_status === 'pending' && (
+                <form action={reviewKyc} className="stack" style={{ gap: 6 }}>
+                  <input type="hidden" name="client" value={cl.id} />
+                  <input className="in" name="note" placeholder={T('Комментарий (для отказа — обязателен)')} />
+                  <div className="row" style={{ gap: 6 }}><button className="btn btn--p" name="decision" value="passed">{T('KYC пройден')}</button><button className="btn" name="decision" value="rejected">{T('Отклонить')}</button></div>
+                </form>
+              )}
+              {canReviewKyc(c.user.role) && cl.kyc_status === 'passed' && <form action={reviewKyc}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--sm" name="decision" value="none">{T('Сбросить KYC')}</button></form>}
+              {cl.kyc_checked_at && <div className="tiny muted">{T('Проверено {d}', { d: dateTime(L, cl.kyc_checked_at) })}</div>}
+              <div className="tiny muted">{T('Без пройденного KYC сделку нельзя перевести в «Договор подписан».')}</div>
+            </div>
             {owners.length > 0 && (
               <form action={transferClient} className="card stack" style={{ gap: 8 }}>
                 <div className="h3" style={{ margin: 0 }}>{T('Передать клиента')}</div>

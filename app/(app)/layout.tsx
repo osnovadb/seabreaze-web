@@ -10,16 +10,18 @@ import { impersonate, logout } from '@/lib/actions'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const c = await requireCtx()
   const u = c.user, T = (s: string) => t(c.lang, s)
-  const cnt = await one<{ notif: number; req: number; apps: number }>(`select
+  const cnt = await one<{ notif: number; req: number; apps: number; kyc: number }>(`select
     (select count(*)::int from portal.notifications where user_id = $1 and not read) notif,
     (select count(*)::int from portal.bookings where status = 'requested') req,
-    (select count(*)::int from portal.agent_applications where status = 'new' and ($2 = 'owner' or market = $3)) apps`, [u.id, u.role, u.market])
+    (select count(*)::int from portal.agent_applications where status = 'new' and ($2 = 'owner' or market = $3)) apps,
+    (select count(*)::int from portal.clients where kyc_status = 'pending') kyc`, [u.id, u.role, u.market])
   const ext = isExternal(u.role)
   const items: { href: string; label: string; cnt?: number }[] = [{ href: '/', label: T('Главная'), cnt: cnt!.notif }]
   items.push({ href: '/projects', label: T('Проекты') }, { href: '/catalog', label: T('Каталог') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/clients', label: ext ? T('Клиенты') : T('CRM · клиенты') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/bookings', label: T('Брони'), cnt: u.role === 'office' || u.role === 'owner' ? cnt!.req : 0 })
   if (u.role !== 'finance' && u.role !== 'content' && u.role !== 'office') items.push({ href: '/selections', label: T('Подборки') })
+  if (u.role === 'office' || u.role === 'owner') items.push({ href: '/kyc', label: 'KYC', cnt: cnt!.kyc })
   if (ext) items.push({ href: '/commission', label: T('Комиссия') })
   if (u.role === 'agency_head') items.push({ href: '/team', label: T('Сотрудники') })
   if (['owner', 'market_head', 'seller'].includes(u.role)) items.push({ href: '/reports', label: T('Отчёты') })

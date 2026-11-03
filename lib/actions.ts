@@ -12,6 +12,7 @@ import { planBase } from './plans'
 import { storeFile, isFile } from './files'
 import { LANGS, t, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
+import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -229,13 +230,44 @@ export async function toggleTask(id: string) {
   await q('update portal.tasks set done = not done where id = $1 and (user_id = $2 or $3)', [id, c.user.id, c.user.role === 'owner'])
   revalidatePath('/', 'layout')
 }
-export async function setKyc(f: FormData) {
+// KYC (v2): анкета и документы ведёт тот, кто ведёт клиента; отправка на проверку — когда всё собрано;
+// решение — офис в Баку или владелец. Пройденный KYC нужен для отметки «Договор подписан».
+export async function saveKycData(f: FormData) {
   const c = await writeCtx()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role) || !['none', 'pending', 'passed', 'rejected'].includes(s(f, 'kyc'))) return
-  await stageGuard(c, s(f, 'client'))
-  await q('update portal.clients set kyc_status = $2 where id = $1', [s(f, 'client'), s(f, 'kyc')])
-  await q(`insert into portal.activities (client_id, user_id, kind, text, internal, vars) values ($1,$2,'system','KYC: {k}',true,$3)`, [s(f, 'client'), c.user.id, { k: s(f, 'kyc') }])
-  revalidatePath(`/clients/${s(f, 'client')}`)
+  const cl = await stageGuard(c, s(f, 'client'))
+  const cur = await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [cl.id])
+  if (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role)) return
+  const pep = s(f, 'pep') === 'yes' ? true : s(f, 'pep') === 'no' ? false : null
+  await q('update portal.clients set kyc_citizenship = $2, kyc_tax_residence = $3, kyc_pep = $4 where id = $1', [cl.id, s(f, 'citizenship').slice(0, 60) || null, s(f, 'tax_residence').slice(0, 60) || null, pep])
+  revalidatePath(`/clients/${cl.id}`)
+}
+export async function submitKyc(f: FormData) {
+  const c = await writeCtx()
+  const cl = await stageGuard(c, s(f, 'client'))
+  const row = await one<KycFields & { kyc_status: string }>('select kyc_status, kyc_citizenship, kyc_tax_residence, kyc_pep from portal.clients where id = $1', [cl.id])
+  if (!row || !['none', 'rejected'].includes(row.kyc_status)) return
+  const kinds = (await q<{ kind: string }>('select distinct kind from portal.client_documents where client_id = $1', [cl.id])).map((r) => r.kind)
+  if (kycMissing(kinds, row).length) return
+  await q(`update portal.clients set kyc_status = 'pending', kyc_submitted_at = now(), kyc_note = null where id = $1`, [cl.id])
+  await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system','KYC отправлен на проверку')`, [cl.id, c.user.id])
+  for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'kyc', 'KYC {c} ждёт проверки', `/clients/${cl.id}`, { c: cl.name })
+  await audit(c.real.id, 'client.kyc_submit', 'client', cl.id, null, c.impersonating ? c.user.id : null)
+  revalidatePath(`/clients/${cl.id}`)
+}
+export async function reviewKyc(f: FormData) {
+  const c = await writeCtx()
+  const id = s(f, 'client'), decision = s(f, 'decision')
+  if (!canReviewKyc(c.user.role) || !['passed', 'rejected', 'none'].includes(decision)) return
+  const cl = await one<{ owner_id: string; name: string; kyc_status: string }>('select owner_id, name, kyc_status from portal.clients where id = $1', [id])
+  if (!cl) return
+  if (decision === 'rejected' && !s(f, 'note')) return
+  await q(`update portal.clients set kyc_status = $2, kyc_note = $3, kyc_checked_by = $4, kyc_checked_at = now() where id = $1`, [id, decision, s(f, 'note').slice(0, 500) || null, c.user.id])
+  const text = decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? 'KYC отклонён: {r}' : 'KYC сброшен — нужна повторная проверка'
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`, [id, c.user.id, text, { r: s(f, 'note') }])
+  if (cl.owner_id !== c.user.id) await notify(cl.owner_id, 'kyc', decision === 'passed' ? 'KYC {c} пройден' : decision === 'rejected' ? 'KYC {c} отклонён — посмотрите причину' : 'KYC {c} нужно пройти заново', `/clients/${id}`, { c: cl.name })
+  await audit(c.real.id, 'client.kyc_' + decision, 'client', id, { note: s(f, 'note') || null }, c.impersonating ? c.user.id : null)
+  revalidatePath(`/clients/${id}`)
+  revalidatePath('/kyc')
 }
 export async function fixation(f: FormData) {
   const c = await writeCtx()
@@ -330,6 +362,8 @@ export async function bookingAction(f: FormData) {
   } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
   } else if (act === 'contract' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && b.status === 'confirmed') {
+    // Договор — только после пройденного KYC (v2)
+    if ((await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [b.client_id]))?.kyc_status !== 'passed') return
     const sp = b.snapshot?.split || {}
     const seller = await one<{ curator_id: string | null; role: string }>('select curator_id, role from portal.users where id = $1', [b.agent_id])
     await tx(async (t) => {
@@ -697,7 +731,7 @@ export async function uploadClientDoc(_: unknown, f: FormData) {
   try { fileId = await storeFile(file, c.user.id) } catch (e: any) {
     return { error: t(c.lang, e?.message === 'size' ? 'Файл больше 25 МБ — дайте ссылку на облако' : 'Такой тип файла не поддерживается') }
   }
-  const kind = ['passport', 'kyc', 'booking', 'contract', 'payment', 'other'].includes(s(f, 'kind')) ? s(f, 'kind') : 'other'
+  const kind = ['passport', 'address', 'funds', 'kyc', 'booking', 'contract', 'payment', 'other'].includes(s(f, 'kind')) ? s(f, 'kind') : 'other'
   const internal = !isExternal(c.user.role) && !!f.get('internal')
   await q(`insert into portal.client_documents (client_id, file_id, kind, note, internal, created_by) values ($1,$2,$3,$4,$5,$6)`, [id, fileId, kind, s(f, 'note') || null, internal, c.user.id])
   await q(`insert into portal.activities (client_id, user_id, kind, text, internal, vars) values ($1,$2,'system','Загружен документ: {k}',$3,$4)`, [id, c.user.id, internal, { k: kind }])

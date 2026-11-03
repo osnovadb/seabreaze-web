@@ -8,14 +8,14 @@ import { bookingScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
 
-type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null }
+type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string }
 export default async function Bookings({ searchParams }: { searchParams: { f?: string; created?: string } }) {
   const c = await requireCtx()
   if (!(canBook(c.user.role) || c.user.role === 'finance')) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
   const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.price_list::float, b.discount_pct::float, coalesce(bl.external_id,'') || '-' || un.number unit, un.id unit_id, un.status unit_status,
-      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval
+      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, cl.kyc_status
     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id
     where ${bs.sql} order by case when b.status in ('requested','confirmed') then 0 else 1 end, b.ends_at`, bs.params)
   const active = rows.filter((r) => ['requested', 'confirmed'].includes(r.status))
@@ -61,7 +61,7 @@ export default async function Bookings({ searchParams }: { searchParams: { f?: s
                       {r.status === 'requested' && r.approval === 'pending' && canApproveDiscount(c.user.role) && <>{act('approve', 'Согласовать', true)}{act('decline', 'Отказать')}</>}
                       {r.status === 'requested' && r.approval !== 'pending' && canConfirmBooking(c.user.role) && act('confirm', 'Подтвердить', true)}
                       {live && !r.extended && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('extend', 'Продлить')}
-                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && act('contract', 'Договор подписан')}
+                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && (r.kyc_status === 'passed' ? act('contract', 'Договор подписан') : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}
                       {live && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('cancel', 'Снять')}
                     </div></td>
                   </tr>
