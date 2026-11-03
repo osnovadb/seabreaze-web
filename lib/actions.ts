@@ -16,6 +16,7 @@ import { stageBlock, LOST_REASONS } from './stages'
 import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
+import { readXlsx } from './xlsx'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -120,8 +121,9 @@ export async function registerClient(_: unknown, f: FormData) {
   const pid = await one<{ id: string }>(`select id from projects where slug = 'premium-residence'`)
   const cond = pid ? await conditionsFor(pid.id) : undefined
   const months = cond?.protect_months ?? 3
-  const n = await one<{ n: number }>(`select count(*)::int + 141 as n from portal.clients`)
-  const reg = `R-2026-0${n!.n + 1}`
+  // номер — из последовательности (v2): count(*) давал одинаковые номера при одновременной регистрации
+  const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
+  const reg = `R-${new Date().getFullYear()}-0${n!.n}`
   const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage, protected_until)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead', current_date + ($18 || ' months')::interval) returning id, protected_until::text`,
     [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), s(f, 'language'), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])
@@ -432,12 +434,13 @@ export async function applyAgent(_: unknown, f: FormData) {
   if (docs.length > 3) return { error: 'Не больше 3 файлов' }
   if (docs.some((d) => !DOC.exts.includes((d.name.split('.').pop() || '').toLowerCase()))) return { error: 'Документы — PDF или фото (JPG, PNG, HEIC)' }
   if (docs.some((d) => d.size > DOC.max)) return { error: 'Файл больше 10 МБ' }
-  const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
-    [s(f, 'kind') === 'agency' ? 'agency' : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market])
+  const token = crypto.randomBytes(12).toString('hex')
+  const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market, status_token) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
+    [s(f, 'kind') === 'agency' ? 'agency' : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market, token])
   for (const d of docs) await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [app!.id, await storeFile(d, null, DOC)])
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
   for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
-  return { ok: true }
+  return { ok: true, token }
 }
 // Документ к заявке, полученный позже (по почте, у куратора) — добавляет проверяющий
 export async function addApplicationFile(_: unknown, f: FormData) {
@@ -785,4 +788,39 @@ export async function dealStage(f: FormData) {
   await syncAct(s(f, 'id')) // М4: акт вознаграждения следует за стадией сделки
   await audit(c.real.id, 'deal.' + st, 'deal', s(f, 'id'))
   revalidatePath('/finance')
+}
+
+/* ── Импорт клиентов из xlsx (v2 · М13): первая строка — заголовки; согласие клиента подтверждает тот, кто загружает ── */
+const IMPORT_COLS: Record<string, string[]> = {
+  name: ['имя', 'name', 'клиент'], phone: ['телефон', 'phone'], email: ['e-mail', 'email', 'почта'], country: ['страна', 'country'], language: ['язык', 'language', 'lang'],
+  source: ['источник', 'source'], goal: ['цель', 'goal'], budget: ['бюджет', 'budget'], consent: ['согласие', 'consent'],
+}
+export async function importClients(_: unknown, f: FormData) {
+  const c = await writeCtx()
+  if (!canRegisterClient(c.user.role)) return { error: 'Нет прав на регистрацию клиента' }
+  const file = f.get('file')
+  if (!isFile(file) || !file.name.toLowerCase().endsWith('.xlsx')) return { error: t(c.lang, 'Нужен файл .xlsx') }
+  let rows: string[][]
+  try { rows = readXlsx(Buffer.from(await file.arrayBuffer())) } catch { return { error: t(c.lang, 'Не получилось прочитать файл') } }
+  if (rows.length < 2) return { error: t(c.lang, 'В файле нет строк с клиентами') }
+  if (rows.length > 501) return { error: t(c.lang, 'Не больше 500 клиентов за раз') }
+  const head = rows[0].map((h) => h.toLowerCase().trim())
+  const col = Object.fromEntries(Object.entries(IMPORT_COLS).map(([k, names]) => [k, head.findIndex((h) => names.includes(h))]))
+  if (col.name < 0 || (col.phone < 0 && col.email < 0)) return { error: t(c.lang, 'Нужны колонки «Имя» и «Телефон» или «E-mail»') }
+  let made = 0
+  const skipped: string[] = []
+  for (const [i, r] of rows.slice(1).entries()) {
+    const get = (k: string) => (col[k] >= 0 ? r[col[k]] || '' : '')
+    if (!get('name') && !get('phone') && !get('email')) continue
+    if (!['да', 'yes', 'ja', '1', 'true', 'x', '+'].includes(get('consent').toLowerCase())) { skipped.push(t(c.lang, 'строка {n}: нет согласия', { n: i + 2 })); continue }
+    const fd = new FormData()
+    for (const k of ['name', 'phone', 'email', 'country', 'language', 'source', 'goal', 'budget']) fd.set(k, get(k))
+    fd.set('consent', 'on')
+    const res: any = await registerClient(null, fd)
+    if (res?.ok) made++
+    else skipped.push(t(c.lang, 'строка {n}: {e}', { n: i + 2, e: res?.duplicate ? t(c.lang, 'уже есть в базе') : t(c.lang, res?.error || 'ошибка') }))
+  }
+  await audit(c.real.id, 'client.import', 'client', '', { made, skipped: skipped.length }, c.impersonating ? c.user.id : null)
+  revalidatePath('/clients')
+  return { ok: true, made, skipped }
 }

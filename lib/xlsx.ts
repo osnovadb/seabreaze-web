@@ -22,3 +22,26 @@ export function makeXlsx(sheets: { name: string; rows: Cell[][] }[]): Buffer {
   sheets.forEach((s, i) => z.file(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows)))
   return z.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) as Buffer
 }
+
+// Чтение первого листа xlsx (М13, импорт клиентов): строки как массивы строк; общие строки и inline-строки, числа как есть
+export function readXlsx(buf: Buffer): string[][] {
+  const z = new PizZip(buf)
+  const shared = (z.file('xl/sharedStrings.xml')?.asText() || '').match(/<si>[\s\S]*?<\/si>/g)?.map((si) => (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map((t) => t.replace(/<[^>]+>/g, '')).join('')) || []
+  const sheetPath = Object.keys(z.files).filter((f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort()[0]
+  if (!sheetPath) return []
+  const un = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  const rows: string[][] = []
+  for (const r of z.file(sheetPath)!.asText().match(/<row[^>]*>[\s\S]*?<\/row>/g) || []) {
+    const out: string[] = []
+    for (const c of r.match(/<c [^>]*?(?:\/>|>[\s\S]*?<\/c>)/g) || []) {
+      const ref = c.match(/r="([A-Z]+)\d+"/)?.[1] || ''
+      const ci = ref.split('').reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1
+      const type = c.match(/ t="(\w+)"/)?.[1]
+      const v = c.match(/<v>([\s\S]*?)<\/v>/)?.[1]
+      const val = type === 's' ? shared[Number(v)] ?? '' : type === 'inlineStr' ? (c.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] || '') : v ?? ''
+      out[ci >= 0 ? ci : out.length] = un(val).trim()
+    }
+    rows.push(Array.from(out, (x) => x ?? ''))
+  }
+  return rows
+}
