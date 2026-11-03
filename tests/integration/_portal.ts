@@ -8,7 +8,7 @@ const env = fs.existsSync('.env.local') ? Object.fromEntries(fs.readFileSync('.e
 export const DB = process.env.DATABASE_URL || env.DATABASE_URL || ''
 // Только seabreeze_v2: интеграционные тесты пишут в базу
 export const SKIP = !URL0 || !/seabreeze_v2/.test(DB) ? 'нужны PORTAL_URL и DATABASE_URL на seabreeze_v2' : false
-export const U = { office: 'leyla.baku@demo.getsestate', owner: 'denis@demo.getsestate', head: 'anna.becker@demo.getsestate', seller: 'martin.schulz@demo.getsestate', agent: 'sophie.lang@demo.getsestate', agentIl: 'david.levi@demo.getsestate' }
+export const U = { office: 'leyla.baku@demo.getsestate', owner: 'denis@demo.getsestate', head: 'anna.becker@demo.getsestate', seller: 'martin.schulz@demo.getsestate', agent: 'sophie.lang@demo.getsestate', agentIl: 'david.levi@demo.getsestate', finance: 'irina.finance@demo.getsestate' }
 
 export async function dbConnect() { const c = new pg.Client({ connectionString: DB }); await c.connect(); return c }
 export async function login(email: string) {
