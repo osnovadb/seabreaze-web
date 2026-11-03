@@ -37,7 +37,9 @@ export function readXlsx(buf: Buffer): string[][] {
   if (!sheetPath) return []
   const un = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
   const rows: string[][] = []
+  // индекс в массиве = номер строки Excel − 1 (пустые строки Excel в XML не пишет — заполняем пропуски)
   for (const r of z.file(sheetPath)!.asText().match(/<row[^>]*>[\s\S]*?<\/row>/g) || []) {
+    const rn = Number(r.match(/^<row[^>]* r="(\d+)"/)?.[1]) || rows.length + 1
     const out: string[] = []
     for (const c of r.match(/<c [^>]*?(?:\/>|>[\s\S]*?<\/c>)/g) || []) {
       const ref = c.match(/r="([A-Z]+)\d+"/)?.[1] || ''
@@ -47,7 +49,8 @@ export function readXlsx(buf: Buffer): string[][] {
       const val = type === 's' ? shared[Number(v)] ?? '' : type === 'inlineStr' ? (c.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] || '') : v ?? ''
       out[ci >= 0 ? ci : out.length] = un(val).trim()
     }
-    rows.push(Array.from(out, (x) => x ?? ''))
+    while (rows.length < rn - 1) rows.push([])
+    rows[rn - 1] = Array.from(out, (x) => x ?? '')
   }
   return rows
 }

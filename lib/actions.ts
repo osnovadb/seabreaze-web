@@ -810,14 +810,22 @@ export async function importClients(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canRegisterClient(c.user.role)) return { error: 'Нет прав на регистрацию клиента' }
   // импорт — заодно массовая проверка «есть ли такой клиент»: не чаще раза в 10 минут
-  if (await one(`select 1 from portal.audit where user_id = $1 and action = 'client.import' and created_at > now() - interval '10 minutes'`, [c.real.id])) return { error: t(c.lang, 'Импорт — не чаще раза в 10 минут') }
   const file = f.get('file')
   if (!isFile(file) || !file.name.toLowerCase().endsWith('.xlsx')) return { error: t(c.lang, 'Нужен файл .xlsx') }
   let rows: string[][]
   try { rows = readXlsx(Buffer.from(await file.arrayBuffer())) } catch { return { error: t(c.lang, 'Не получилось прочитать файл') } }
-  rows = rows.filter((r, i) => i === 0 || r.some((x) => x)) // пустые строки после форматирования Excel не считаются
-  if (rows.length < 2) return { error: t(c.lang, 'В файле нет строк с клиентами') }
-  if (rows.length > 501) return { error: t(c.lang, 'Не больше 500 клиентов за раз') }
+  // пустые строки после форматирования Excel не считаются; номер строки в сообщениях — как в Excel (индекс + 2)
+  const filled = rows.slice(1).filter((r) => r.some((x) => x)).length
+  if (filled < 1) return { error: t(c.lang, 'В файле нет строк с клиентами') }
+  if (filled > 500) return { error: t(c.lang, 'Не больше 500 клиентов за раз') }
+  // лимит частоты: проверка и отметка о начале — под блокировкой пользователя (две вкладки сразу не пройдут обе)
+  const busy = await tx(async (tq) => {
+    await tq.query('select pg_advisory_xact_lock(hashtext($1))', ['import:' + c.real.id])
+    if ((await tq.query(`select 1 from portal.audit where user_id = $1 and action = 'client.import' and created_at > now() - interval '10 minutes'`, [c.real.id])).rowCount) return true
+    await tq.query(`insert into portal.audit (user_id, action, entity, data) values ($1, 'client.import', 'client', $2)`, [c.real.id, JSON.stringify({ rows: filled })])
+    return false
+  })
+  if (busy) return { error: t(c.lang, 'Импорт — не чаще раза в 10 минут') }
   const head = rows[0].map((h) => h.toLowerCase().trim())
   const col = Object.fromEntries(Object.entries(IMPORT_COLS).map(([k, names]) => [k, head.findIndex((h) => names.includes(h))]))
   if (col.name < 0 || (col.phone < 0 && col.email < 0)) return { error: t(c.lang, 'Нужны колонки «Имя» и «Телефон» или «E-mail»') }
@@ -834,7 +842,7 @@ export async function importClients(_: unknown, f: FormData) {
     if (res?.ok) made++
     else skipped.push(t(c.lang, 'строка {n}: {e}', { n: i + 2, e: res?.duplicate ? t(c.lang, 'уже есть в базе') : t(c.lang, res?.error || 'ошибка') }))
   }
-  await audit(c.real.id, 'client.import', 'client', '', { made, skipped: skipped.length }, c.impersonating ? c.user.id : null)
+  await audit(c.real.id, 'client.import_result', 'client', '', { made, skipped: skipped.length }, c.impersonating ? c.user.id : null)
   // много совпадений с чужими клиентами — сигнал руководителю рынка
   const dups = skipped.filter((x) => x.includes(t(c.lang, 'уже есть в базе'))).length
   if (dups >= 20) for (const h of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [c.user.market])) await notify(h.id, 'client', 'Импорт клиентов у {u}: совпадений с базой {n}', '/admin/journal', { u: c.user.name, n: dups })
