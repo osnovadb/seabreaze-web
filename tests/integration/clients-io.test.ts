@@ -21,7 +21,9 @@ function xlsx(name: string, rows: unknown[][], opts: Record<string, string> = {}
   return p
 }
 // импорт как из браузера: поля формы ImportExport + файл; ответ серверного действия — RSC-поток, результат смотрим в базе и в тексте
-async function upload(cookie: string, file: string) {
+const unlimit = () => db.query(`delete from portal.audit where action='client.import' and created_at > now() - interval '15 minutes' and user_id = (select id from portal.users where email=$1)`, [U.agent])
+async function upload(cookie: string, file: string, keepLimit = false) {
+  if (!keepLimit) await unlimit()
   const html = (await page(cookie, '/clients')).html
   const f = forms(html).find((x) => x.html.includes('name="file"'))
   assert.ok(f, 'на /clients нет формы импорта')
@@ -32,13 +34,16 @@ async function upload(cookie: string, file: string) {
   return await r.text()
 }
 const mine = async () => (await db.query(`select name, phone, owner_id, language from portal.clients where name like $1 order by name`, [`QA Импорт ${run}%`])).rows
+const LIMIT = /Höchstens 500|Не больше 500|500 clients/
 const H = ['Имя', 'Телефон', 'E-mail', 'Страна', 'Язык', 'Источник', 'Согласие']
 
 before(async () => { if (!SKIP) db = await dbConnect() })
 after(async () => {
   fs.rmSync(tmp, { recursive: true, force: true })
   if (SKIP) return
+  await db.query(`delete from portal.notifications where text like 'Импорт клиентов у {u}%' and created_at > now() - interval '15 minutes'`)
   await db.query(`delete from portal.clients where name like $1 or phone_norm like $2`, [`QA Импорт ${run}%`, `%152${run}%`])
+  await unlimit()
   if (appId) await db.query(`delete from portal.agent_applications where id=$1`, [appId])
   await db.end()
 })
@@ -63,7 +68,7 @@ test('импорт: дубль внутри файла и чужой клиен�
 test('импорт: 501 строка → ошибка; нет колонки «Имя» → ошибка; не .xlsx → ошибка; ничего не создано', { skip: SKIP }, async () => {
   const c = await login(U.agent)
   const big = xlsx('big.xlsx', [H, ...Array.from({ length: 501 }, (_, i) => [`QA Импорт ${run} big${i}`, `+49 152 ${run}${String(i).padStart(3, '0')}`, '', '', '', '', 'да'])])
-  assert.ok((await upload(c, big)).includes('500'), '501 строка — нет ошибки «не больше 500»')
+  assert.match(await upload(c, big), LIMIT, '501 строка — нет ошибки «не больше 500»')
   const noname = xlsx('noname.xlsx', [['Телефон', 'Согласие'], [ph(20), 'да']])
   assert.ok(/Имя|Name|Name»/.test(await upload(c, noname)), 'нет колонки «Имя» — нет ошибки')
   const csv = path.join(tmp, 'c.csv'); fs.writeFileSync(csv, 'Имя,Телефон\nx,1')
@@ -78,7 +83,7 @@ test('импорт: язык клиента — код из списка, а н�
   await upload(await login(U.agent), f)
   const l = (await mine()).find((x) => x.name.endsWith(' L'))
   assert.ok(l, 'строка не импортирована')
-  assert.ok(['ru', 'en', 'de', 'he', null].includes(l!.language), `язык сохранён как «${l!.language}»`)
+  assert.equal(l!.language, 'de', `язык сохранён как «${l!.language}»`)
 })
 
 test('выгрузка: агент — только свои клиенты; office, finance, content — 403', { skip: SKIP }, async () => {
@@ -120,4 +125,36 @@ test('/clients: форма импорта не вложена в другую ф
   let depth = 0, max = 0
   for (const m of html.matchAll(/<(\/?)form\b/g)) { depth += m[1] ? -1 : 1; max = Math.max(max, depth) }
   assert.equal(max, 1, 'на /clients <form> внутри <form>')
+})
+
+test('импорт: заголовки DE и HE, согласие «כן», пустые строки не считаются в лимит 500', { skip: SKIP }, async () => {
+  const c = await login(U.agent)
+  await upload(c, xlsx('de.xlsx', [['Name', 'Telefon', 'Sprache', 'Einwilligung'], [`QA Импорт ${run} DE`, ph(50), 'Deutsch', 'ja']]))
+  await upload(c, xlsx('he.xlsx', [['שם', 'טלפון', 'שפה', 'הסכמה'], [`QA Импорт ${run} HE`, ph(51), 'עברית', 'כן']]))
+  const got = await mine()
+  assert.equal(got.find((x) => x.name.endsWith(' DE'))?.language, 'de')
+  assert.equal(got.find((x) => x.name.endsWith(' HE'))?.language, 'he')
+  // 500 клиентов + пустые строки между ними — не «больше 500»
+  const rows: unknown[][] = [H]
+  for (let i = 0; i < 500; i++) { rows.push([`QA Импорт ${run} p${i}`, `+49 152 ${run}${String(i).padStart(3, '0')}9`, '', '', '', '', 'нет']); if (i % 100 === 0) rows.push(['', '', '', '', '', '', '']) }
+  assert.doesNotMatch(await upload(c, xlsx('blank.xlsx', rows)), LIMIT, '500 строк с пустыми между ними — ошибка лимита')
+})
+
+test('импорт: номер строки в пропусках — как в Excel, даже если выше есть пустые строки', { skip: SKIP }, async () => {
+  const t = await upload(await login(U.agent), xlsx('gap.xlsx', [H, ['', '', '', '', '', '', ''], [`QA Импорт ${run} G`, ph(60), '', '', '', '', '']]))
+  const n = t.match(/(?:строка|Zeile|row|שורה) (\d+):/)?.[1]
+  assert.equal(n, '3', `клиент без согласия в строке 3 Excel, а в ответе «строка ${n}» (readXlsx не учитывает r="3" у <row>, пустые строки сдвигают нумерацию)`)
+})
+
+test('импорт: не чаще раза в 10 минут; при 20+ совпадениях — уведомление руководителю рынка', { skip: SKIP }, async () => {
+  const c = await login(U.agent)
+  const dirk = (await db.query(`select phone from portal.clients where id='1a047999-ee3f-4693-bb34-af813e95c076'`)).rows[0].phone
+  const head = (await db.query(`select id from portal.users where email=$1`, [U.head])).rows[0].id
+  const n0 = (await db.query(`select count(*)::int n from portal.notifications where user_id=$1 and text like 'Импорт клиентов у {u}%'`, [head])).rows[0].n
+  await upload(c, xlsx('many.xlsx', [H, ...Array.from({ length: 21 }, (_, i) => [`QA Импорт ${run} d${i}`, dirk, '', '', '', '', 'да'])]))
+  const n1 = (await db.query(`select count(*)::int n from portal.notifications where user_id=$1 and text like 'Импорт клиентов у {u}%'`, [head])).rows[0].n
+  assert.equal(n1, n0 + 1, 'руководитель рынка DE не уведомлён о 21 совпадении')
+  const again = await upload(c, xlsx('again.xlsx', [H, [`QA Импорт ${run} R`, ph(70), '', '', '', '', 'да']]), true)
+  assert.ok(/10 min|10 Min|10 минут|10 דקות/.test(again), 'второй импорт сразу — без ошибки лимита')
+  assert.ok(!(await mine()).some((x) => x.name.endsWith(' R')))
 })
