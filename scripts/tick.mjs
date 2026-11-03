@@ -115,7 +115,7 @@ let searchN = 0
 for (const s of searches) {
   const f = s.filters
   const ids = (await q(`select u.id from units u where u.project_id = $1 and ${FREE}
-      and ($2::int is null or coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) = $2) -- комнаты как в каталоге (lib/catalog.ts roomsSql) and ($3::numeric is null or ${'(case when u.price_currency = \'AZN\' then u.price_list / (select azn_per_unit from currency_rates where currency = \'USD\' order by valid_from desc limit 1) else u.price_list end)'} <= $3 * 1000)
+      and ($2::int is null or coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) = $2) /* комнаты как в каталоге (lib/catalog.ts roomsSql) */ and ($3::numeric is null or ${'(case when u.price_currency = \'AZN\' then u.price_list / (select azn_per_unit from currency_rates where currency = \'USD\' order by valid_from desc limit 1) else u.price_list end)'} <= $3 * 1000)
       and ($4::text is null or ($4 = 'g' and u.plot_area_m2 > 0) or ($4 = 't' and u.area_external_m2 > 0))
       and ($5 not in ('agent','agency_head') or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`,
     [f.project, f.rooms ?? null, f.max ?? null, f.outdoor ?? null, s.role])).map((r) => r.id)
