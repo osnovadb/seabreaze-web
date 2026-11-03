@@ -17,6 +17,8 @@ export async function joinWaitlist(f: FormData) {
   const c = await writeCtx()
   const u = await one<{ id: string; project_id: string; status: string }>('select id, project_id, status from units where id = $1', [s(f, 'unit')])
   if (!u || u.status === 'sold') return
+  // свободная квартира — бронировать, а не ждать
+  if (u.status === 'available' && !(await one(`select 1 from portal.bookings where unit_id = $1 and status in ('requested','confirmed') union all select 1 from portal.deals where unit_id = $1 and stage <> 'cancelled' limit 1`, [u.id]))) return
   if (isExternal(c.user.role) && !(await projectVisible(u.project_id, c.user))) return
   let clientId: string | null = s(f, 'client') || null
   if (clientId) {

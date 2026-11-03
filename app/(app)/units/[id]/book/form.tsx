@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useFormState, useFormStatus } from 'react-dom'
 import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
-import { priceChain, isFull, termUnknown, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
+import { priceChain, isFull, termUnknown, hasSchedule, planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import { ScheduleTable, type FxView } from '@/components/Calculator'
 import { t, usd, pct, type Lang } from '@/lib/i18n'
 
@@ -34,11 +34,12 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         {plans.length > 0 && (
           <div className="mt0" style={{ marginBottom: 16 }}>
             <div className="h3">{T('План оплаты')}</div>
-            <div className="chips mt8">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => setPlanId(p.id)}>{p.name}</button>)}</div>
+            <div className="chips mt8">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => setPlanId(p.id)}>{planLabel(T, p.name)}</button>)}</div>
             <input type="hidden" name="plan" value={planId} />
             {plan && <div className="small muted mt8">{isFull(plan) ? (Number(plan.full_payment_discount_pct) ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, list) }) : T('Полная оплата'))
               : termUnknown(plan) ? T('Первый взнос {p}; срок и платежи — по графику застройщика', { p: pct(lang, Number(plan.down_payment_pct)) })
-                : T('Первый взнос {p}, затем {m} ежемесячных платежей', { p: pct(lang, Number(plan.down_payment_pct)), m: plan.months || 0 })}</div>}
+                : hasSchedule(plan) ? T('Первый взнос {p}, затем этапы по графику застройщика: {n}', { p: pct(lang, Number(plan.down_payment_pct)), n: plan.schedule!.filter((m) => Number(m.pct) > 0).length })
+                : T('Первый взнос {p}, затем ежемесячные платежи: {m}', { p: pct(lang, Number(plan.down_payment_pct)), m: plan.months || 0 })}</div>}
           </div>
         )}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
@@ -54,7 +55,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
             : showOurs ? <div className="card card--tight" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)' }}><div className="small okc">{T('Наш доход по сделке')}</div><div className="big num okc">{usd(lang, sp.ours)}</div><div className="tiny okc">{T('фикс {f} + пул {p} · продавцу {s}', { f: usd(lang, sp.ourFix), p: usd(lang, sp.ourPool), s: usd(lang, sp.seller) })}</div></div>
               : <div className="card card--tight"><div className="small muted">{T('Скидка')}</div><div className="big num">{pct(lang, disc)}</div></div>}
         </div>
-        {plan && <><div className="label mt16">{T('График платежей')}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
+        {plan && <><div className="label mt16">{T('График платежей')}{disc > 0 ? ' · ' + T('с учётом скидки {p}', { p: pct(lang, disc) }) : ''}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
         <div className="mt16">
           <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, priceList)}</span></div>
           {ch.planAmt > 0 && <div className="kv"><span>{T('Скидка за 100%')}</span><span>−{usd(lang, ch.planAmt)}</span></div>}

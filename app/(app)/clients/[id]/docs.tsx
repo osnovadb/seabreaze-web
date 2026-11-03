@@ -35,7 +35,7 @@ export function DocStatus({ lang, id, status }: { lang: Lang; id: string; status
   const [st, act] = useFormState(docStatus, null)
   if (status === 'signed' || status === 'void') return null
   return (
-    <form action={act} className="row" style={{ gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }} encType="multipart/form-data">
+    <form action={act} className="row" style={{ gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       <input type="hidden" name="id" value={id} />
       {status === 'draft' && <button className="btn btn--sm" name="to" value="sent">{T('Отправлен')}</button>}
       {status === 'sent' && <><input className="in" type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.heic" style={{ maxWidth: 170, paddingTop: 4, height: 30 }} /><button className="btn btn--sm" name="to" value="signed">{T('Подписан')}</button></>}

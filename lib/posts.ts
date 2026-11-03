@@ -27,6 +27,8 @@ export async function feed(u: User, opts: { limit?: number; all?: boolean } = {}
     where ${where.join(' and ')} order by p.kind = 'banner' desc, p.starts_on desc, p.created_at desc limit ${Number(opts.limit) || 50}`, params)
 }
 // Авто-запись: один раз на ключ (повторное событие не дублирует)
-export async function autoPost(key: string, title: string, vars: Record<string, string | number>, projectId: string | null, link: string | null, markets: string[] = []) {
-  await q(`insert into portal.posts (kind, title, vars, project_id, link, markets, auto_key) values ('auto', $1, $2, $3, $4, $5, $6) on conflict (auto_key) do nothing`, [title, vars, projectId, link, markets, key])
+export async function autoPost(key: string, title: string, vars: Record<string, string | number>, projectId: string | null, link: string | null, markets: string[] = [], period?: { starts_on?: string | null; ends_on?: string | null }) {
+  await q(`insert into portal.posts (kind, title, vars, project_id, link, markets, auto_key, starts_on, ends_on) values ('auto', $1, $2, $3, $4, $5, $6, coalesce($7::date, current_date), $8)
+    on conflict (auto_key) do update set vars = excluded.vars, starts_on = excluded.starts_on, ends_on = excluded.ends_on`, [title, vars, projectId, link, markets, key, period?.starts_on || null, period?.ends_on || null])
 }
+export const dropAutoPost = (key: string) => q('delete from portal.posts where auto_key = $1', [key])

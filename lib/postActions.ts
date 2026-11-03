@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { q, one, audit } from './db'
 import { requireCtx } from './auth'
-import { t, LANGS } from './i18n'
+import { t, LANGS, bakuToday } from './i18n'
 import { canWritePosts, feed } from './posts'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
@@ -20,8 +20,10 @@ export async function savePost(_: unknown, f: FormData) {
   const lang = LANGS.includes(s(f, 'lang') as any) ? s(f, 'lang') : c.lang
   let markets = ['DE', 'IL', 'GLOBAL'].filter((m) => f.get('m_' + m))
   if (c.user.role === 'market_head') markets = [c.user.market || 'DE']
-  const link = /^(https?:\/\/|\/)/.test(s(f, 'link')) ? s(f, 'link') : null
-  const vals = [s(f, 'kind') === 'banner' ? 'banner' : 'news', s(f, 'title').slice(0, 160), s(f, 'body').slice(0, 4000) || null, lang, markets, s(f, 'project') || null, link, s(f, 'starts_on') || new Date().toISOString().slice(0, 10), s(f, 'ends_on') || null]
+  // внутренняя ссылка — «/путь» (не «//хост»), внешняя — только http(s)
+  const link = /^(https?:\/\/[^\s]+|\/(?!\/)[^\s]*)$/.test(s(f, 'link')) ? s(f, 'link') : null
+  if (s(f, 'starts_on') && s(f, 'ends_on') && s(f, 'ends_on') < s(f, 'starts_on')) return { error: t(c.lang, 'Дата окончания раньше начала') }
+  const vals = [s(f, 'kind') === 'banner' ? 'banner' : 'news', s(f, 'title').slice(0, 160), s(f, 'body').slice(0, 4000) || null, lang, markets, s(f, 'project') || null, link, s(f, 'starts_on') || bakuToday(), s(f, 'ends_on') || null]
   if (id) await q(`update portal.posts set kind = $2, title = $3, body = $4, lang = $5, markets = $6, project_id = $7, link = $8, starts_on = $9, ends_on = $10 where id = $1 and kind <> 'auto'`, [id, ...vals])
   else await q(`insert into portal.posts (kind, title, body, lang, markets, project_id, link, starts_on, ends_on, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [...vals, c.user.id])
   await audit(c.real.id, id ? 'post.update' : 'post.create', 'post', id || '', { title: s(f, 'title') })

@@ -2,7 +2,7 @@ import { Pool, PoolClient } from 'pg'
 
 // Один пул на процесс (в dev переживает горячую перезагрузку)
 const g = globalThis as unknown as { __pool?: Pool }
-export const pool = g.__pool ?? new Pool({ connectionString: process.env.DATABASE_URL, max: 8 })
+export const pool = g.__pool ?? new Pool({ connectionString: process.env.DATABASE_URL, max: 8, options: '-c timezone=Asia/Baku' }) // «сегодня» в SQL — по Баку
 if (process.env.NODE_ENV !== 'production') g.__pool = pool
 
 export async function q<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {

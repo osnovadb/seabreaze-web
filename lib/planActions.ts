@@ -18,15 +18,22 @@ export async function savePlans(_: unknown, f: FormData) {
     const key = m[1] + ':' + m[2]
     rows.set(key, { ...(rows.get(key) || {}), [m[3]]: val === '' ? null : Number(val) })
   }
+  // сначала проверяем всё, потом пишем — без частичного сохранения
+  for (const vals of rows.values()) {
+    if (Object.values(vals).some((x) => x != null && (!Number.isFinite(x) || x < 0))) return { error: 'Числа в плане — неотрицательные' }
+    if (vals.units != null && !Number.isInteger(vals.units)) return { error: 'Штуки — целым числом' }
+  }
   let n = 0
   for (const [key, vals] of rows) {
     const [scope, id] = key.split(':') as [Scope, string]
     const market = scope === 'market' ? id : (await one<{ market: string | null }>(`select market from portal.${scope === 'user' ? 'users' : 'agencies'} where id = $1`, [id]))?.market ?? null
     if (!canEditPlan(c.user, scope, market)) continue
-    if (Object.values(vals).some((x) => x != null && (!Number.isFinite(x) || x < 0))) return { error: 'Числа в плане — неотрицательные' }
     if (Object.values(vals).every((x) => x == null)) { await q('delete from portal.sales_plans where period_kind = $1 and period_start = $2 and scope = $3 and scope_id = $4', [kind, p.start, scope, id]); continue }
+    // поле, которого нет в запросе, остаётся как было (форма шлёт все четыре; прямой запрос — какие есть)
+    const has = (k: string) => (k in vals ? 'true' : 'false')
     await q(`insert into portal.sales_plans (period_kind, period_start, scope, scope_id, units, area, revenue, commission, updated_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      on conflict (period_kind, period_start, scope, scope_id) do update set units = $5, area = $6, revenue = $7, commission = $8, updated_by = $9, updated_at = now()`,
+      on conflict (period_kind, period_start, scope, scope_id) do update set units = case when ${has('units')} then $5 else sales_plans.units end, area = case when ${has('area')} then $6 else sales_plans.area end,
+        revenue = case when ${has('revenue')} then $7 else sales_plans.revenue end, commission = case when ${has('commission')} then $8 else sales_plans.commission end, updated_by = $9, updated_at = now()`,
       [kind, p.start, scope, id, vals.units ?? null, vals.area ?? null, vals.revenue ?? null, vals.commission ?? null, c.user.id])
     n++
   }

@@ -11,8 +11,9 @@ export async function syncAct(dealId: string) {
   if (d.stage === 'cancelled') {
     if (act.status === 'paid') {
       // уже выплачено — возврат: удержим из следующих актов партнёра (решение ТЗ 2.0, вопрос 8)
-      await q(`update portal.commission_acts set status = 'clawback', clawback_left = amount - deducted where id = $1`, [act.id])
-      await notify(d.agent_id, 'payout', 'Сделка расторгнута — выплаченная комиссия {a} будет удержана из следующих выплат', '/commission', { a: '$' + Math.round(act.amount - act.deducted).toLocaleString('en') })
+      // возвращается вся сумма акта: зачтённая в долг часть тоже была получена партнёром
+      await q(`update portal.commission_acts set status = 'clawback', clawback_left = amount where id = $1`, [act.id])
+      await notify(d.agent_id, 'payout', 'Сделка расторгнута — выплаченная комиссия {a} будет удержана из следующих выплат', '/commission', { a: '$' + Math.round(act.amount).toLocaleString('en') })
     } else if (act.status !== 'clawback') await q(`update portal.commission_acts set status = 'void' where id = $1`, [act.id])
     return
   }

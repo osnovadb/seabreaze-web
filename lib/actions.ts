@@ -11,7 +11,7 @@ import { conditionsFor, split, unitById, projectVisible, plansFor } from './cata
 import { priceChain } from './plans'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
-import { LANGS, t, type Lang } from './i18n'
+import { LANGS, t, bakuYear, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
 import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
@@ -123,7 +123,7 @@ export async function registerClient(_: unknown, f: FormData) {
   const months = cond?.protect_months ?? 3
   // номер — из последовательности (v2): count(*) давал одинаковые номера при одновременной регистрации
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
-  const reg = `R-${new Date().getFullYear()}-0${n!.n}`
+  const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage, protected_until)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead', current_date + ($18 || ' months')::interval) returning id, protected_until::text`,
     [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), s(f, 'language'), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])
@@ -241,7 +241,8 @@ export async function saveKycData(f: FormData) {
   const c = await writeCtx()
   const cl = await stageGuard(c, s(f, 'client'))
   const cur = await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [cl.id])
-  if (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role)) return
+  // на проверке анкету не меняет никто; пройденную — только проверяющий
+  if (cur?.kyc_status === 'pending' || (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role))) return
   const pep = s(f, 'pep') === 'yes' ? true : s(f, 'pep') === 'no' ? false : null
   await q('update portal.clients set kyc_citizenship = $2, kyc_tax_residence = $3, kyc_pep = $4 where id = $1', [cl.id, s(f, 'citizenship').slice(0, 60) || null, s(f, 'tax_residence').slice(0, 60) || null, pep])
   revalidatePath(`/clients/${cl.id}`)
@@ -266,6 +267,10 @@ export async function reviewKyc(f: FormData) {
   const cl = await one<{ owner_id: string; name: string; kyc_status: string }>('select owner_id, name, kyc_status from portal.clients where id = $1', [id])
   if (!cl) return
   if (decision === 'rejected' && !s(f, 'note')) return
+  // решение — только по отправленному KYC; сброс — только после решения; своему клиенту KYC не проходит никто
+  if ((decision === 'passed' || decision === 'rejected') && cl.kyc_status !== 'pending') return
+  if (decision === 'none' && !['passed', 'rejected'].includes(cl.kyc_status)) return
+  if (decision !== 'none' && cl.owner_id === c.user.id) return
   await q(`update portal.clients set kyc_status = $2, kyc_note = $3, kyc_checked_by = $4, kyc_checked_at = now() where id = $1`, [id, decision, s(f, 'note').slice(0, 500) || null, c.user.id])
   const text = decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? 'KYC отклонён: {r}' : 'KYC сброшен — нужна повторная проверка'
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`, [id, c.user.id, text, { r: s(f, 'note') }])

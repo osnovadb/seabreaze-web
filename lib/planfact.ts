@@ -46,7 +46,9 @@ export async function planFact(u: User, kind: PeriodKind, key?: string) {
     `select scope, scope_id, units, area::float, revenue::float, commission::float from portal.sales_plans where period_kind = $1 and period_start = $2`, [kind, p.start])
   const who: Record<Scope, { id: string; name: string; market: string | null }[]> = {
     market: (market ? [market] : ['DE', 'IL', 'GLOBAL']).map((m) => ({ id: m, name: m, market: m })),
-    user: await q(`select id::text, name, market from portal.users where active and role in ('seller','market_head') and ($1::text is null or market = $1) order by name`, [market]),
+    // менеджеры: действующие продавцы и руководители рынка + все, у кого есть сделки периода (чтобы разрезы сходились)
+    user: await q(`select id::text, name, market from portal.users u where ((active and role in ('seller','market_head')) or exists (select 1 from portal.deals d join portal.clients cl on cl.id = d.client_id
+        where d.seller_id = u.id and d.stage <> 'cancelled' and d.created_at >= $2 and d.created_at < $3 and ($1::text is null or cl.market = $1))) and ($1::text is null or market = $1 or role not in ('seller','market_head')) order by name`, [market, p.start, p.end]),
     agency: await q(`select id::text, name, market from portal.agencies where ($1::text is null or market = $1) order by name`, [market]),
   }
   const out: Record<Scope, (Line & { market: string | null })[]> = { market: [], user: [], agency: [] }
@@ -69,7 +71,7 @@ export function monthly(u: User) {
     from portal.deals d join portal.clients cl on cl.id = d.client_id join units un on un.id = d.unit_id
     where d.stage <> 'cancelled' and d.created_at >= date_trunc('month', now()) - interval '11 months' and ($1::text is null or cl.market = $1) group by 1 order by 1`, [market])
 }
-// Динамика по проекту: средняя цена м² свободных квартир по последней цене месяца (USD, AZN — по курсу) и продажи по месяцам
+// Динамика по проекту: средняя цена м² всех квартир проекта с ценой (и проданных) по последней цене месяца (USD, AZN — по курсу) и продажи по месяцам
 export function projectDynamics(projectId: string) {
   return q<{ month: string; per_m2: number | null; changes: number; deals: number }>(`with m as (select generate_series(date_trunc('month', now()) - interval '11 months', date_trunc('month', now()), interval '1 month') as m),
     usd as (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1)

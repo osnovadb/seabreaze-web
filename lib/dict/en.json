@@ -1395,5 +1395,19 @@
 "Колонки: Имя, Телефон, E-mail, Страна, Язык, Источник, Цель, Бюджет, Согласие (да). Дубли по телефону и e-mail пропускаются.": "Columns: Name, Phone, E-mail, Country, Language, Source, Goal, Budget, Consent (yes). Duplicates by phone and e-mail are skipped.",
 "Загрузить клиентов": "Upload clients",
 "Добавлено: {n}": "Added: {n}",
-"пропущено: {n}": "skipped: {n}"
+"пропущено: {n}": "skipped: {n}",
+"Рассрочка застройщика": "Developer instalment plan",
+"Рассрочка {m} мес.": "Instalments, {m} months",
+"Срок уточнить у застройщика: у разных объектов до 60 мес. Регистрация до сдачи — только при полной оплате.": "Term to be confirmed with the developer: up to 60 months depending on the property. Registration before completion only with full payment.",
+"Скидка за полную оплату — уточнить": "Full-payment discount — to be confirmed",
+"Первый взнос {p}, затем этапы по графику застройщика: {n}": "Down payment {p}, then developer schedule stages: {n}",
+"Первый взнос {p}, затем ежемесячные платежи: {m}": "Down payment {p}, then monthly payments: {m}",
+"Показать весь график (платежей: {n})": "Show the full schedule (payments: {n})",
+"… и ещё платежей: {n}, по {x}": "… and {n} more payments of {x}",
+"Валюта суммы — USD или валюта цен проекта ({c})": "Amount currency: USD or the project's price currency ({c})",
+"Акция из Profitbase меняется только у застройщика": "A Profitbase promotion can only be changed by the developer",
+"скидка за 100% (сумма)": "100% payment discount (amount)",
+"комнат (как на сайтах: спальни + 1)": "rooms (as on the websites: bedrooms + 1)",
+"Штуки — целым числом": "Units must be a whole number",
+"Выполнение, %": "Achieved, %"
 }
