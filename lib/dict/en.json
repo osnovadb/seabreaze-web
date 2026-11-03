@@ -1411,5 +1411,6 @@
 "Штуки — целым числом": "Units must be a whole number",
 "Выполнение, %": "Achieved, %",
 "Импорт — не чаще раза в 10 минут": "Import at most once every 10 minutes",
-"Импорт клиентов у {u}: совпадений с базой {n}": "Client import by {u}: {n} matches with the database"
+"Импорт клиентов у {u}: совпадений с базой {n}": "Client import by {u}: {n} matches with the database",
+"Квартира {u} снята с продажи для партнёров — вы убраны из листа ожидания": "Apartment {u} is no longer offered to partners — you have been removed from the waitlist"
 }
