@@ -74,6 +74,14 @@ const changed = await q(`select ph.id, ph.unit_id, se.id sel, se.user_id, se.cli
 for (const r of changed) await notify(r.user_id, 'selection', 'Изменилась цена {u} в подборке для {c}', '/selections/' + r.sel, { u: r.unit, c: r.name }, 'selprice:' + r.id + ':' + r.sel)
 out.selection_prices = changed.length
 
+// 7б. Акция закончилась — владельцу подборки, где есть квартира под этой акцией (цена по ссылке выросла)
+const promoEnd = await q(`select o.id, o.name, se.id sel, se.user_id, cl.name client
+  from portal.special_offers o join units u on u.project_id = o.project_id and (o.building_id is null or u.building_id = o.building_id) and (o.unit_ids is null or u.id = any(o.unit_ids))
+  join portal.selection_items si on si.unit_id = u.id join portal.selections se on se.id = si.selection_id join portal.clients cl on cl.id = se.client_id
+  where o.active and o.ends_on = current_date - 1 group by o.id, o.name, se.id, se.user_id, cl.name`)
+for (const r of promoEnd) await notify(r.user_id, 'selection', 'Акция «{n}» закончилась — цены в подборке для {c} изменились', '/selections/' + r.sel, { n: r.name, c: r.client }, 'promoend:' + r.id + ':' + r.sel)
+out.promo_ended = promoEnd.length
+
 // 8. Курсы ЦБ Азербайджана (USD, EUR, ILS) — раз в сутки, для показа цены в валюте рынка (М7). Сбой сайта ЦБ не роняет tick.
 const today = new Date().toISOString().slice(0, 10)
 if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from = $1::date limit 1`, [today])).length) {

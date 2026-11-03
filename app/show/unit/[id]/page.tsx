@@ -6,6 +6,8 @@ import { t, usd, m2 } from '@/lib/i18n'
 import { unitById, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
+import { promoForUnit } from '@/lib/promo'
+import { priceChain } from '@/lib/plans'
 import { DESIGN, LOBBY } from '@/components/ui'
 import { likeInShow } from '@/lib/actions'
 import { ShowBook } from './book'
@@ -22,6 +24,8 @@ export default async function ShowUnit({ params, searchParams }: { params: { id:
   const plans = await plansFor(u.project_id, u.building_id)
   const cl = c.show?.clientId ? await one<{ market: string }>('select market from portal.clients where id = $1', [c.show.clientId]) : null
   const fx = await fxFor(cl?.market || c.user.market, L)
+  const { promo, mode } = await promoForUnit(u)
+  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, mode).base : null
   return (
     <div className="page split">
       <div className="stack">
@@ -34,7 +38,8 @@ export default async function ShowUnit({ params, searchParams }: { params: { id:
         <div className="h2 mt8" style={{ fontSize: 28 }}>{T('Квартира {n}', { n: unitNo(u) })}</div>
         <div className="muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
         {u.plot_area ? <div className="small mt8">{T('Свой сад')} {m2(L, u.plot_area)}</div> : u.ext_area ? <div className="small mt8">{T('Терраса')} {m2(L, u.ext_area)}</div> : null}
-        <div className="big mt16" style={{ fontSize: 32 }}>{free && u.usd ? usd(L, u.usd) : T('Недоступна')}</div>
+        {free && promo && <div className="mt16"><span className="pill pill--ok">{promo.badge || T('Акция')}</span> <span className="small muted">{promo.name}</span></div>}
+        <div className="big mt16" style={{ fontSize: 32 }}>{free && u.usd ? (promoPrice ? <>{usd(L, promoPrice)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T('Недоступна')}</div>
         {free && u.usd && <div className="small muted">{usd(L, u.usd / (u.area + (u.plot_area || u.ext_area || 0)))}/m² · {T('расходы на сделку отдельно')}</div>}
         {searchParams.booked && <div className="okbox mt16">{T('Квартира забронирована на 14 дней. Консультант подтвердит бронь у застройщика.')}</div>}
         {free && u.sales_status === 'sales' && c.show?.clientId && (
@@ -45,7 +50,7 @@ export default async function ShowUnit({ params, searchParams }: { params: { id:
         )}
         <div className="tiny muted mt16">{T('Квартиры сдаются без ремонта; на фото — пример дизайна застройщика.')}</div>
       </div>
-      {free && u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} />}
+      {free && u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={mode} />}
       </div>
     </div>
   )

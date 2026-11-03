@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { q, one } from '@/lib/db'
 import { t, usd, m2, date, isRtl, type Lang } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
-import { planBase } from '@/lib/plans'
+import { priceChain } from '@/lib/plans'
+import { offersFor, promoOf, promoMode } from '@/lib/promo'
 import { fxFor } from '@/lib/fx'
 import { ScheduleTable } from '@/components/Calculator'
 import { openedSelection } from '@/lib/actions'
@@ -19,6 +20,10 @@ export default async function PublicSelection({ params, searchParams }: { params
   const items = await q<{ unit_id: string; note: string | null; plan_id: string | null }>('select unit_id, note, plan_id from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
   const fx = await fxFor(s.market, L)
+  // Акции и правило сложения — по проектам квартир подборки
+  const projIds = Array.from(new Set(Array.from(units.values()).map((u) => u.project_id)))
+  const offers = new Map(await Promise.all(projIds.map(async (p) => [p, { offers: await offersFor(p), mode: await promoMode(p) }] as const)))
+  const promoBy = (u: NonNullable<ReturnType<typeof units.get>>) => { const o = offers.get(u.project_id)!; return { promo: promoOf(u, o.offers), mode: o.mode } }
   // План, выбранный консультантом, и только если он ещё действует для этой квартиры
   const planOf = new Map<string, Awaited<ReturnType<typeof plansFor>>[number]>()
   for (const i of items) { const u = units.get(i.unit_id); if (u && i.plan_id) { const p = (await plansFor(u.project_id, u.building_id)).find((x) => x.id === i.plan_id); if (p) planOf.set(i.unit_id, p) } }
@@ -41,7 +46,8 @@ export default async function PublicSelection({ params, searchParams }: { params
                   <div>
                     <div className="h2">{T('Квартира {n}', { n: unitNo(u) })}</div>
                     <div className="muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
-                    <div className="big mt16">{free && u.usd ? usd(L, u.usd) : T('Уже забронирована')}</div>
+                    {free && promoBy(u).promo && <div className="mt16"><span className="pill pill--ok">{promoBy(u).promo!.badge || T('Акция')}</span> <span className="small muted">{promoBy(u).promo!.name}</span></div>}
+                    <div className="big mt16">{free && u.usd ? (promoBy(u).promo ? <>{usd(L, priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T('Уже забронирована')}</div>
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
                     <div className="small muted mt8">{T('Сдаётся без ремонта; на фото — пример дизайна застройщика.')}</div>
                   </div>
@@ -50,7 +56,7 @@ export default async function PublicSelection({ params, searchParams }: { params
                 {free && u.usd && planOf.get(u.id) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
                     <div className="label">{T('График платежей')} · {p.name}</div>
-                    <ScheduleTable plan={p} price={planBase(p, u.usd)} lang={L} fx={fx} />
+                    <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).base} lang={L} fx={fx} />
                     <div className="tiny muted mt8">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
                   </div>) })()}
               </div>
