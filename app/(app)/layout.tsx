@@ -30,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (u.role === 'owner' || u.role === 'office') items.push({ href: '/admin/objects', label: T('Объекты') })
   if (canSeeSources(u.role)) items.push({ href: '/sources', label: T('Источники') })
   items.push({ href: '/materials', label: T('Материалы') })
+  if (u.role === 'owner' || u.role === 'content') items.push({ href: '/admin/templates', label: T('Шаблоны') })
   if (canManageUsers(u.role) || u.role === 'market_head' || u.role === 'finance') items.push({ href: '/admin', label: T('Админка') })
   else if (canSeeJournal(u.role)) items.push({ href: '/admin/journal', label: T('Журнал') })
   const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []

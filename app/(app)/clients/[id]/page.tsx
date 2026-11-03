@@ -9,6 +9,7 @@ import { Top, Pill, AGENT_STAGES, STAGES, stageName } from '@/components/ui'
 import { StageStepper } from '@/components/StageStepper'
 import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
+import { MakeDoc, DocStatus } from './docs'
 import { split, type SplitCond } from '@/lib/money'
 import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
 
@@ -35,6 +36,8 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const docs = await q<{ id: string; file_id: string; kind: string; note: string | null; internal: boolean; created_by: string; created_at: string; filename: string }>(`select d.id, d.file_id, d.kind, d.note, d.internal, d.created_by, d.created_at, f.filename from portal.client_documents d join portal.files f on f.id = d.file_id where d.client_id = $1 ${ext ? 'and not d.internal' : ''} order by d.created_at desc`, [cl.id])
   const tours = acts.filter((a) => a.text.startsWith('Заявка на тур')).slice(0, 5)
   const docKinds = Array.from(new Set(docs.map((d) => d.kind)))
+  const made = await q<{ id: string; kind: string; number: string; lang: string; status: string; pdf_file_id: string | null; docx_file_id: string | null; signed_file_id: string | null; created_at: string }>(
+    'select id, kind, number, lang, status, pdf_file_id, docx_file_id, signed_file_id, created_at from portal.documents where client_id = $1 order by created_at desc', [cl.id])
   const kycMiss = kycMissing(docKinds, cl)
   const kycLocked = cl.kyc_status === 'pending' || (cl.kyc_status === 'passed' && !canReviewKyc(c.user.role))
   // Ожидаемая комиссия: партнёру — его доля, команде — наш доход; по активным броням (снимок условий) и сделкам в работе
@@ -136,6 +139,16 @@ export default async function ClientCard({ params }: { params: { id: string } })
                 <span className="row" style={{ gap: 4 }}><span className="tiny muted">{date(L, d.created_at)}</span>{(!ext || d.created_by === c.user.id) && <form action={deleteClientDoc}><input type="hidden" name="id" value={d.id} /><button className="btn btn--sm" title={T('Удалить')}>×</button></form>}</span></div>)}
               <DocUpload lang={L} clientId={cl.id} team={!ext} />
               <div className="tiny muted mt8">{T('Паспорт для KYC, договор, платёжки. Хранятся в ЕС, видны только тем, кому виден клиент.')}</div>
+            </div>
+            <div className="card">
+              <div className="h3">{T('Документы из шаблонов')}</div>
+              {made.length === 0 && <div className="small muted">{T('Пока нет')}</div>}
+              {made.map((d) => (
+                <div key={d.id} className="kv"><span><b className="small">{d.number}</b> <span className="tiny muted">{T(({ booking_offer: 'Оферта брони', fixation_act: 'Акт фиксации клиента', commission_act: 'Акт вознаграждения' } as Record<string, string>)[d.kind] || d.kind)} · {d.lang.toUpperCase()}</span>
+                  <div className="tiny">{d.pdf_file_id && <a href={`/files/${d.pdf_file_id}`} target="_blank">PDF</a>}{d.docx_file_id && <> · <a href={`/files/${d.docx_file_id}`}>docx</a></>}{d.signed_file_id && <> · <a href={`/files/${d.signed_file_id}`} target="_blank">{T('подписанный')}</a></>}</div></span>
+                  <span className="stack" style={{ gap: 4, alignItems: 'flex-end' }}><Pill kind={d.status === 'signed' ? 'ok' : d.status === 'void' ? 'off' : d.status === 'sent' ? 'warn' : 'ink'}>{T(({ draft: 'черновик', sent: 'отправлен', signed: 'подписан', void: 'аннулирован' } as Record<string, string>)[d.status])}</Pill><DocStatus lang={L} id={d.id} status={d.status} /></span></div>
+              ))}
+              <MakeDoc lang={L} clientId={cl.id} clientLang={cl.language || ''} bookings={books.filter((b) => b.status !== 'cancelled').map((b) => ({ id: b.id, unit: b.unit }))} fixations={fixes.map((f) => ({ project_id: f.project_id, name: f.name }))} commission={['owner', 'finance', 'office'].includes(c.user.role)} />
             </div>
             <div className="card">
               <div className="h3">{T('Фиксация у застройщиков')}</div>

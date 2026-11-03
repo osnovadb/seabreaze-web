@@ -1,0 +1,142 @@
+// Документы из шаблонов (М8): шаблон docx с переменными вида {unit.number} → docx и PDF клиента.
+// Переменные — только из словаря VARS: при загрузке шаблона неизвестная переменная — ошибка с её именем.
+import { execFile } from 'node:child_process'
+import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import PizZip from 'pizzip'
+import Docxtemplater from 'docxtemplater'
+import { q, one, tx } from './db'
+import { num, date, type Lang } from './i18n'
+
+export const DOC_KINDS = ['booking_offer', 'fixation_act', 'commission_act'] as const
+export type DocKind = (typeof DOC_KINDS)[number]
+export const DOC_KIND_NAMES: Record<DocKind, string> = { booking_offer: 'Оферта брони', fixation_act: 'Акт фиксации клиента', commission_act: 'Акт вознаграждения' }
+export const canEditTemplates = (role: string) => role === 'owner' || role === 'content'
+const PREFIX: Record<DocKind, string> = { booking_offer: 'OF', fixation_act: 'FX', commission_act: 'AV' }
+
+// Словарь переменных: имя → описание (для экрана шаблонов). Группы booking.* и fixation.* есть только у своих видов документов.
+export const VARS: Record<string, string> = {
+  'doc.number': 'номер документа', 'doc.date': 'дата документа', 'doc.city': 'город',
+  'client.name': 'имя клиента', 'client.reg_no': 'номер клиента в портале', 'client.email': 'e-mail клиента', 'client.phone': 'телефон клиента',
+  'client.country': 'страна клиента', 'client.citizenship': 'гражданство', 'client.tax_residence': 'налоговое резидентство',
+  'agent.name': 'кто ведёт клиента', 'agent.email': 'e-mail ведущего', 'agent.company': 'агентство',
+  'project.name': 'проект', 'project.developer': 'застройщик', 'project.city': 'город проекта',
+  'unit.number': 'номер квартиры', 'unit.block': 'блок', 'unit.floor': 'этаж', 'unit.rooms': 'комнат', 'unit.area': 'площадь, м²',
+  'booking.price_list': 'прайс застройщика', 'booking.promo': 'акция (название и сумма)', 'booking.discount_pct': 'скидка, %', 'booking.discount': 'скидка, сумма',
+  'booking.final': 'итоговая цена', 'booking.currency': 'валюта', 'booking.plan': 'план оплаты', 'booking.starts_at': 'дата брони', 'booking.ends_at': 'бронь до', 'booking.days': 'срок брони, дней',
+  'fixation.sent_at': 'дата отправки на фиксацию', 'fixation.decided_at': 'дата решения застройщика', 'fixation.protected_until': 'клиент закреплён до',
+}
+// Переменные брони и квартиры есть только у документов по брони, фиксации — только у акта фиксации
+export const varAllowed = (kind: DocKind, v: string) => (v.startsWith('booking.') || v.startsWith('unit.') ? kind !== 'fixation_act' : v.startsWith('fixation.') ? kind === 'fixation_act' : true)
+
+// Шаблон: проверить переменные. Возвращает найденные имена или бросает Error('vars:<имена>')
+export function inspectTemplate(buf: Buffer): string[] {
+  const seen = new Set<string>()
+  const doc = new Docxtemplater(new PizZip(buf), {
+    paragraphLoop: true, linebreaks: true, delimiters: { start: '{', end: '}' },
+    parser: (tag: string) => { seen.add(tag.trim()); return { get: () => '' } },
+  })
+  doc.render({})
+  const bad = Array.from(seen).filter((v) => !VARS[v])
+  if (bad.length) throw new Error('vars:' + bad.join(', '))
+  return Array.from(seen)
+}
+function render(buf: Buffer, vars: Record<string, string>) {
+  const doc = new Docxtemplater(new PizZip(buf), {
+    paragraphLoop: true, linebreaks: true, delimiters: { start: '{', end: '}' },
+    // пустое значение — прочерк, чтобы в документе не оставалось «Акция: .»
+    parser: (tag: string) => ({ get: () => vars[tag.trim()] || '—' }),
+    nullGetter: () => '',
+  })
+  doc.render({})
+  return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' }) as Buffer
+}
+
+// docx → PDF через LibreOffice; у каждого вызова свой профиль, чтобы параллельные конвертации не мешали друг другу.
+// Нет soffice (локальная разработка) — null, документ остаётся только в docx.
+async function toPdf(docx: Buffer): Promise<Buffer | null> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ge-doc-'))
+  try {
+    const src = path.join(dir, 'doc.docx')
+    await fs.writeFile(src, docx)
+    await new Promise<void>((res, rej) => execFile('soffice', ['-env:UserInstallation=file://' + path.join(dir, 'profile'), '--headless', '--convert-to', 'pdf', '--outdir', dir, src],
+      { timeout: 90_000, env: { ...process.env, HOME: dir } }, (e) => (e ? rej(e) : res())))
+    return await fs.readFile(path.join(dir, 'doc.pdf'))
+  } catch { return null } finally { await fs.rm(dir, { recursive: true, force: true }) }
+}
+async function saveFile(buf: Buffer, filename: string, mime: string, userId: string) {
+  const id = crypto.randomUUID(), ext = filename.split('.').pop()
+  await fs.writeFile(path.join(process.env.FILES_DIR || './dev-files', `${id}.${ext}`), buf, { mode: 0o640 })
+  await q(`insert into portal.files (id, filename, mime, size, disk_name, created_by) values ($1,$2,$3,$4,$5,$6)`, [id, filename, mime, buf.length, `${id}.${ext}`, userId])
+  return id
+}
+export async function readFileBuf(fileId: string) {
+  const f = await one<{ disk_name: string }>('select disk_name from portal.files where id = $1', [fileId])
+  if (!f) throw new Error('file')
+  return fs.readFile(path.join(process.env.FILES_DIR || './dev-files', f.disk_name))
+}
+
+const money = (lang: Lang, n: number | null | undefined) => (n == null ? '' : num(lang, Math.round(Number(n))))
+// Данные документа: клиент и ведущий + бронь (оферта, акт вознаграждения) или фиксация (акт фиксации)
+async function collect(kind: DocKind, lang: Lang, src: { clientId: string; bookingId?: string; projectId?: string }) {
+  const cl = await one<any>(`select cl.*, u.name agent_name, u.email agent_email, a.name agency from portal.clients cl join portal.users u on u.id = cl.owner_id left join portal.agencies a on a.id = cl.agency_id where cl.id = $1`, [src.clientId])
+  if (!cl) throw new Error('client')
+  const v: Record<string, string> = {
+    'doc.city': lang === 'ru' ? 'Баку' : lang === 'he' ? 'באקו' : 'Baku',
+    'client.name': cl.name, 'client.reg_no': cl.reg_no, 'client.email': cl.email || '', 'client.phone': cl.phone || '', 'client.country': cl.country || '',
+    'client.citizenship': cl.kyc_citizenship || '', 'client.tax_residence': cl.kyc_tax_residence || '',
+    'agent.name': cl.agent_name, 'agent.email': cl.agent_email, 'agent.company': cl.agency || 'GetsEstate',
+  }
+  let projectId = src.projectId, bookingId: string | null = null
+  if (kind === 'booking_offer' || kind === 'commission_act') {
+    const b = await one<any>(`select b.*, un.number, un.floor, un.bedrooms, un.area_total_m2::float area, coalesce(bl.external_id, bl.name) block
+      from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.id = $1 and b.client_id = $2`, [src.bookingId, src.clientId])
+    if (!b) throw new Error('booking')
+    projectId = b.project_id; bookingId = b.id
+    const promo = b.snapshot?.promo, plan = b.snapshot?.plan
+    const list0 = Number(b.snapshot?.list_original ?? b.price_list)
+    Object.assign(v, {
+      'unit.number': b.number, 'unit.block': b.block, 'unit.floor': String(b.floor), 'unit.rooms': b.bedrooms == null ? '' : String(b.bedrooms), 'unit.area': num(lang, b.area, 2),
+      'booking.price_list': money(lang, list0), 'booking.promo': promo ? `${promo.name} (−${money(lang, promo.amount)})` : '',
+      'booking.discount_pct': num(lang, Number(b.discount_pct), Number(b.discount_pct) % 1 ? 1 : 0), 'booking.discount': money(lang, Number(b.price_list) - Number(b.final_price)),
+      'booking.final': money(lang, b.final_price), 'booking.currency': 'USD', 'booking.plan': plan?.name || '',
+      'booking.starts_at': date(lang, b.starts_at), 'booking.ends_at': date(lang, b.ends_at), 'booking.days': String(b.snapshot?.booking_days ?? ''),
+    })
+  }
+  if (kind === 'fixation_act') {
+    const fx = await one<any>('select * from portal.fixations where client_id = $1 and project_id = $2', [src.clientId, src.projectId])
+    if (!fx) throw new Error('fixation')
+    Object.assign(v, { 'fixation.sent_at': date(lang, fx.sent_at), 'fixation.decided_at': date(lang, fx.decided_at), 'fixation.protected_until': date(lang, fx.protected_until) })
+  }
+  const p = await one<any>('select p.name, p.city, d.name developer from projects p left join developers d on d.id = p.developer_id where p.id = $1', [projectId])
+  Object.assign(v, { 'project.name': p?.name || '', 'project.developer': p?.developer || '', 'project.city': p?.city || '' })
+  return { v, projectId: projectId || null, bookingId }
+}
+
+// Создать документ: номер по счётчику, docx из активного шаблона языка (нет — английский), PDF, запись в документах клиента
+export async function createDocument(kind: DocKind, langWanted: Lang, src: { clientId: string; bookingId?: string; projectId?: string }, userId: string) {
+  const tpl = await one<{ id: string; file_id: string; lang: Lang; vars: string[] }>(`select id, file_id, lang, vars from portal.doc_templates where kind = $1 and active and lang = any($2) order by lang = $3 desc limit 1`, [kind, [langWanted, 'en'], langWanted])
+  if (!tpl) throw new Error('template')
+  const lang = tpl.lang
+  const { v, projectId, bookingId } = await collect(kind, lang, src)
+  const year = new Date().getFullYear()
+  const n = await one<{ last: number }>(`insert into portal.doc_numbers (kind, year, last) values ($1, $2, 1) on conflict (kind, year) do update set last = doc_numbers.last + 1 returning last`, [kind, year])
+  const number = `${PREFIX[kind]}-${year}-${String(n!.last).padStart(4, '0')}`
+  v['doc.number'] = number
+  v['doc.date'] = date(lang, new Date())
+  const docx = render(await readFileBuf(tpl.file_id), v)
+  const pdf = await toPdf(docx)
+  const base = `${number} ${v['client.name']}`.replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 80)
+  const docxId = await saveFile(docx, base + '.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', userId)
+  const pdfId = pdf ? await saveFile(pdf, base + '.pdf', 'application/pdf', userId) : null
+  const docKind = kind === 'booking_offer' ? 'booking' : kind === 'fixation_act' ? 'other' : 'contract'
+  return tx(async (t) => {
+    const d = (await t.query(`insert into portal.documents (template_id, kind, number, lang, client_id, booking_id, project_id, docx_file_id, pdf_file_id, data, created_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`, [tpl.id, kind, number, lang, src.clientId, bookingId, projectId, docxId, pdfId, v, userId])).rows[0]
+    // Файлы — в документах клиента, чтобы права на скачивание были те же, что у клиента
+    for (const fid of [pdfId, docxId].filter(Boolean)) await t.query(`insert into portal.client_documents (client_id, file_id, kind, note, internal, created_by) values ($1,$2,$3,$4,false,$5)`, [src.clientId, fid, docKind, number, userId])
+    return { id: d.id as string, number, pdf: !!pdfId }
+  })
+}
