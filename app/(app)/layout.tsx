@@ -28,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (ext) items.push({ href: '/commission', label: T('Комиссия') })
   if (u.role === 'agency_head') items.push({ href: '/team', label: T('Сотрудники') })
   if (['owner', 'market_head', 'seller'].includes(u.role)) items.push({ href: '/reports', label: T('Отчёты') })
+  if (u.role === 'finance') items.push({ href: '/reports/plan', label: T('План и факт') })
   if (canSeeFinance(u.role)) items.push({ href: '/finance', label: T('Финансы') })
   if (canReviewAgents(u.role)) items.push({ href: '/admin/agents', label: T('Агенты'), cnt: cnt!.apps })
   if (u.role === 'owner' || u.role === 'office') items.push({ href: '/admin/objects', label: T('Объекты') })
