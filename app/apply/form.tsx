@@ -12,7 +12,7 @@ export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
   const [st, act] = useFormState(applyAgent, null)
   const T = (s: string) => t(lang, s)
   if (st?.ok) return (
-    <div className="okbox mt24"><b>{T('Заявка отправлена')}</b><div className="mt8">{T('Продавец рынка свяжется с вами в течение 2 рабочих дней. Статус: проверка.')}</div></div>
+    <div className="okbox mt24"><b>{T('Заявка отправлена')}</b><div className="mt8">{T('Продавец рынка свяжется с вами в течение 2 рабочих дней. Статус: проверка.')}</div>{st.token && <div className="mt8"><Link className="bronze" href={`/apply/status/${st.token}`}>{T('Статус заявки — сохраните эту ссылку')} →</Link></div>}</div>
   )
   const F = (name: string, label: string, ph = '', req = false) => <label className="field"><span>{T(label)}{req ? ' *' : ''}</span><input className="in" name={name} placeholder={ph ? T(ph) : ''} required={req} /></label>
   return (

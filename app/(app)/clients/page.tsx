@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { ImportExport } from './import'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, date } from '@/lib/i18n'
@@ -42,7 +43,8 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
     <>
       <Top title={ext ? T('Клиенты') : T('CRM · клиенты')} sub={T('{a} в работе · {p} на паузе · {l} отказов', { a: live.length, p: paused.length, l: lost.length })}
         right={<>
-          <form className="row"><input className="in" name="q" defaultValue={searchParams.q} placeholder={T('Поиск: имя, телефон, e-mail')} style={{ width: 240 }} /><input type="hidden" name="v" value={view} /></form>
+          <form className="row"><input className="in" name="q" defaultValue={searchParams.q} placeholder={T('Поиск: имя, телефон, e-mail')} style={{ width: 240 }} />
+      {['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) && <div className="page" style={{ paddingBottom: 0 }}><ImportExport lang={L} /></div>}<input type="hidden" name="v" value={view} /></form>
           <div className="chips"><Link className={'chip' + (view === 'kanban' ? ' on' : '')} href="?v=kanban">{T('Воронка')}</Link><Link className={'chip' + (view === 'list' ? ' on' : '')} href="?v=list">{T('Список')}</Link></div>
           {canRegisterClient(c.user.role) && <Link className="btn btn--p" href="/clients/new">+ {T('Клиент')}</Link>}
         </>} />
