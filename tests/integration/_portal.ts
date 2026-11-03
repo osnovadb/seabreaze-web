@@ -32,6 +32,7 @@ export function forms(html: string): Form[] {
       if ((type === 'checkbox' || type === 'radio') && !/\bchecked\b/.test(a)) continue
       fields.push([unent(name), unent(a.match(/\bvalue="([^"]*)"/)?.[1] ?? '')])
     }
+    for (const m of body.matchAll(/<textarea\b[^>]*name="([^"]*)"[^>]*>([\s\S]*?)<\/textarea>/g)) fields.push([unent(m[1]), unent(m[2])])
     for (const m of body.matchAll(/<select\b[^>]*name="([^"]*)"[^>]*>([\s\S]*?)<\/select>/g)) {
       const opt = m[2].match(/<option[^>]*selected[^>]*value="([^"]*)"/) || m[2].match(/<option[^>]*value="([^"]*)"/)
       fields.push([unent(m[1]), unent(opt?.[1] ?? '')])
