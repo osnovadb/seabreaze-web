@@ -17,7 +17,9 @@ async function rates() {
 }
 // Валюта рынка пользователя (DE → EUR, IL → ILS); для GLOBAL и без курса — null, показываем только USD
 export async function fxFor(market: string | null | undefined, lang?: Lang): Promise<Fx | null> {
-  const cur = (market && MARKET_CUR[market]) || (lang && LANG_CUR[lang])
+  // GLOBAL — только USD (ТЗ); по языку — лишь когда рынка нет вовсе (клиент без рынка)
+  if (market === 'GLOBAL') return null
+  const cur = (market && MARKET_CUR[market]) || (!market && lang && LANG_CUR[lang])
   if (!cur) return null
   const r = await rates(), usd = r.get('USD'), x = r.get(cur)
   if (!usd || !x) return null

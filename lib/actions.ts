@@ -241,7 +241,8 @@ export async function saveKycData(f: FormData) {
   const c = await writeCtx()
   const cl = await stageGuard(c, s(f, 'client'))
   const cur = await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [cl.id])
-  if (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role)) return
+  // на проверке анкету не меняет никто; пройденную — только проверяющий
+  if (cur?.kyc_status === 'pending' || (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role))) return
   const pep = s(f, 'pep') === 'yes' ? true : s(f, 'pep') === 'no' ? false : null
   await q('update portal.clients set kyc_citizenship = $2, kyc_tax_residence = $3, kyc_pep = $4 where id = $1', [cl.id, s(f, 'citizenship').slice(0, 60) || null, s(f, 'tax_residence').slice(0, 60) || null, pep])
   revalidatePath(`/clients/${cl.id}`)
@@ -266,6 +267,10 @@ export async function reviewKyc(f: FormData) {
   const cl = await one<{ owner_id: string; name: string; kyc_status: string }>('select owner_id, name, kyc_status from portal.clients where id = $1', [id])
   if (!cl) return
   if (decision === 'rejected' && !s(f, 'note')) return
+  // решение — только по отправленному KYC; сброс — только после решения; своему клиенту KYC не проходит никто
+  if ((decision === 'passed' || decision === 'rejected') && cl.kyc_status !== 'pending') return
+  if (decision === 'none' && !['passed', 'rejected'].includes(cl.kyc_status)) return
+  if (decision !== 'none' && cl.owner_id === c.user.id) return
   await q(`update portal.clients set kyc_status = $2, kyc_note = $3, kyc_checked_by = $4, kyc_checked_at = now() where id = $1`, [id, decision, s(f, 'note').slice(0, 500) || null, c.user.id])
   const text = decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? 'KYC отклонён: {r}' : 'KYC сброшен — нужна повторная проверка'
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`, [id, c.user.id, text, { r: s(f, 'note') }])

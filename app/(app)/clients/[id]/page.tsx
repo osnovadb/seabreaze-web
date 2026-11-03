@@ -37,7 +37,8 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const tours = acts.filter((a) => a.text.startsWith('Заявка на тур')).slice(0, 5)
   const docKinds = Array.from(new Set(docs.map((d) => d.kind)))
   const made = await q<{ id: string; kind: string; number: string; lang: string; status: string; pdf_file_id: string | null; docx_file_id: string | null; signed_file_id: string | null; created_at: string }>(
-    'select id, kind, number, lang, status, pdf_file_id, docx_file_id, signed_file_id, created_at from portal.documents where client_id = $1 order by created_at desc', [cl.id])
+    `select d.id, d.kind, d.number, d.lang, d.status, d.pdf_file_id, d.docx_file_id, d.signed_file_id, d.created_at from portal.documents d where d.client_id = $1
+      and (d.kind <> 'commission_act' or $2 or exists (select 1 from portal.commission_acts ca where ca.document_id = d.id and ca.agent_id = $3)) order by d.created_at desc`, [cl.id, ['owner', 'finance'].includes(c.user.role), c.user.id])
   const kycMiss = kycMissing(docKinds, cl)
   const kycLocked = cl.kyc_status === 'pending' || (cl.kyc_status === 'passed' && !canReviewKyc(c.user.role))
   // Ожидаемая комиссия: партнёру — его доля, команде — наш доход; по активным броням (снимок условий) и сделкам в работе

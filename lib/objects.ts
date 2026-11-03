@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation'
 import { q, one, tx, audit } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { t } from './i18n'
-import { autoPost } from './posts'
+import { autoPost, dropAutoPost } from './posts'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
@@ -251,14 +251,16 @@ export async function saveException(f: FormData) {
 export const savePromo = safe(async (_: unknown, f: FormData) => {
   const c = await owner()
   const pid = s(f, 'project'), id = s(f, 'id')
-  if (s(f, 'delete')) { await q(`delete from portal.special_offers where id = $1 and project_id = $2 and source = 'manual'`, [id, pid]); await log(c, 'object.promo_delete', 'project', pid); done(pid); return { ok: true } }
+  if (s(f, 'delete')) { await q(`delete from portal.special_offers where id = $1 and project_id = $2 and source = 'manual'`, [id, pid]); await dropAutoPost('promo:' + id); await log(c, 'object.promo_delete', 'project', pid); done(pid); return { ok: true } }
   const kind = s(f, 'kind') === 'fixed' ? 'fixed' : 'pct', value = num(f, 'value')
   if (!s(f, 'name')) return { error: t(c.lang, 'Нужно название') }
   if (value == null || !(value > 0) || (kind === 'pct' && value >= 100)) return { error: t(c.lang, 'Скидка: процент от 0 до 100 или сумма больше нуля') }
   const cur = kind === 'fixed' ? (s(f, 'currency') || 'USD').toUpperCase().slice(0, 3) : null
+  // фиксированная скидка применяется только в валюте квартир проекта или в USD — иначе молча не сработала бы
+  if (cur) { const curs = (await q<{ c: string }>('select distinct price_currency c from units where project_id = $1', [pid])).map((r) => r.c.trim()); if (cur !== 'USD' && !curs.includes(cur)) return { error: t(c.lang, 'Валюта суммы — USD или валюта цен проекта ({c})', { c: curs.join(', ') || 'USD' }) } }
   const bid = s(f, 'building') || null
   // Квартиры — номерами через запятую (как в шахматке); пусто — весь проект или блок
-  const nums = s(f, 'units').split(/[\s,;]+/).filter(Boolean)
+  const nums = Array.from(new Set(s(f, 'units').split(/[\s,;]+/).filter(Boolean)))
   let unitIds: string[] | null = null
   if (nums.length) {
     unitIds = (await q<{ id: string }>(`select id from units where project_id = $1 and ($2::uuid is null or building_id = $2) and number = any($3)`, [pid, bid, nums])).map((r) => r.id)
@@ -267,12 +269,14 @@ export const savePromo = safe(async (_: unknown, f: FormData) => {
   const from = s(f, 'starts_on') || null, to = s(f, 'ends_on') || null
   if (from && to && to < from) return { error: t(c.lang, 'Дата окончания раньше начала') }
   const vals = [s(f, 'name').slice(0, 120), s(f, 'badge').slice(0, 30) || null, kind, value, cur, unitIds, from, to, !!f.get('active'), bid]
-  if (id) await q(`update portal.special_offers set name = $2, badge = $3, kind = $4, value = $5, currency = $6, unit_ids = $7, starts_on = $8, ends_on = $9, active = $10, building_id = $11 where id = $1 and project_id = $12 and source = 'manual'`, [id, ...vals, pid])
+  if (id && (await one<{ source: string }>('select source from portal.special_offers where id = $1', [id]))?.source === 'profitbase') return { error: t(c.lang, 'Акция из Profitbase меняется только у застройщика') }
+  const pr = await one<{ name: string; slug: string }>('select name, slug from projects where id = $1', [pid])
+  // Лента партнёров (М9): запись об акции живёт в сроки акции; выключили — запись убирается
+  const syncPost = (oid: string) => (f.get('active') ? autoPost('promo:' + oid, 'Новая акция «{n}» в проекте {p}', { n: s(f, 'name'), p: pr?.name || '' }, pid, `/projects/${pr?.slug}`, [], { starts_on: from, ends_on: to }) : dropAutoPost('promo:' + oid))
+  if (id) { await q(`update portal.special_offers set name = $2, badge = $3, kind = $4, value = $5, currency = $6, unit_ids = $7, starts_on = $8, ends_on = $9, active = $10, building_id = $11 where id = $1 and project_id = $12 and source = 'manual'`, [id, ...vals, pid]); await syncPost(id) }
   else {
     const r = await one<{ id: string }>(`insert into portal.special_offers (name, badge, kind, value, currency, unit_ids, starts_on, ends_on, active, building_id, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`, [...vals, pid, c.user.id])
-    // Лента партнёров (М9): новая акция
-    const pr = await one<{ name: string; slug: string }>('select name, slug from projects where id = $1', [pid])
-    if (f.get('active')) await autoPost('promo:' + r!.id, 'Новая акция «{n}» в проекте {p}', { n: s(f, 'name'), p: pr?.name || '' }, pid, `/projects/${pr?.slug}`)
+    await syncPost(r!.id)
   }
   await log(c, id ? 'object.promo_update' : 'object.promo_create', 'project', pid, { name: s(f, 'name'), kind, value }); done(pid)
   return { ok: true }

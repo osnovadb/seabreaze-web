@@ -12,7 +12,7 @@ export function ImportExport({ lang }: { lang: Lang }) {
       <summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Импорт и выгрузка xlsx')}</summary>
       <div className="row mt8" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <a className="btn" href="/clients/export">{T('Выгрузить клиентов в xlsx')}</a>
-        <form action={act} className="stack" style={{ gap: 6, flex: 1, minWidth: 280 }} encType="multipart/form-data">
+        <form action={act} className="stack" style={{ gap: 6, flex: 1, minWidth: 280 }}>
           <input className="in" type="file" name="file" accept=".xlsx" required style={{ paddingTop: 6 }} />
           <div className="tiny muted">{T('Колонки: Имя, Телефон, E-mail, Страна, Язык, Источник, Цель, Бюджет, Согласие (да). Дубли по телефону и e-mail пропускаются.')}</div>
           <div><button className="btn btn--sm btn--p">{T('Загрузить клиентов')}</button></div>

@@ -13,7 +13,7 @@ export function ActionForm({ action, lang, children, className, style, okText, r
   // Формы «добавить» очищаем после успешного сохранения, чтобы следующая запись не унаследовала значения
   useEffect(() => { if (reset && st?.ok) ref.current?.reset() }, [st, reset])
   return (
-    <form ref={ref} action={act} className={className} style={style} encType="multipart/form-data">
+    <form ref={ref} action={act} className={className} style={style}>
       {children}
       {st?.error && <div className="err tiny" style={{ gridColumn: '1 / -1' }}>{st.error}</div>}
       {st?.ok && <div className="tiny okc" style={{ gridColumn: '1 / -1' }}>{okText || t(lang, 'Сохранено')}{st.made != null ? ` · ${st.made}` : ''}</div>}

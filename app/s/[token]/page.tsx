@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { q, one } from '@/lib/db'
 import { t, usd, m2, date, isRtl, type Lang } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
-import { priceChain } from '@/lib/plans'
+import { priceChain, planLabel } from '@/lib/plans'
 import { offersFor, promoOf, promoMode } from '@/lib/promo'
 import { fxFor } from '@/lib/fx'
 import { ScheduleTable } from '@/components/Calculator'
@@ -55,7 +55,7 @@ export default async function PublicSelection({ params, searchParams }: { params
                 </div>
                 {free && u.usd && planOf.get(u.id) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
-                    <div className="label">{T('График платежей')} · {p.name}</div>
+                    <div className="label">{T('График платежей')} · {planLabel(T, p.name)}</div>
                     <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).base} lang={L} fx={fx} />
                     <div className="tiny muted mt8">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
                   </div>) })()}

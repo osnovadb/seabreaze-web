@@ -36,3 +36,7 @@ export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.D
 // Переменные шаблонов из базы: даты в ISO показываем в формате языка
 export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | undefined) =>
   v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? date(lang, x) : x])) : undefined
+
+// «Сегодня» по Баку (YYYY-MM-DD): портал работает по времени офиса, сервер — в UTC
+export const bakuToday = (d: Date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(d)
+export const bakuYear = () => Number(bakuToday().slice(0, 4))

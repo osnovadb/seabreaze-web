@@ -24,6 +24,8 @@ export async function aznPerUsd() {
   rateCache = { v: Number(r?.azn_per_unit || 1.7), at: Date.now() }
   return rateCache.v
 }
+// Комнаты как в каталоге и на сайтах: студия = 1, 1br = 2 … (спальни + 1), если застройщик не дал своё число
+export const roomsSql = `coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end)`
 export const toUsdSql = `case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end`
 
 const UNIT_SELECT = `

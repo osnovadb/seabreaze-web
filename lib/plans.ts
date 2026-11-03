@@ -9,6 +9,13 @@ export type Milestone = { label?: string; pct: number; after_months: number }
 // 100% — только явная полная оплата; взнос без срока («срок уточнить») — рассрочка с неизвестным графиком
 export const isFull = (p: Plan) => Number(p.down_payment_pct ?? 0) >= 100
 export const termUnknown = (p: Plan) => !isFull(p) && !p.months && !p.schedule?.length
+export const hasSchedule = (p: Plan) => !isFull(p) && !!p.schedule?.some((m) => Number(m.pct) > 0)
+// Названия и примечания планов приходят из каталога по-русски: переводим по словарю, «Рассрочка N мес.» — по шаблону
+export function planLabel(T: (s: string, v?: Record<string, string | number>) => string, name: string | null | undefined) {
+  if (!name) return ''
+  const m = name.match(/^Рассрочка (\d+) мес\.?$/)
+  return m ? T('Рассрочка {m} мес.', { m: m[1] }) : T(name)
+}
 // Скидка застройщика за полную оплату уменьшает цену до раздела денег: фикс и пул считаются от неё
 export const planBase = (p: Plan | null | undefined, list: number) => (p && isFull(p) ? list * (1 - Number(p.full_payment_discount_pct || 0) / 100) : list)
 export function schedule(p: Plan, price: number) {
@@ -22,22 +29,26 @@ export const PLAN_COLS = `id, project_id, building_id, name, down_payment_pct::f
 // График платежей по датам (М7). Суммы — в целых единицах валюты, остаток округления уходит в последний платёж,
 // поэтому сумма строк всегда равна цене. start — дата первого взноса (по умолчанию сегодня), дальше платёж раз в месяц.
 export type Row = { n: number; kind: 'full' | 'down' | 'month' | 'step' | 'rest'; label?: string; due: string | null; amount: number }
-export function paymentRows(p: Plan, price: number, start: Date = new Date()): Row[] {
+export function paymentRows(p: Plan, price: number, start: Date = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date()) + 'T00:00:00Z')): Row[] {
   const total = Math.round(price)
   const at = (m: number) => { const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + m, 1)); d.setUTCDate(Math.min(start.getUTCDate(), daysIn(d))); return d.toISOString().slice(0, 10) }
   if (isFull(p)) return [{ n: 1, kind: 'full', due: at(0), amount: total }]
-  const down = Math.round(total * Number(p.down_payment_pct || 0) / 100)
-  const rows: Row[] = [{ n: 1, kind: 'down', due: at(0), amount: down }]
-  const ms = (p.schedule || []).filter((m) => Number(m.pct) > 0)
+  const down = Math.min(total, Math.round(total * Number(p.down_payment_pct || 0) / 100))
+  // нулевой взнос — без строки «Первый взнос $0»
+  const rows: Row[] = down > 0 ? [{ n: 1, kind: 'down', due: at(0), amount: down }] : []
+  const ms = (p.schedule || []).filter((m) => Number(m.pct) > 0).sort((a, b) => (Number(a.after_months) || 0) - (Number(b.after_months) || 0))
   if (ms.length) {
-    ms.forEach((m) => rows.push({ n: rows.length + 1, kind: 'step', label: m.label, due: at(Number(m.after_months) || 0), amount: Math.round(total * Number(m.pct) / 100) }))
+    // доли графика не могут превысить остаток: лишнее срезается, нулевые этапы не показываются
+    let left = total - down
+    for (const m of ms) { const a = Math.min(left, Math.round(total * Number(m.pct) / 100)); if (a <= 0) continue; rows.push({ n: rows.length + 1, kind: 'step', label: m.label, due: at(Number(m.after_months) || 0), amount: a }); left -= a }
   } else if (p.months) {
     const each = Math.floor((total - down) / p.months)
-    for (let i = 1; i <= p.months; i++) rows.push({ n: i + 1, kind: 'month', due: at(i), amount: each })
-  } else {
-    rows.push({ n: 2, kind: 'rest', due: null, amount: total - down })
+    for (let i = 1; i <= p.months; i++) rows.push({ n: rows.length + 1, kind: 'month', due: at(i), amount: each })
+  } else if (total - down > 0) {
+    rows.push({ n: rows.length + 1, kind: 'rest', due: null, amount: total - down })
   }
-  // остаток округления — в последний платёж
+  if (!rows.length) return [{ n: 1, kind: 'full', due: at(0), amount: total }]
+  // остаток округления (и недобор долей графика) — в последний платёж
   const sum = rows.reduce((a, r) => a + r.amount, 0)
   rows[rows.length - 1].amount += total - sum
   return rows
@@ -53,7 +64,7 @@ export function priceChain(list: number, plan: Plan | null | undefined, promo: P
   const planAmt0 = list * planPct / 100
   const promoOf = (from: number) => (!promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, from) : from * promo.pct / 100)
   let planAmt = planAmt0, promoAmt = 0
-  if (mode === 'sum') promoAmt = promoOf(list)
+  if (mode === 'sum') promoAmt = Math.min(promoOf(list), list - planAmt0) // вместе со скидкой за 100% не больше прайса
   else if (mode === 'best') { const pa = promoOf(list); if (pa > planAmt0) { promoAmt = pa; planAmt = 0 } }
   else promoAmt = promoOf(list - planAmt0)
   const base = Math.max(0, list - planAmt - promoAmt)

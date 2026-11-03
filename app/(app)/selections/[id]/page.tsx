@@ -5,7 +5,7 @@ import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, m2, dateTime } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
-import type { Plan } from '@/lib/plans'
+import { planLabel, type Plan } from '@/lib/plans'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
@@ -51,7 +51,7 @@ export default async function SelectionEdit({ params }: { params: { id: string }
                     <label className="field mt8"><span>{T('График платежей для клиента')}</span>
                       <select className="in" name={`plan:${u.id}`} defaultValue={i.plan_id || ''}>
                         <option value="">{T('Не показывать')}</option>
-                        {plansBy.get(u.project_id + ':' + (u.building_id || ''))!.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {plansBy.get(u.project_id + ':' + (u.building_id || ''))!.map((p) => <option key={p.id} value={p.id}>{planLabel(T, p.name)}</option>)}
                       </select></label>
                   )}
                 </div>

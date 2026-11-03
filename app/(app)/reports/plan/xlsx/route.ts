@@ -11,8 +11,8 @@ export async function GET(req: Request) {
   const u = new URL(req.url)
   const kind: PeriodKind = u.searchParams.get('kind') === 'quarter' ? 'quarter' : 'month'
   const { period, lines } = await planFact(c.user, kind, u.searchParams.get('p') || undefined)
-  const head = ['', T('План, штук'), T('Факт, штук'), T('План, м²'), T('Факт, м²'), T('План, объём USD'), T('Факт, объём USD'), T('План, доход USD'), T('Факт, доход USD')]
-  const sheet = (name: string, rows: typeof lines.market) => ({ name, rows: [head, ...rows.map((l) => [l.name, l.plan?.units ?? null, l.fact.units, l.plan?.area ?? null, Math.round(l.fact.area * 100) / 100, l.plan?.revenue ?? null, Math.round(l.fact.revenue), l.plan?.commission ?? null, Math.round(l.fact.commission)])] })
+  const head = ['', T('План, штук'), T('Факт, штук'), T('План, м²'), T('Факт, м²'), T('План, объём USD'), T('Факт, объём USD'), T('План, доход USD'), T('Факт, доход USD'), T('Выполнение, %')]
+  const sheet = (name: string, rows: typeof lines.market) => ({ name, rows: [head, ...rows.map((l) => [l.name, l.plan?.units ?? null, l.fact.units, l.plan?.area ?? null, Math.round(l.fact.area * 100) / 100, l.plan?.revenue ?? null, Math.round(l.fact.revenue), l.plan?.commission ?? null, Math.round(l.fact.commission), l.plan?.revenue ? Math.round((l.fact.revenue / l.plan.revenue) * 1000) / 10 : null])] })
   const m = await monthly(c.user)
   const buf = makeXlsx([
     sheet(T('Рынки'), lines.market), sheet(T('Менеджеры'), lines.user), sheet(T('Агентства'), lines.agency),

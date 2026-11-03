@@ -7,7 +7,7 @@ const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
   return env.DATABASE_URL
 })()
-const db = new pg.Client({ connectionString: url })
+const db = new pg.Client({ connectionString: url, options: '-c timezone=Asia/Baku' }) // current_date — по Баку
 await db.connect()
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const notify = (user, kind, text, link, vars, dedup) =>
@@ -95,7 +95,11 @@ for (const u of waitUnits) {
   if (u.last && Date.now() - new Date(u.last).getTime() < u.pause * 3600_000) continue
   // партнёру — только если квартира ему видна (не скрыта)
   const next = (await q(`select w.id, w.user_id, w.client_id, cl.name client from portal.waitlist w join portal.users us on us.id = w.user_id left join portal.clients cl on cl.id = w.client_id
-    where w.unit_id = $1 and w.active and (us.role not in ('agent','agency_head') or not exists (select 1 from portal.unit_hidden h where h.unit_id = w.unit_id))
+    where w.unit_id = $1 and w.active and (us.role not in ('agent','agency_head') or (not exists (select 1 from portal.unit_hidden h where h.unit_id = w.unit_id)
+      -- партнёру проект должен быть по-прежнему виден (как visibleSql в lib/catalog.ts)
+      and exists (select 1 from units uu join portal.project_settings ps on ps.project_id = uu.project_id where uu.id = w.unit_id and ps.sales_status in ('sales','stop')
+        and not exists (select 1 from portal.project_exceptions x where x.project_id = ps.project_id and not x.allow and (x.user_id = us.id or x.agency_id = us.agency_id))
+        and (us.market = any(ps.agent_markets) or exists (select 1 from portal.project_exceptions x where x.project_id = ps.project_id and x.allow and (x.user_id = us.id or x.agency_id = us.agency_id))))))
     order by w.created_at limit 1`, [u.id]))[0]
   if (!next) continue
   await q(`update portal.waitlist set active = false, notified_at = now() where id = $1`, [next.id])
@@ -111,7 +115,7 @@ let searchN = 0
 for (const s of searches) {
   const f = s.filters
   const ids = (await q(`select u.id from units u where u.project_id = $1 and ${FREE}
-      and ($2::int is null or u.bedrooms = $2) and ($3::numeric is null or ${'(case when u.price_currency = \'AZN\' then u.price_list / (select azn_per_unit from currency_rates where currency = \'USD\' order by valid_from desc limit 1) else u.price_list end)'} <= $3 * 1000)
+      and ($2::int is null or coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) = $2) -- комнаты как в каталоге (lib/catalog.ts roomsSql) and ($3::numeric is null or ${'(case when u.price_currency = \'AZN\' then u.price_list / (select azn_per_unit from currency_rates where currency = \'USD\' order by valid_from desc limit 1) else u.price_list end)'} <= $3 * 1000)
       and ($4::text is null or ($4 = 'g' and u.plot_area_m2 > 0) or ($4 = 't' and u.area_external_m2 > 0))
       and ($5 not in ('agent','agency_head') or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`,
     [f.project, f.rooms ?? null, f.max ?? null, f.outdoor ?? null, s.role])).map((r) => r.id)
@@ -145,7 +149,7 @@ if (process.env.BITRIX_WEBHOOK) {
 } else out.bitrix_pending = Number((await q(`select count(*)::int n from portal.bitrix_outbox where status <> 'sent'`))[0].n)
 
 // 8. Курсы ЦБ Азербайджана (USD, EUR, ILS) — раз в сутки, для показа цены в валюте рынка (М7). Сбой сайта ЦБ не роняет tick.
-const today = new Date().toISOString().slice(0, 10)
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date()) // дата по Баку
 if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from = $1::date limit 1`, [today])).length) {
   try {
     const d = today.split('-').reverse().join('.')
