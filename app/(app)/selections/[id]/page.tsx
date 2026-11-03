@@ -9,6 +9,7 @@ import type { Plan } from '@/lib/plans'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
+import { joinWaitlist } from '@/lib/waitActions'
 
 export default async function SelectionEdit({ params }: { params: { id: string } }) {
   const c = await requireCtx()
@@ -32,6 +33,7 @@ export default async function SelectionEdit({ params }: { params: { id: string }
       <div className="page split">
         <form action={selectionUpdate} className="card stack">
           <input type="hidden" name="id" value={s.id} />
+          <input type="hidden" name="client" value={s.client_id} />
           {items.length === 0 && <div className="muted">{T('Пусто — добавьте квартиры из каталога или шахматки')}</div>}
           {items.map((i) => {
             const u = units.get(i.unit_id)
@@ -41,7 +43,7 @@ export default async function SelectionEdit({ params }: { params: { id: string }
               <div key={i.unit_id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto', gap: 16, borderBottom: '1px solid var(--line-2)', paddingBottom: 12 }}>
                 <div className="planbox" style={{ padding: 4, height: 110 }}>{planUrl(u.plan_file) && <img src={planUrl(u.plan_file)!} alt="" style={{ maxHeight: 100 }} />}</div>
                 <div>
-                  <div className="row"><b>{unitNo(u)}</b>{!free && <Pill kind="bad">{T('уже занята')}</Pill>}{i.liked && <Pill kind="warn">♥ {T('понравилась на встрече')}</Pill>}</div>
+                  <div className="row"><b>{unitNo(u)}</b>{!free && <Pill kind="bad">{T('уже занята')}</Pill>}{!free && u.status !== 'sold' && <button className="btn btn--sm" formAction={joinWaitlist} name="unit" value={u.id}>{T('Ждать освобождения')}</button>}{i.liked && <Pill kind="warn">♥ {T('понравилась на встрече')}</Pill>}</div>
                   <div className="small muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
                   <div className="mt8"><b>{u.usd ? usd(L, u.usd) : ''}</b></div>
                   <input className="in mt8" name={`note:${u.id}`} defaultValue={i.note || ''} placeholder={T('Заметка для клиента…')} />
