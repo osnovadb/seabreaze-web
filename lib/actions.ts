@@ -11,7 +11,7 @@ import { conditionsFor, split, unitById, projectVisible, plansFor } from './cata
 import { priceChain } from './plans'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
-import { LANGS, t, type Lang } from './i18n'
+import { LANGS, t, bakuYear, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
 import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
@@ -123,7 +123,7 @@ export async function registerClient(_: unknown, f: FormData) {
   const months = cond?.protect_months ?? 3
   // номер — из последовательности (v2): count(*) давал одинаковые номера при одновременной регистрации
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
-  const reg = `R-${new Date().getFullYear()}-0${n!.n}`
+  const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage, protected_until)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead', current_date + ($18 || ' months')::interval) returning id, protected_until::text`,
     [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), s(f, 'language'), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])

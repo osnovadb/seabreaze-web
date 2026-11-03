@@ -1,6 +1,7 @@
 // Заявки с сайтов и смарт-каталога (М5). Портал принимает сырую заявку, проверяет «чей клиент» по телефону и e-mail
 // (правило «кто раньше»), заводит или находит клиента и ставит лид в очередь Bitrix24 (bitrix_outbox).
-import { q, one, notify } from './db'
+import { q, one, tx, notify } from './db'
+import { bakuYear } from './i18n'
 import { conditionsFor } from './catalog'
 
 export type LeadIn = {
@@ -15,8 +16,10 @@ const MARKETS = ['DE', 'IL', 'GLOBAL']
 const clip = (v: unknown, n = 200) => (typeof v === 'string' ? v.trim().slice(0, n) : '')
 
 export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart_catalog', raw: LeadIn, payload: unknown) {
-  const name = clip(raw.name, 120), phone = clip(raw.phone, 40), email = clip(raw.email, 160).toLowerCase()
-  const pn = normPhone(phone)
+  const name = clip(raw.name, 120), email = clip(raw.email, 160).toLowerCase()
+  let phone = clip(raw.phone, 40), pn = normPhone(phone)
+  // опечатка в телефоне при нормальном e-mail — принимаем по e-mail
+  if (pn && pn.length < 7 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { phone = ''; pn = '' }
   const market = MARKETS.includes(clip(raw.market).toUpperCase()) ? clip(raw.market).toUpperCase() : raw.lang === 'he' ? 'IL' : raw.lang === 'de' ? 'DE' : 'GLOBAL'
   const lang = ['ru', 'en', 'de', 'he'].includes(clip(raw.lang)) ? clip(raw.lang) : 'en'
   const utm: Record<string, string> = { ...(raw.utm && typeof raw.utm === 'object' ? raw.utm : {}), ...(raw.gclid ? { gclid: clip(raw.gclid) } : {}), ...(raw.fbclid ? { fbclid: clip(raw.fbclid) } : {}), ...(raw.ttclid ? { ttclid: clip(raw.ttclid) } : {}), ...(raw.page ? { page: clip(raw.page, 500) } : {}) }
@@ -27,11 +30,17 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id`, [source, clip(raw.site, 80) || null, payload, name || null, phone || null, pn || null, email || null, email || null, lang, market, unitId, project?.project_id || null, utm, consent, result, err || null])
   // Спам: ловушка, нет ни телефона, ни e-mail, телефон из мусора
   if (raw._hp || (!pn && !email) || (pn && pn.length < 7) || (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) { const r = await ins('spam'); return { id: r!.id, result: 'spam' as const } }
-  // Повтор той же заявки за 10 минут — не дублируем
-  const rep = await one<{ id: string; result: string }>(`select id, result from portal.inbound_leads where result <> 'spam' and created_at > now() - interval '10 minutes'
+  if (source === 'website' || source === 'quiz' || source === 'landing') { if (!consent) { const r = await ins('error', 'no consent'); return { id: r!.id, result: 'error' as const } } }
+  // Одновременные одинаковые заявки (двойной клик) — по очереди: блокировка по телефону и e-mail до конца обработки
+  return tx(async (t) => {
+    for (const k of [pn.length >= 9 ? 'p:' + pn.slice(-9) : '', email ? 'e:' + email : ''].filter(Boolean).sort()) await t.query('select pg_advisory_xact_lock(hashtext($1))', ['lead:' + k])
+    return matchLead()
+  })
+  async function matchLead() {
+  // Повтор той же заявки за 10 минут — не дублируем (неудачные и спам не считаются)
+  const rep = await one<{ id: string; result: string }>(`select id, result from portal.inbound_leads where result not in ('spam','error') and created_at > now() - interval '10 minutes'
     and ((length($1) >= 9 and right(phone_norm, 9) = right($1, 9)) or ($2 <> '' and email_norm = $2)) order by created_at desc limit 1`, [pn, email])
   if (rep) return { id: rep.id, result: 'repeat' as const }
-  if (source === 'website' || source === 'quiz' || source === 'landing') { if (!consent) { const r = await ins('error', 'no consent'); return { id: r!.id, result: 'error' as const } } }
 
   const dup = await one<{ id: string; owner_id: string; name: string; role: string; market: string | null }>(`select cl.id, cl.owner_id, cl.name, u.role, cl.market from portal.clients cl join portal.users u on u.id = cl.owner_id
     where (length($1) >= 9 and length(cl.phone_norm) >= 9 and right(cl.phone_norm, 9) = right($1, 9)) or (cl.email_norm <> '' and cl.email_norm = $2) order by cl.created_at limit 1`, [pn, email])
@@ -50,7 +59,7 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
     const pid = project?.project_id || (await one<{ id: string }>(`select id from projects where slug = 'premium-residence'`))?.id
     const months = (pid ? (await conditionsFor(pid))?.protect_months : null) ?? 3
     const seq = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
-    const reg = `R-${new Date().getFullYear()}-0${seq!.n}`
+    const reg = `R-${bakuYear()}-${String(seq!.n).padStart(4, '0')}`
     const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, name, phone, phone_norm, email, email_norm, language, market, consent_at, source, interest, stage, protected_until)
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'lead', current_date + ($13 || ' months')::interval) returning id, protected_until::text`,
       [reg, ownerId, name || phone || email, phone || null, pn, email || null, email, lang, market, consent ? new Date() : null, source, clip(raw.comment, 1000) || null, months])
@@ -72,4 +81,5 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
     portal: { client_id: clientId, market, lang, result, unit_id: unitId, gclid: utm.gclid, fbclid: utm.fbclid, ttclid: utm.ttclid, consent },
   }, lead!.id])
   return { id: lead!.id, result, clientId }
+  }
 }
