@@ -1,12 +1,14 @@
 // М9: лента для партнёров — кто что видит, права на запись. Тест кладёт записи «QA …» прямо в seabreeze_v2 и удаляет их.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { bakuToday } from '../../lib/i18n'
 import type pg from 'pg'
 import { SKIP, U, dbConnect, login, page, formWith, submit } from './_portal'
 
 const MR = 'c531e4dd-e500-47cf-b000-febd86a6fc7f' // test-marina: партнёрам закрыт
 let db: pg.Client
-const day = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
+// «сегодня» — по Баку, как в портале (иначе после 20:00 UTC «завтра» теста = сегодня портала)
+const day = (n: number) => bakuToday(new Date(Date.now() + n * 864e5))
 const add = (title: string, x: { markets?: string[]; lang?: string | null; project?: string; starts?: string; ends?: string; kind?: string } = {}) =>
   db.query(`insert into portal.posts (kind, title, lang, markets, project_id, starts_on, ends_on) values ($1,$2,$3,$4,$5,$6,$7)`,
     [x.kind || 'news', title, x.lang === undefined ? 'en' : x.lang, x.markets || [], x.project || null, x.starts || day(0), x.ends || null])

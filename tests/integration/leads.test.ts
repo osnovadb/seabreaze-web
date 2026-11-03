@@ -30,7 +30,7 @@ before(async () => {
 after(async () => {
   if (skip) return
   const leads = (await db.query(`select id from portal.inbound_leads where phone_norm like $1 or name like $2 or email_norm like $3`, [`%151${run}%`, `QA Лид ${run}%`, `qa${run}%`])).rows.map((r) => r.id)
-  const cl = (await db.query(`select id from portal.clients where phone_norm like $1 or name like $2`, [`%151${run}%`, `QA%${run}%`])).rows.map((r) => r.id)
+  const cl = (await db.query(`select id from portal.clients where phone_norm like $1 or name like $2 or email_norm like $3`, [`%151${run}%`, `QA%${run}%`, `qa${run}%`])).rows.map((r) => r.id)
   await db.query(`delete from portal.bitrix_outbox where ref_kind='inbound_lead' and ref_id = any($1)`, [leads])
   await db.query(`delete from portal.inbound_leads where id = any($1)`, [leads])
   await db.query(`delete from portal.notifications where link = any($1)`, [cl.map((id) => `/clients/${id}`)]).catch(() => {})
@@ -96,20 +96,25 @@ test('после отказа «нет согласия» повторная о�
   assert.equal((await clientsByPhone(4)).length, 1)
 })
 
-// Номер клиента: ручная регистрация считает count(*)+142, заявки — последовательность client_reg_seq. Номера пересекаются,
-// а reg_no уникален — заявка падает с 500 и теряется (или падает ручная регистрация).
-test('номера клиентов из заявок и ручной регистрации не пересекаются', { skip }, async () => {
+// Номер клиента: ручная регистрация и заявки берут номер из одной последовательности client_reg_seq (раньше ручная — count(*)+142,
+// номера пересекались, заявка падала 500). Формат R-<год по Баку>-NNNN.
+test('номера клиентов из заявок и ручной регистрации не пересекаются, формат R-ГГГГ-NNNN', { skip }, async () => {
   await age()
   const c = await login(U.agent)
-  const p = await page(c, '/clients/new')
-  const f = formWith(p.html, 'name', 'phone'); assert.ok(f, 'форма регистрации клиента')
+  const f = formWith((await page(c, '/clients/new')).html, 'name', 'phone'); assert.ok(f, 'форма регистрации клиента')
   await submit(c, '/clients/new', f!, { name: `QA Ручной ${run}`, phone: ph(5), consent: 'on', language: 'de' })
   const manual = (await clientsByPhone(5))[0]; assert.ok(manual, 'ручная регистрация прошла')
-  const m = Number(manual.reg_no.split('-').pop())
-  // следующие заявки получают номера из последовательности; ставим её прямо перед номером ручного клиента
-  await db.query(`select setval('portal.client_reg_seq', $1)`, [m - 1])
-  const r = await post(lead(6)), body = await r.text()
-  assert.equal(r.status, 200, `заявка упала: ${r.status} ${body.slice(0, 80)} (номер R-…-0${m} уже у ручного клиента ${manual.reg_no})`)
+  const r = await post(lead(6)); assert.equal(r.status, 200, 'заявка после ручной регистрации')
+  const viaLead = (await clientsByPhone(6))[0]
+  const year = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Baku', year: 'numeric' }).format(new Date())
+  for (const x of [manual.reg_no, viaLead.reg_no]) assert.match(x, new RegExp(`^R-${year}-\\d{4,}$`))
+  assert.ok(Number(viaLead.reg_no.split('-')[2]) > Number(manual.reg_no.split('-')[2]), `${manual.reg_no} → ${viaLead.reg_no}`)
+})
+
+test('телефон-мусор при правильном e-mail: заявка принимается по e-mail', { skip }, async () => {
+  await age()
+  const j = await (await post({ name: `QA Лид ${run}-e`, phone: '12', email: `qa${run}@lead.example`, lang: 'de', consent: { text: 'QA' } })).json()
+  assert.equal((await res(j.id)).result, 'new_client')
 })
 
 test('/admin/leads: партнёр и продавец не видят; руководитель рынка DE видит только DE', { skip }, async () => {

@@ -1,6 +1,7 @@
 // М6: акции и правило сложения на живом локальном портале (seabreeze_v2). Тест создаёт свои акции с именем «QA …» и удаляет их.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { bakuToday } from '../../lib/i18n'
 import type pg from 'pg'
 import { SKIP, U, dbConnect, login, page, formWith, submit, scheduleTotal } from './_portal'
 
@@ -31,7 +32,7 @@ test('четыре режима на «100% сразу» (−5%) + акция 10
 })
 test('просроченная, будущая и выключенная акции не применяются', { skip: SKIP }, async () => {
   await cleanup(); await setMode(MR, 'chain')
-  const d = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
+  const d = (n: number) => bakuToday(new Date(Date.now() + n * 864e5))  // по Баку, как в портале
   await addOffer({ project: MR, name: 'QA вчера', value: 50, ends_on: d(-1) })
   await addOffer({ project: MR, name: 'QA завтра', value: 50, starts_on: d(1) })
   await addOffer({ project: MR, name: 'QA выкл', value: 50, active: false })
