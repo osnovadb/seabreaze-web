@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { q, one, tx, audit } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { t } from './i18n'
+import { autoPost } from './posts'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
@@ -217,12 +218,15 @@ export const saveAccess = safe(async (_: unknown, f: FormData) => {
   const c = await owner()
   const pid = s(f, 'project')
   const st = ['draft', 'sales', 'stop', 'closed'].includes(s(f, 'sales_status')) ? s(f, 'sales_status') : 'draft'
+  const was = (await one<{ sales_status: string }>('select sales_status from portal.project_settings where project_id = $1', [pid]))?.sales_status
   const markets = ['DE', 'IL', 'GLOBAL'].filter((m) => f.get('m_' + m))
   // Ссылка «На сайте» — своя для партнёров каждого рынка
   const urls: Record<string, string> = {}
   for (const m of ['DE', 'IL', 'GLOBAL']) if (/^https?:\/\//.test(s(f, 'url_' + m))) urls[m] = s(f, 'url_' + m)
   await q(`insert into portal.project_settings (project_id, sales_status, agent_markets, site_urls, updated_at) values ($1,$2,$3,$4, now())
     on conflict (project_id) do update set sales_status = $2, agent_markets = $3, site_urls = $4, updated_at = now()`, [pid, st, markets, JSON.stringify(urls)])
+  // Лента партнёров (М9): старт продаж — один раз на день
+  if (st === 'sales' && was !== 'sales') { const pr = await one<{ name: string; slug: string }>('select name, slug from projects where id = $1', [pid]); await autoPost(`sales:${pid}:${new Date().toISOString().slice(0, 10)}`, 'Старт продаж: {p}', { p: pr?.name || '' }, pid, `/projects/${pr?.slug}`) }
   // Сайты рынков — каталог (project_markets): то, что видят покупатели
   for (const m of ['dach', 'il']) {
     const on = !!f.get('site_' + m)
@@ -264,7 +268,12 @@ export const savePromo = safe(async (_: unknown, f: FormData) => {
   if (from && to && to < from) return { error: t(c.lang, 'Дата окончания раньше начала') }
   const vals = [s(f, 'name').slice(0, 120), s(f, 'badge').slice(0, 30) || null, kind, value, cur, unitIds, from, to, !!f.get('active'), bid]
   if (id) await q(`update portal.special_offers set name = $2, badge = $3, kind = $4, value = $5, currency = $6, unit_ids = $7, starts_on = $8, ends_on = $9, active = $10, building_id = $11 where id = $1 and project_id = $12 and source = 'manual'`, [id, ...vals, pid])
-  else await q(`insert into portal.special_offers (name, badge, kind, value, currency, unit_ids, starts_on, ends_on, active, building_id, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [...vals, pid, c.user.id])
+  else {
+    const r = await one<{ id: string }>(`insert into portal.special_offers (name, badge, kind, value, currency, unit_ids, starts_on, ends_on, active, building_id, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`, [...vals, pid, c.user.id])
+    // Лента партнёров (М9): новая акция
+    const pr = await one<{ name: string; slug: string }>('select name, slug from projects where id = $1', [pid])
+    if (f.get('active')) await autoPost('promo:' + r!.id, 'Новая акция «{n}» в проекте {p}', { n: s(f, 'name'), p: pr?.name || '' }, pid, `/projects/${pr?.slug}`)
+  }
   await log(c, id ? 'object.promo_update' : 'object.promo_create', 'project', pid, { name: s(f, 'name'), kind, value }); done(pid)
   return { ok: true }
 })
