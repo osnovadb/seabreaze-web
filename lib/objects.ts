@@ -242,3 +242,37 @@ export async function saveException(f: FormData) {
   }
   await log(c, 'object.exception', 'project', pid, { who: s(f, 'who'), allow: s(f, 'allow'), del: s(f, 'delete') || undefined }); done(pid)
 }
+
+/* ── Акции застройщика и правило сложения (v2 · М6) ── */
+export const savePromo = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), id = s(f, 'id')
+  if (s(f, 'delete')) { await q(`delete from portal.special_offers where id = $1 and project_id = $2 and source = 'manual'`, [id, pid]); await log(c, 'object.promo_delete', 'project', pid); done(pid); return { ok: true } }
+  const kind = s(f, 'kind') === 'fixed' ? 'fixed' : 'pct', value = num(f, 'value')
+  if (!s(f, 'name')) return { error: t(c.lang, 'Нужно название') }
+  if (value == null || !(value > 0) || (kind === 'pct' && value >= 100)) return { error: t(c.lang, 'Скидка: процент от 0 до 100 или сумма больше нуля') }
+  const cur = kind === 'fixed' ? (s(f, 'currency') || 'USD').toUpperCase().slice(0, 3) : null
+  const bid = s(f, 'building') || null
+  // Квартиры — номерами через запятую (как в шахматке); пусто — весь проект или блок
+  const nums = s(f, 'units').split(/[\s,;]+/).filter(Boolean)
+  let unitIds: string[] | null = null
+  if (nums.length) {
+    unitIds = (await q<{ id: string }>(`select id from units where project_id = $1 and ($2::uuid is null or building_id = $2) and number = any($3)`, [pid, bid, nums])).map((r) => r.id)
+    if (unitIds.length !== nums.length) return { error: t(c.lang, 'Не все квартиры найдены: {n} из {m}', { n: unitIds.length, m: nums.length }) }
+  }
+  const from = s(f, 'starts_on') || null, to = s(f, 'ends_on') || null
+  if (from && to && to < from) return { error: t(c.lang, 'Дата окончания раньше начала') }
+  const vals = [s(f, 'name').slice(0, 120), s(f, 'badge').slice(0, 30) || null, kind, value, cur, unitIds, from, to, !!f.get('active'), bid]
+  if (id) await q(`update portal.special_offers set name = $2, badge = $3, kind = $4, value = $5, currency = $6, unit_ids = $7, starts_on = $8, ends_on = $9, active = $10, building_id = $11 where id = $1 and project_id = $12 and source = 'manual'`, [id, ...vals, pid])
+  else await q(`insert into portal.special_offers (name, badge, kind, value, currency, unit_ids, starts_on, ends_on, active, building_id, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [...vals, pid, c.user.id])
+  await log(c, id ? 'object.promo_update' : 'object.promo_create', 'project', pid, { name: s(f, 'name'), kind, value }); done(pid)
+  return { ok: true }
+})
+export const savePromoMode = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), mode = s(f, 'mode')
+  if (!['chain', 'sum', 'best', 'exclusive'].includes(mode)) return { error: 'mode' }
+  await q(`insert into portal.project_settings (project_id, promo_mode) values ($1, $2) on conflict (project_id) do update set promo_mode = excluded.promo_mode`, [pid, mode])
+  await log(c, 'object.promo_mode', 'project', pid, { mode }); done(pid)
+  return { ok: true }
+})

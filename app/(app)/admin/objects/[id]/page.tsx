@@ -9,7 +9,7 @@ import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { saveGenplan, saveFacade, saveFloorPlan, saveRisers } from '@/lib/markup'
 import { riser as riserOf } from '@/lib/catalog'
-import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, bulkUnits, savePlan, saveAccess, saveException } from '@/lib/objects'
+import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, bulkUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode } from '@/lib/objects'
 
 const TYPES = ['studio', '1br', '2br', '3br', '4br', 'duplex', 'penthouse', 'townhouse', 'villa', 'commercial', 'parking']
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
@@ -24,7 +24,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   if (!p) notFound()
   const ps = await one<{ sales_status: string; agent_markets: string[]; site_urls: Record<string, string> }>('select sales_status, agent_markets, site_urls from portal.project_settings where project_id = $1', [p.id])
   const tab = owner ? searchParams.tab || 'main' : 'units'
-  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['plans', 'Планы оплаты'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры']]
+  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры']]
   const blocks = await q<{ id: string; name: string; external_id: string | null; kind: string; floors_total: number | null; delivery: string | null; sort: number; n: number }>(
     'select b.id, b.name, b.external_id, b.kind, b.floors_total, b.delivery, b.sort, (select count(*)::int from units u where u.building_id = b.id) n from buildings b where b.project_id = $1 order by b.sort, b.name', [p.id])
   const layouts = await q<{ id: string; code: string; unit_type: string; name: string | null; bedrooms: number | null; internal_area_m2: number | null; external_area_m2: number | null; total_area_m2: number | null; plan_file: string | null; n: number }>(
@@ -44,6 +44,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         {tab === 'layouts' && <Layouts />}
         {tab === 'units' && <Units />}
         {tab === 'plans' && <Plans />}
+        {tab === 'promos' && <Promos />}
         {tab === 'access' && <Access />}
         {tab === 'markup' && <Markup />}
         {tab === 'orient' && <Orient />}
@@ -224,6 +225,53 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         <div className="label">{T('Новый план оплаты')}</div>
         {row()}
         <div className="tiny muted">{T('Скидка за 100% — скидка застройщика: снижает цену до раздела денег, фикс и пул считаются от сниженной цены. Планы видят партнёры в карточке квартиры и при брони, клиент — в режиме показа и на сайтах.')}</div>
+      </div>
+    )
+  }
+
+  // Акции застройщика (М6): пока вручную, после подключения Profitbase — из API (такие только для чтения)
+  async function Promos() {
+    const mode = (await one<{ promo_mode: string }>('select promo_mode from portal.project_settings where project_id = $1', [p!.id]))?.promo_mode || 'chain'
+    const rows = await q<{ id: string; name: string; badge: string | null; kind: string; value: number; currency: string | null; building_id: string | null; nums: string | null; starts_on: string | null; ends_on: string | null; active: boolean; source: string }>(
+      `select o.id, o.name, o.badge, o.kind, o.value::float, o.currency, o.building_id, (select string_agg(u.number, ', ' order by u.number) from units u where u.id = any(o.unit_ids)) nums,
+         o.starts_on::text, o.ends_on::text, o.active, o.source from portal.special_offers o where o.project_id = $1 order by o.active desc, o.ends_on nulls last, o.created_at`, [p!.id])
+    const cur = (await one<{ c: string }>('select price_currency c from units where project_id = $1 group by 1 order by count(*) desc limit 1', [p!.id]))?.c || 'USD'
+    const MODES: [string, string][] = [['chain', 'По очереди: скидка за 100%, затем акция, затем пул'], ['sum', 'Проценты складываются'], ['best', 'Бо́льшая из акции и скидки за 100%'], ['exclusive', 'При акции скидки из пула нет']]
+    const row = (o?: (typeof rows)[number]) => (
+      <ActionForm key={o?.id || 'new'} action={savePromo} lang={L} reset={!o} className="card stack" style={{ gap: 8 }}>
+        <input type="hidden" name="project" value={p!.id} />{o && <input type="hidden" name="id" value={o.id} />}
+        {o?.source === 'profitbase' && <div className="tiny muted">{T('Из Profitbase — меняется только у застройщика')}</div>}
+        <div className="grid g3">
+          <label className="field"><span>{T('Название')}</span><input className="in" name="name" defaultValue={o?.name} placeholder={T('Осенняя акция')} required /></label>
+          <label className="field"><span>{T('Бейдж')}</span><input className="in" name="badge" defaultValue={o?.badge || ''} placeholder="−5%" /></label>
+          <label className="field"><span>{T('Где действует')}</span><select className="in" name="building" defaultValue={o?.building_id || ''}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        </div>
+        <div className="grid g4">
+          <label className="field"><span>{T('Тип')}</span><select className="in" name="kind" defaultValue={o?.kind || 'pct'}><option value="pct">{T('Процент')}</option><option value="fixed">{T('Сумма')}</option></select></label>
+          <label className="field"><span>{T('Скидка')}</span><input className="in" name="value" inputMode="decimal" defaultValue={o?.value ?? ''} required /></label>
+          <label className="field"><span>{T('Валюта суммы')}</span><input className="in" name="currency" defaultValue={o?.currency || cur} /></label>
+          <label className="field"><span>{T('Квартиры (номера)')}</span><input className="in" name="units" defaultValue={o?.nums || ''} placeholder={T('пусто — все')} /></label>
+        </div>
+        <div className="grid g3">
+          <label className="field"><span>{T('Действует с')}</span><input className="in" name="starts_on" type="date" defaultValue={o?.starts_on || ''} /></label>
+          <label className="field"><span>{T('по')}</span><input className="in" name="ends_on" type="date" defaultValue={o?.ends_on || ''} /></label>
+          <label className="check" style={{ alignSelf: 'end' }}><input type="checkbox" name="active" defaultChecked={o ? o.active : true} /> <span>{T('Активна')}</span></label>
+        </div>
+        {o?.source !== 'profitbase' && <div className="row"><button className="btn btn--sm btn--p">{o ? T('Сохранить') : T('Добавить акцию')}</button>{o && <button className="btn btn--sm" name="delete" value="1">{T('Удалить')}</button>}</div>}
+      </ActionForm>
+    )
+    return (
+      <div className="stack">
+        <ActionForm action={savePromoMode} lang={L} className="card stack" style={{ gap: 8, maxWidth: 640 }}>
+          <input type="hidden" name="project" value={p!.id} />
+          <div className="h3" style={{ margin: 0 }}>{T('Как акция складывается со скидками')}</div>
+          <select className="in" name="mode" defaultValue={mode}>{MODES.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+          <div className="tiny muted">{T('Скидка за 100% и акция уменьшают цену до раздела денег: фикс и пул считаются от неё. Скидки и суммы — в валюте проекта.')}</div>
+          <div><button className="btn btn--sm">{T('Сохранить правило')}</button></div>
+        </ActionForm>
+        {rows.map((o) => row(o))}
+        <div className="label">{T('Новая акция')}</div>
+        {row()}
       </div>
     )
   }

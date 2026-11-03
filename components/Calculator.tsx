@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { paymentRows, planBase, isFull, termUnknown, type Plan, type Row } from '@/lib/plans'
+import { paymentRows, priceChain, isFull, termUnknown, type Plan, type Row, type PromoView, type PromoMode } from '@/lib/plans'
 import { t, usd, pct, num, date, type Lang } from '@/lib/i18n'
 
 // Курс для справочной колонки в валюте рынка (lib/fx.ts на сервере)
@@ -53,8 +53,8 @@ export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand
 
 // Калькулятор (М7): выбор плана, дата первого взноса, график по датам и пересчёт в валюту рынка.
 // price — прайс в USD; скидка за 100% применяется здесь, персональная скидка — только в брони (discountPct).
-export function Calculator({ plans, price, lang, fx, discountPct = 0, initialPlan, title, note = true }: {
-  plans: Plan[]; price: number; lang: Lang; fx: FxView; discountPct?: number; initialPlan?: string; title?: string; note?: boolean
+export function Calculator({ plans, price, lang, fx, discountPct = 0, initialPlan, title, note = true, promo, mode = 'chain' }: {
+  plans: Plan[]; price: number; lang: Lang; fx: FxView; discountPct?: number; initialPlan?: string; title?: string; note?: boolean; promo?: PromoView | null; mode?: PromoMode
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [planId, setPlanId] = useState(initialPlan && plans.some((p) => p.id === initialPlan) ? initialPlan : plans[0]?.id)
@@ -62,19 +62,20 @@ export function Calculator({ plans, price, lang, fx, discountPct = 0, initialPla
   const [open, setOpen] = useState(false)
   const plan = plans.find((p) => p.id === planId)
   if (!plans.length || !plan) return null
-  const base = planBase(plan, price), total = base * (1 - discountPct / 100)
+  const ch = priceChain(price, plan, promo, mode), base = ch.base, total = base * (1 - discountPct / 100)
   return (
     <div className="card">
       <div className="h3">{title ?? T('Калькулятор и график платежей')}</div>
       <div className="chips mt8 noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => { setPlanId(p.id); setOpen(false) }}>{p.name}</button>)}</div>
       <div className="small muted mt8">
         {isFull(plan)
-          ? (Number(plan.full_payment_discount_pct) ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, base) }) : T('Полная оплата'))
+          ? (ch.planAmt > 0 ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, base) }) : T('Полная оплата'))
           : termUnknown(plan) ? T('Первый взнос {p}; срок и платежи — по графику застройщика', { p: pct(lang, Number(plan.down_payment_pct)) })
             : T('Первый взнос {p}, затем {m} ежемесячных платежей', { p: pct(lang, Number(plan.down_payment_pct)), m: plan.months || 0 })}
         {discountPct ? ' · ' + T('с учётом скидки {p}', { p: pct(lang, discountPct) }) : ''}
       </div>
       {plan.source_note && <div className="tiny muted mt8">{plan.source_note}</div>}
+      {promo && <div className="kv mt8"><span>{T('Акция «{n}»', { n: promo.name })}{promo.ends_on ? <div className="tiny muted">{T('до {d}', { d: date(lang, promo.ends_on) })}</div> : null}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
       <label className="field mt16 noprint" style={{ maxWidth: 220 }}><span>{T('Дата первого взноса')}</span>
         <input className="in" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
       <ScheduleTable plan={plan} price={total} lang={lang} fx={fx} start={start} expanded={open} onExpand={() => setOpen(true)} />

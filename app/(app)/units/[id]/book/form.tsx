@@ -1,10 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useFormState, useFormStatus } from 'react-dom'
 import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
-import { planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
+import { priceChain, isFull, termUnknown, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import { ScheduleTable, type FxView } from '@/components/Calculator'
 import { t, usd, pct, type Lang } from '@/lib/i18n'
 
@@ -12,16 +12,19 @@ function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{label}</button>
 }
-export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, preset, showOurs }: {
+export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs }: {
   lang: Lang; unitId: string; list: number; ext: boolean; cap: number; ceiling: number; cond: SplitCond; days: number; ext_days: number
-  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; preset?: string; showOurs: boolean
+  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [disc, setDisc] = useState(0)
   const [planId, setPlanId] = useState(plans[0]?.id || '')
   const plan = plans.find((p) => p.id === planId)
   // Скидка застройщика за 100% снижает цену до раздела денег
-  const list = planBase(plan, priceList)
+  const ch = priceChain(priceList, plan, promo, mode)
+  const list = ch.base
+  const maxDisc = ch.poolAllowed ? ceiling : 0
+  useEffect(() => { if (disc > maxDisc) setDisc(maxDisc) }, [maxDisc]) // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false)
   const [st, act] = useFormState(createBooking, null)
   const sp = split(cond, list, disc, ext)
@@ -40,8 +43,9 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         )}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
         <div className="small muted">{ext ? T('Вам выделено {p} от прайса: сколько отдать клиенту, а сколько оставить себе — решаете вы', { p: pct(lang, cond.agent_pool_pct) }) : T('Сами — до {p}, больше — с согласованием руководителя', { p: pct(lang, cap) })}</div>
-        <input className="disc mt16" type="range" min={0} max={ceiling} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} name="discount" />
-        <div className="between small muted"><span>0%</span><b style={{ color: 'var(--ink)' }}>{pct(lang, disc)}</b><span>{pct(lang, ceiling)}</span></div>
+        <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} name="discount" />
+        <div className="between small muted"><span>0%</span><b style={{ color: 'var(--ink)' }}>{pct(lang, disc)}</b><span>{pct(lang, maxDisc)}</span></div>
+        {!ch.poolAllowed && <div className="note mt8">{T('По условиям акции «{n}» скидка из пула не применяется.', { n: promo?.name || '' })}</div>}
         {disc > cap && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, cap) })}</div>}
         <div className="grid g2 mt16">
           <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, sp.final)}</div><div className="tiny muted">{T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) })}</div></div>
@@ -52,7 +56,10 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         </div>
         {plan && <><div className="label mt16">{T('График платежей')}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
         <div className="mt16">
-          <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, list)}</span></div>
+          <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, priceList)}</span></div>
+          {ch.planAmt > 0 && <div className="kv"><span>{T('Скидка за 100%')}</span><span>−{usd(lang, ch.planAmt)}</span></div>}
+          {promo && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
+          {disc > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, sp.discount)} ({pct(lang, disc)})</span></div>}
           <div className="kv"><span>{T('Итоговая цена')}</span><span>{usd(lang, sp.final)}</span></div>
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}
           {ext && <div className="kv"><span>{T('Ваша часть пула, не отданная клиенту')}</span><span>{pct(lang, Math.max(0, cond.agent_pool_pct - disc))} · {usd(lang, sp.agentPoolLeft)}</span></div>}

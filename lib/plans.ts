@@ -43,3 +43,19 @@ export function paymentRows(p: Plan, price: number, start: Date = new Date()): R
   return rows
 }
 const daysIn = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+
+// Акция застройщика и правило сложения (М6). Скидка за 100% и акция уменьшают цену до раздела денег —
+// от получившейся базы считаются фикс и пул, как раньше от planBase. Фиксированная акция — в USD уже на квартире.
+export type PromoMode = 'chain' | 'sum' | 'best' | 'exclusive'
+export type PromoView = { id: string; name: string; badge: string | null; kind: 'pct' | 'fixed'; pct: number; usd: number; ends_on: string | null }
+export function priceChain(list: number, plan: Plan | null | undefined, promo: PromoView | null | undefined, mode: PromoMode = 'chain') {
+  const planPct = plan && isFull(plan) ? Number(plan.full_payment_discount_pct || 0) : 0
+  const planAmt0 = list * planPct / 100
+  const promoOf = (from: number) => (!promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, from) : from * promo.pct / 100)
+  let planAmt = planAmt0, promoAmt = 0
+  if (mode === 'sum') promoAmt = promoOf(list)
+  else if (mode === 'best') { const pa = promoOf(list); if (pa > planAmt0) { promoAmt = pa; planAmt = 0 } }
+  else promoAmt = promoOf(list - planAmt0)
+  const base = Math.max(0, list - planAmt - promoAmt)
+  return { list, planPct, planAmt, promoAmt, base, promoApplied: promoAmt > 0, poolAllowed: !(mode === 'exclusive' && promoAmt > 0) }
+}

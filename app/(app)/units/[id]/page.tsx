@@ -6,6 +6,8 @@ import { t, usd, m2, date, dateTime } from '@/lib/i18n'
 import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
+import { promoForUnit } from '@/lib/promo'
+import { priceChain } from '@/lib/plans'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
@@ -39,6 +41,8 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const bk = u.booking_id ? (await q<{ client: string; agent: string; status: string; ends_at: string; final_price: number }>(`select cl.name client, us.name agent, b.status, b.ends_at, b.final_price::float from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [u.booking_id]))[0] : null
   const plans = await plansFor(u.project_id, u.building_id)
   const fx = await fxFor(c.user.market, L)
+  const { promo, mode: promoMode } = await promoForUnit(u)
+  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]
   return (
@@ -57,7 +61,8 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
         </div>
         <div className="stack">
           <div className="card">
-            <div className="big num">{u.usd ? usd(L, u.usd) : T('Цена по запросу')}</div>
+            {promo && <div className="row" style={{ gap: 6, marginBottom: 6 }}><Pill kind="ok">{promo.badge || T('Акция')}</Pill><span className="small muted">{promo.name}{promo.ends_on ? ' · ' + T('до {d}', { d: date(L, promo.ends_on) }) : ''}</span></div>}
+            <div className="big num">{promoPrice ? <>{usd(L, promoPrice)} <s className="muted small">{usd(L, u.usd!)}</s></> : u.usd ? usd(L, u.usd) : T('Цена по запросу')}</div>
             {perM2 && <div className="small muted">{usd(L, perM2)}/{L === 'ru' ? 'м²' : 'm²'}{outdoor ? ' · ' + T('с учётом сада или террасы') : ''} · {T('прайс застройщика, USD')}{u.currency !== 'USD' ? ` (${T('пересчёт из')} ${u.currency})` : ''}</div>}
             <div className="mt16">
               <div className="kv"><span>{T('Общая площадь')}</span><span>{m2(L, u.area)}</span></div>
@@ -84,7 +89,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>
             )}
           </div>
-          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} />}
+          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={promoMode} />}
           {!ext && (
             <div className="card card--sand">
               <div className="label" style={{ color: 'var(--bronze)' }}>{T('Только для команды')}</div>
