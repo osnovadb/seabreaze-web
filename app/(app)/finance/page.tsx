@@ -5,6 +5,9 @@ import { t, usd, pct, date } from '@/lib/i18n'
 import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { dealStage, dealPaid } from '@/lib/actions'
+import { actDocument, payActNow } from '@/lib/docActions'
+import { ACT_STATUS } from '@/lib/acts'
+import { ActionForm } from '@/components/ActionForm'
 
 export default async function Finance() {
   const c = await requireCtx()
@@ -15,6 +18,11 @@ export default async function Finance() {
      from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id join portal.clients cl on cl.id = d.client_id
      left join portal.users ag on ag.id = d.agent_id left join portal.users se on se.id = d.seller_id ${c.user.role === 'market_head' ? 'where cl.market = $1' : ''} order by d.created_at desc`, c.user.role === 'market_head' ? [c.user.market] : [])
   const sum = (k: 'final_price' | 'agent_amount' | 'our_amount' | 'seller_amount') => deals.filter((d) => d.stage !== 'cancelled').reduce((a, d) => a + d[k], 0)
+  const acts = await q<{ id: string; unit: string; client: string; agent: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; docx: string | null; created_at: string }>(
+    `select ca.id, coalesce(bl.external_id,'') || '-' || un.number unit, cl.name client, ag.name agent, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, doc.docx_file_id docx, ca.created_at
+     from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id join portal.users ag on ag.id = ca.agent_id left join portal.documents doc on doc.id = ca.document_id
+     ${c.user.role === 'market_head' ? 'where cl.market = $1' : ''} order by ca.status = 'due' desc, ca.created_at desc`, c.user.role === 'market_head' ? [c.user.market] : [])
+  const fin = ['owner', 'finance'].includes(c.user.role)
   const stages: [string, string][] = [['contract', 'Договор'], ['payments', 'Платежи клиента'], ['fee_received', 'Вознаграждение получено'], ['paid_out', 'Выплачено агенту'], ['cancelled', 'Отменена']]
   return (
     <>
@@ -37,6 +45,23 @@ export default async function Finance() {
           </tbody>
         </table></div>
         <div className="small muted mt8">{T('Суммы считаются по условиям проекта на дату брони (снимок условий хранится в брони).')}</div>
+        <div className="h2 mt24">{T('Акты вознаграждения партнёрам')}</div>
+        <div className="tbl-wrap mt8"><table className="tbl">
+          <thead><tr>{['Сделка', 'Партнёр', 'Комиссия', 'Удержано', 'К выплате', 'Статус', 'Документ'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
+          <tbody>
+            {acts.length === 0 && <tr><td colSpan={7} className="muted">{T('Актов пока нет')}</td></tr>}
+            {acts.map((a) => (
+              <tr key={a.id}>
+                <td><b>{a.unit}</b><div className="tiny muted">{a.client}</div></td><td className="small">{a.agent}</td><td>{usd(L, a.amount)}</td>
+                <td>{a.status === 'clawback' ? <span className="badc">{T('вернуть {a}', { a: usd(L, a.clawback_left) })}</span> : a.deducted ? '−' + usd(L, a.deducted) : '—'}</td>
+                <td><b>{a.status === 'clawback' || a.status === 'void' ? '—' : usd(L, a.amount - a.deducted)}</b></td>
+                <td><Pill kind={ACT_STATUS[a.status][1]}>{T(ACT_STATUS[a.status][0])}</Pill>{fin && a.status === 'due' && <form action={payActNow} className="mt8"><input type="hidden" name="id" value={a.id} /><button className="btn btn--sm btn--p">{T('Выплатить')}</button></form>}</td>
+                <td className="small">{a.number ? <>{a.number}<div className="tiny">{a.pdf && <a href={`/files/${a.pdf}`} target="_blank">PDF</a>}{a.docx && <> · <a href={`/files/${a.docx}`}>docx</a></>}</div></> : fin && a.status !== 'void' ? <ActionForm action={actDocument} lang={L}><input type="hidden" name="id" value={a.id} /><button className="btn btn--sm">{T('Создать акт')}</button></ActionForm> : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <div className="small muted mt8">{T('Расторжение после выплаты создаёт возврат: он удерживается из следующих выплат партнёру. Выплата акта переводит сделку в «Выплачено агенту».')}</div>
       </div>
     </>
   )

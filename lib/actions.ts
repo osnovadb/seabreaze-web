@@ -15,6 +15,7 @@ import { LANGS, t, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
 import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
+import { syncAct } from './acts'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -379,6 +380,8 @@ export async function bookingAction(f: FormData) {
       await t.query(`update portal.clients set stage = 'contract' where id = $1`, [b.client_id])
     })
     await notify(b.agent_id, 'deal', 'Договор подписан — сделка в работе', '/commission')
+    const nd = await one<{ id: string }>('select id from portal.deals where booking_id = $1', [id])
+    if (nd) await syncAct(nd.id)
   }
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
   revalidatePath('/bookings')
@@ -779,6 +782,7 @@ export async function dealStage(f: FormData) {
   await q(`update portal.deals set stage = $2, paid_pct = case when $2 in ('fee_received','paid_out') then 100 else paid_pct end, paid_out_at = case when $2 = 'paid_out' then current_date else paid_out_at end where id = $1`, [s(f, 'id'), st])
   const d = await one<{ agent_id: string | null }>('select agent_id from portal.deals where id = $1', [s(f, 'id')])
   if (d?.agent_id && st === 'paid_out') await notify(d.agent_id, 'payout', 'Комиссия выплачена', '/commission')
+  await syncAct(s(f, 'id')) // М4: акт вознаграждения следует за стадией сделки
   await audit(c.real.id, 'deal.' + st, 'deal', s(f, 'id'))
   revalidatePath('/finance')
 }
