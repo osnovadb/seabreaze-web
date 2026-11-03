@@ -6,7 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { q, one, tx, audit } from './db'
+import { q, one, tx, audit, notify as notifyUser } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { t } from './i18n'
 import { autoPost, dropAutoPost } from './posts'
@@ -153,7 +153,14 @@ export const saveUnit = safe(async (_: unknown, f: FormData) => {
   }
   // Скрыть от партнёров — отдельная отметка портала, на сайты не влияет
   if (id && f.has('hidden_set')) {
-    if (s(f, 'hidden') === '1') await q(`insert into portal.unit_hidden (unit_id, created_by) values ($1,$2) on conflict do nothing`, [id, c.user.id])
+    if (s(f, 'hidden') === '1') {
+      await q(`insert into portal.unit_hidden (unit_id, created_by) values ($1,$2) on conflict do nothing`, [id, c.user.id])
+      // М12: партнёры в листе ожидания на скрытую квартиру — запись закрывается с уведомлением, а не висит молча
+      const gone = await q<{ id: string; user_id: string; unit: string }>(`update portal.waitlist w set active = false from portal.users us, units u join buildings b on b.id = u.building_id
+        where w.unit_id = $1 and w.active and us.id = w.user_id and us.role in ('agent','agency_head') and u.id = w.unit_id
+        returning w.id, w.user_id, coalesce(b.external_id, '') || '-' || u.number unit`, [id])
+      for (const g of gone) await notifyUser(g.user_id, 'waitlist', 'Квартира {u} снята с продажи для партнёров — вы убраны из листа ожидания', '/waitlist', { u: g.unit })
+    }
     else await q('delete from portal.unit_hidden where unit_id = $1', [id])
   }
   await log(c, id ? 'object.unit_update' : 'object.unit_create', 'unit', id || s(f, 'number'), { price, status }); done(pid)
