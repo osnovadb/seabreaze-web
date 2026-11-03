@@ -1,12 +1,13 @@
 'use server'
 // Действия М8: шаблоны документов (владелец и контент), создание документа по брони или фиксации, статусы и подписанная копия.
 import { revalidatePath } from 'next/cache'
-import { q, one, audit } from './db'
+import { q, one, audit, notify } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { clientScope } from './scope'
 import { storeFile, isFile } from './files'
 import { t, LANGS, type Lang } from './i18n'
 import { DOC_KINDS, inspectTemplate, varAllowed, createDocument, canEditTemplates, type DocKind } from './docs'
+import { syncAct } from './acts'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function writeCtx() {
@@ -94,4 +95,34 @@ export async function docStatus(_: unknown, f: FormData) {
   await log(c, 'document.' + to, 'document', d.id)
   revalidatePath(`/clients/${d.client_id}`)
   return { ok: true }
+}
+
+// Акт вознаграждения из «Финансов» (М4 + М8): документ по сделке акта, язык — интерфейса партнёра
+export async function actDocument(_: unknown, f: FormData) {
+  const c = await writeCtx()
+  if (!['owner', 'finance'].includes(c.user.role)) return { error: 'Нет прав' }
+  const a = await one<{ id: string; client_id: string; booking_id: string; locale: string }>(`select ca.id, d.client_id, d.booking_id, u.locale from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join portal.users u on u.id = ca.agent_id where ca.id = $1`, [s(f, 'id')])
+  if (!a?.booking_id) return { error: 'Нет прав' }
+  try {
+    const d = await createDocument('commission_act', (LANGS.includes(a.locale as Lang) ? a.locale : 'en') as Lang, { clientId: a.client_id, bookingId: a.booking_id }, c.user.id)
+    await q('update portal.commission_acts set document_id = $2 where id = $1', [a.id, d.id])
+    await log(c, 'document.create', 'document', d.id, { kind: 'commission_act', number: d.number })
+    revalidatePath('/finance')
+    return { ok: true }
+  } catch (e: any) {
+    return { error: String(e?.message) === 'template' ? t(c.lang, 'Нет шаблона для этого вида документа — загрузите его в «Шаблоны документов»') : t(c.lang, 'Документ не создан: {e}', { e: String(e?.message || '').slice(0, 80) }) }
+  }
+}
+export async function payActNow(f: FormData) {
+  const c = await writeCtx()
+  if (!['owner', 'finance'].includes(c.user.role)) return
+  const a = await one<{ deal_id: string }>(`select deal_id from portal.commission_acts where id = $1 and status = 'due'`, [s(f, 'id')])
+  if (!a) return
+  // выплата акта = стадия сделки «выплачено агенту»; вычет возвратов — в payAct
+  await q(`update portal.deals set stage = 'paid_out', paid_pct = 100, paid_out_at = current_date where id = $1`, [a.deal_id])
+  await syncAct(a.deal_id)
+  const ag = await one<{ agent_id: string }>('select agent_id from portal.commission_acts where id = $1', [s(f, 'id')])
+  if (ag) await notify(ag.agent_id, 'payout', 'Комиссия выплачена', '/commission')
+  await log(c, 'act.pay', 'commission_act', s(f, 'id'))
+  revalidatePath('/finance')
 }

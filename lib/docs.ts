@@ -26,10 +26,11 @@ export const VARS: Record<string, string> = {
   'unit.number': 'номер квартиры', 'unit.block': 'блок', 'unit.floor': 'этаж', 'unit.rooms': 'комнат', 'unit.area': 'площадь, м²',
   'booking.price_list': 'прайс застройщика', 'booking.promo': 'акция (название и сумма)', 'booking.discount_pct': 'скидка, %', 'booking.discount': 'скидка, сумма',
   'booking.final': 'итоговая цена', 'booking.currency': 'валюта', 'booking.plan': 'план оплаты', 'booking.starts_at': 'дата брони', 'booking.ends_at': 'бронь до', 'booking.days': 'срок брони, дней',
+  'act.amount': 'комиссия по акту', 'act.deducted': 'удержано в счёт возвратов', 'act.net': 'к выплате по акту',
   'fixation.sent_at': 'дата отправки на фиксацию', 'fixation.decided_at': 'дата решения застройщика', 'fixation.protected_until': 'клиент закреплён до',
 }
 // Переменные брони и квартиры есть только у документов по брони, фиксации — только у акта фиксации
-export const varAllowed = (kind: DocKind, v: string) => (v.startsWith('booking.') || v.startsWith('unit.') ? kind !== 'fixation_act' : v.startsWith('fixation.') ? kind === 'fixation_act' : true)
+export const varAllowed = (kind: DocKind, v: string) => (v.startsWith('act.') ? kind === 'commission_act' : v.startsWith('booking.') || v.startsWith('unit.') ? kind !== 'fixation_act' : v.startsWith('fixation.') ? kind === 'fixation_act' : true)
 
 // Шаблон: проверить переменные. Возвращает найденные имена или бросает Error('vars:<имена>')
 export function inspectTemplate(buf: Buffer): string[] {
@@ -104,6 +105,10 @@ async function collect(kind: DocKind, lang: Lang, src: { clientId: string; booki
       'booking.final': money(lang, b.final_price), 'booking.currency': 'USD', 'booking.plan': plan?.name || '',
       'booking.starts_at': date(lang, b.starts_at), 'booking.ends_at': date(lang, b.ends_at), 'booking.days': String(b.snapshot?.booking_days ?? ''),
     })
+  }
+  if (kind === 'commission_act') {
+    const a = await one<{ amount: number; deducted: number }>('select ca.amount::float, ca.deducted::float from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id where d.booking_id = $1', [src.bookingId])
+    if (a) Object.assign(v, { 'act.amount': money(lang, a.amount), 'act.deducted': money(lang, a.deducted), 'act.net': money(lang, a.amount - a.deducted) })
   }
   if (kind === 'fixation_act') {
     const fx = await one<any>('select * from portal.fixations where client_id = $1 and project_id = $2', [src.clientId, src.projectId])

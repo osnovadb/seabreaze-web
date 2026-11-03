@@ -5,6 +5,7 @@ import { t, usd, date, pct } from '@/lib/i18n'
 import { bookingScope } from '@/lib/scope'
 import { conditionsFor } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
+import { ACT_STATUS } from '@/lib/acts'
 
 export default async function Commission() {
   const c = await requireCtx()
@@ -16,6 +17,11 @@ export default async function Commission() {
   const pipe = await q<{ unit: string; client: string; final_price: number; agent: number; ends_at: string }>(
     `select coalesce(bl.external_id,'') || '-' || un.number unit, cl.name client, b.final_price::float, (b.snapshot->'split'->>'agent')::float agent, b.ends_at
      from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and ${bs.sql}`, bs.params)
+  const acts = await q<{ id: string; unit: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; paid_at: string | null }>(
+    `select ca.id, coalesce(bl.external_id,'') || '-' || un.number unit, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, ca.paid_at
+     from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id left join portal.documents doc on doc.id = ca.document_id
+     where ${c.user.role === 'agency_head' ? 'ca.agent_id in (select id from portal.users where agency_id = $1)' : 'ca.agent_id = $1'} order by ca.created_at desc`, [c.user.role === 'agency_head' ? c.user.agency_id : c.user.id])
+  const owed = acts.filter((a) => a.status === 'clawback').reduce((x, a) => x + a.clawback_left, 0)
   const projects = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
   const rates = await Promise.all(projects.map(async (p) => [p.name, await conditionsFor(p.id, c.user)] as const))
   const paid = deals.filter((d) => d.stage === 'paid_out').reduce((a, d) => a + d.agent_amount, 0)
@@ -35,6 +41,16 @@ export default async function Commission() {
           <tbody>
             {deals.length === 0 && <tr><td colSpan={6} className="muted">{T('Сделок пока нет')}</td></tr>}
             {deals.map((d) => <tr key={d.id}><td><b>{d.unit}</b></td><td>{d.client}</td><td>{usd(L, d.final_price)}</td><td><b>{usd(L, d.agent_amount)}</b></td><td>{pct(L, d.paid_pct)}</td><td><Pill kind={stageL[d.stage][1]}>{T(stageL[d.stage][0])}</Pill>{d.paid_out_at && <div className="tiny muted">{date(L, d.paid_out_at)}</div>}</td></tr>)}
+          </tbody>
+        </table></div>
+        <div className="h2 mt24">{T('Акты')}</div>
+        {owed > 0 && <div className="note mt8">{T('К удержанию из следующих выплат: {a} — по расторгнутым сделкам.', { a: usd(L, owed) })}</div>}
+        <div className="tbl-wrap mt8"><table className="tbl">
+          <thead><tr>{['Квартира', 'Комиссия', 'Удержано', 'К выплате', 'Статус', 'Акт'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
+          <tbody>
+            {acts.length === 0 && <tr><td colSpan={6} className="muted">{T('Актов пока нет')}</td></tr>}
+            {acts.map((a) => <tr key={a.id}><td><b>{a.unit}</b></td><td>{usd(L, a.amount)}</td><td>{a.deducted ? '−' + usd(L, a.deducted) : '—'}</td><td><b>{a.status === 'clawback' || a.status === 'void' ? '—' : usd(L, a.amount - a.deducted)}</b></td>
+              <td><Pill kind={ACT_STATUS[a.status][1]}>{T(ACT_STATUS[a.status][0])}</Pill>{a.paid_at && <div className="tiny muted">{date(L, a.paid_at)}</div>}</td><td className="small">{a.number ? <>{a.number}{a.pdf && <> · <a href={`/files/${a.pdf}`} target="_blank">PDF</a></>}</> : '—'}</td></tr>)}
           </tbody>
         </table></div>
         <div className="h2 mt24">{T('Активные брони')}</div>
