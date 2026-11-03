@@ -5,7 +5,8 @@
     "dev": "next dev -p 3040",
     "build": "next build",
     "start": "next start -p 3040",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "test": "node --test --import tsx tests/unit/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -21,6 +22,7 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }
 }
