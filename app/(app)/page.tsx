@@ -8,6 +8,7 @@ import { listProjects } from '@/lib/catalog'
 import { split, type SplitCond } from '@/lib/money'
 import { Top, AGENT_STAGES, STAGES } from '@/components/ui'
 import { readAll, toggleTask, startShow } from '@/lib/actions'
+import { feed } from '@/lib/posts'
 
 export default async function Home() {
   const c = await requireCtx()
@@ -41,6 +42,7 @@ export default async function Home() {
   const disp = ['owner', 'market_head'].includes(u.role) ? await one<{ n: number }>(`select count(*)::int n from portal.disputes d join portal.clients cl on cl.id = d.client_id where d.status = 'open' ${u.role === 'market_head' ? 'and cl.market = $1' : ''}`, u.role === 'market_head' ? [u.market] : []) : null
   const appr = ['owner', 'market_head'].includes(u.role) ? await one<{ n: number }>(`select count(*)::int n from portal.bookings b join portal.clients cl on cl.id = b.client_id where b.approval = 'pending' and b.status = 'requested' ${u.role === 'market_head' ? 'and cl.market = $1' : ''}`, u.role === 'market_head' ? [u.market] : []) : null
 
+  const news = (await feed(u, { limit: 3 }))
   const active = clients.filter((x) => !x.pause_until && !['handed'].includes(x.stage))
   const now = Date.now()
   const attention: { kind: 'bad' | 'warn' | 'ok'; title: string; sub: string; href: string }[] = []
@@ -84,6 +86,12 @@ export default async function Home() {
         right={<>{(ext || ['seller', 'market_head', 'owner'].includes(u.role)) && <Link className="btn btn--p" href="/clients/new">+ {T('Клиент')}</Link>}<Link className="btn" href="/projects">{T('Шахматка')}</Link></>} />
       <div className="page">
         <div className="grid g4">{kpis.map(([a, b]) => <div key={a} className="card card--tight kpi"><div className="small muted">{a}</div><div className="v num">{b}</div></div>)}</div>
+        {news.length > 0 && (
+          <div className="card mt16">
+            <div className="between"><div className="h3">{T('Новости')}</div><Link className="small bronze" href="/news">{T('Все')} →</Link></div>
+            {news.map((p) => <Link key={p.id} href="/news" className="kv"><span style={{ color: 'var(--ink)' }}>{!p.read && <b className="warnc">● </b>}{p.kind === 'auto' ? T(p.title, fmtVars(L, p.vars)) : p.title}</span><span className="tiny muted">{date(L, p.starts_on)}</span></Link>)}
+          </div>
+        )}
         <div className="grid g2 mt16">
           <div className="card">
             <div className="between"><div className="h3">{T('Требует внимания')}</div><span className="small muted">{attention.length}</span></div>

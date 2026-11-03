@@ -14,6 +14,7 @@ import { storeFile, isFile } from './files'
 import { LANGS, t, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
 import { canReviewKyc, kycMissing, type KycFields } from './kyc'
+import { autoPost } from './posts'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -482,8 +483,10 @@ export async function saveConditions(_: unknown, f: FormData) {
   }
   await audit(c.real.id, 'conditions.save', 'project', pid)
   if (s(f, 'publish')) {
-    await q(`update portal.conditions set status = 'published' where project_id = $1 and status = 'draft'`, [pid])
+    const pub = await one<{ version: number }>(`update portal.conditions set status = 'published' where project_id = $1 and status = 'draft' returning version`, [pid])
     await audit(c.real.id, 'conditions.publish', 'project', pid)
+    // Лента партнёров (М9): новые условия — партнёру стоит проверить свою ставку
+    if (pub) { const pr = await one<{ name: string; slug: string }>('select name, slug from projects where id = $1', [pid]); await autoPost(`cond:${pid}:${pub.version}`, 'Новые условия по проекту {p} — проверьте ставку и сроки брони', { p: pr?.name || '' }, pid, `/projects/${pr?.slug}?tab=terms`) }
   }
   revalidatePath('/admin/conditions')
   return { ok: s(f, 'publish') ? 'Опубликовано' : 'Черновик сохранён' }

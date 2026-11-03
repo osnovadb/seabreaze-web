@@ -4,6 +4,7 @@ import { q, one } from '@/lib/db'
 import { t } from '@/lib/i18n'
 import { ROLE_NAMES, isExternal, canReviewAgents, canSeeFinance, canSeeSources, canManageUsers, canSeeJournal } from '@/lib/perm'
 import { Nav } from '@/components/Nav'
+import { feed } from '@/lib/posts'
 import { LangSwitch } from '@/components/LangSwitch'
 import { impersonate, logout } from '@/lib/actions'
 
@@ -16,7 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     (select count(*)::int from portal.agent_applications where status = 'new' and ($2 = 'owner' or market = $3)) apps,
     (select count(*)::int from portal.clients where kyc_status = 'pending') kyc`, [u.id, u.role, u.market])
   const ext = isExternal(u.role)
+  const newsUnread = (await feed(u, { limit: 100 })).filter((p) => !p.read).length
   const items: { href: string; label: string; cnt?: number }[] = [{ href: '/', label: T('Главная'), cnt: cnt!.notif }]
+  items.push({ href: '/news', label: T('Новости'), cnt: newsUnread })
   items.push({ href: '/projects', label: T('Проекты') }, { href: '/catalog', label: T('Каталог') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/clients', label: ext ? T('Клиенты') : T('CRM · клиенты') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/bookings', label: T('Брони'), cnt: u.role === 'office' || u.role === 'owner' ? cnt!.req : 0 })
