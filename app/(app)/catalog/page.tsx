@@ -3,6 +3,7 @@ import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
 import { listProjects, unitsOfProject, viewMode, codeFor, unitNo } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
+import { saveSearch } from '@/lib/waitActions'
 
 export default async function Catalog({ searchParams }: { searchParams: { p?: string; r?: string; max?: string; o?: string; all?: string; s?: string } }) {
   const c = await requireCtx()
@@ -19,7 +20,8 @@ export default async function Catalog({ searchParams }: { searchParams: { p?: st
   const qs = (o: Record<string, string | number>) => '?' + new URLSearchParams(Object.entries({ p: p.slug, r: rooms || '', max: max || '', o: searchParams.o || '', all: all ? '1' : '', s: sort, ...o }).filter(([, v]) => v !== '' && v !== 0).map(([k, v]) => [k, String(v)])).toString()
   return (
     <>
-      <Top title={T('Каталог')} sub={T('{n} квартир по фильтру', { n: units.length })} />
+      <Top title={T('Каталог')} sub={T('{n} квартир по фильтру', { n: units.length })}
+        right={<form action={saveSearch}><input type="hidden" name="p" value={p.slug} /><input type="hidden" name="r" value={rooms || ''} /><input type="hidden" name="max" value={max || ''} /><input type="hidden" name="o" value={searchParams.o || ''} /><button className="btn">{T('Сохранить поиск')}</button></form>} />
       <div className="page">
         <div className="chips">{ps.map((x) => <Link key={x.id} href={`?p=${x.slug}`} className={'chip' + (x.id === p.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>
         <div className="between mt16">

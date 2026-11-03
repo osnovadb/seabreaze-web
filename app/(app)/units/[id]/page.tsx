@@ -12,6 +12,7 @@ import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
 import { addToSelection, startShow } from '@/lib/actions'
+import { joinWaitlist } from '@/lib/waitActions'
 
 const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
   F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Квота SeaBreeze', 'off'],
@@ -45,6 +46,11 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]
+  // Лист ожидания (М12): на занятую, но не проданную квартиру
+  const waitable = ['B', 'O', 'D', 'SB', 'N'].includes(code) && u.status !== 'sold'
+  const myWait = waitable ? await q<{ client: string | null; pos: number }>(`select cl.name client, (select count(*)::int from portal.waitlist w2 where w2.unit_id = w.unit_id and w2.active and w2.created_at <= w.created_at) pos
+    from portal.waitlist w left join portal.clients cl on cl.id = w.client_id where w.unit_id = $1 and w.user_id = $2 and w.active`, [u.id, c.user.id]) : []
+  const queue = waitable ? (await q<{ n: number }>('select count(*)::int n from portal.waitlist where unit_id = $1 and active', [u.id]))[0].n : 0
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [proj.name, `/projects/${proj.slug}`], [u.building, `/projects/${proj.slug}/chess?b=${u.building_id}`], [unitNo(u)]]}
@@ -84,6 +90,17 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
                 <select className="in" name="client" style={{ flex: 1 }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
                 <button className="btn">{T('В подборку')}</button>
               </form>
+            )}
+            {waitable && (
+              <div className="mt16">
+                {myWait.map((w, i) => <div key={i} className="note small">{T('Вы в листе ожидания: {n}-й', { n: w.pos })}{w.client ? ' · ' + w.client : ''}</div>)}
+                <form action={joinWaitlist} className="row mt8">
+                  <input type="hidden" name="unit" value={u.id} />
+                  <select className="in" name="client" style={{ flex: 1 }}><option value="">{T('Без клиента')}</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+                  <button className="btn">{T('В лист ожидания')}</button>
+                </form>
+                <div className="tiny muted mt8">{T('В очереди: {n}. Освободится — первый узнает сразу, следующий через паузу проекта.', { n: queue })}</div>
+              </div>
             )}
             {code === 'F' && (
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>

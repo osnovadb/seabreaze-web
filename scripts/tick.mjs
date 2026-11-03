@@ -82,6 +82,48 @@ const promoEnd = await q(`select o.id, o.name, se.id sel, se.user_id, cl.name cl
 for (const r of promoEnd) await notify(r.user_id, 'selection', 'Акция «{n}» закончилась — цены в подборке для {c} изменились', '/selections/' + r.sel, { n: r.name, c: r.client }, 'promoend:' + r.id + ':' + r.sel)
 out.promo_ended = promoEnd.length
 
+// 7в. Лист ожидания (М12): квартира свободна — первому в очереди сразу, следующему — через паузу проекта после предыдущего
+const FREE = `u.status = 'available' and u.price_list is not null
+  and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('requested','confirmed'))
+  and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')`
+const waitUnits = await q(`select u.id, coalesce(bl.external_id, '') || '-' || u.number unit, coalesce(ps.waitlist_pause_hours, 24) pause,
+    (select max(w.notified_at) from portal.waitlist w where w.unit_id = u.id and w.notified_at > now() - interval '30 days') last
+  from units u join buildings bl on bl.id = u.building_id left join portal.project_settings ps on ps.project_id = u.project_id
+  where ${FREE} and exists (select 1 from portal.waitlist w where w.unit_id = u.id and w.active)`)
+let waitN = 0
+for (const u of waitUnits) {
+  if (u.last && Date.now() - new Date(u.last).getTime() < u.pause * 3600_000) continue
+  // партнёру — только если квартира ему видна (не скрыта)
+  const next = (await q(`select w.id, w.user_id, w.client_id, cl.name client from portal.waitlist w join portal.users us on us.id = w.user_id left join portal.clients cl on cl.id = w.client_id
+    where w.unit_id = $1 and w.active and (us.role not in ('agent','agency_head') or not exists (select 1 from portal.unit_hidden h where h.unit_id = w.unit_id))
+    order by w.created_at limit 1`, [u.id]))[0]
+  if (!next) continue
+  await q(`update portal.waitlist set active = false, notified_at = now() where id = $1`, [next.id])
+  await notify(next.user_id, 'waitlist', next.client ? 'Освободилась {u} — вы первый в очереди (клиент {c})' : 'Освободилась {u} — вы первый в очереди', '/units/' + u.id, { u: u.unit, c: next.client || '' }, 'wait:' + next.id)
+  if (next.client_id) await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Освободилась квартира из листа ожидания: {u}',$2)`, [next.client_id, JSON.stringify({ u: u.unit })])
+  waitN++
+}
+out.waitlist = waitN
+
+// 7г. Сохранённые поиски (М12): новые подходящие свободные квартиры с прошлой проверки; первая проверка только запоминает
+const searches = await q(`select s.id, s.user_id, s.name, s.filters, s.seen_ids, s.checked_at, us.role from portal.saved_searches s join portal.users us on us.id = s.user_id where s.active and us.active`)
+let searchN = 0
+for (const s of searches) {
+  const f = s.filters
+  const ids = (await q(`select u.id from units u where u.project_id = $1 and ${FREE}
+      and ($2::int is null or u.bedrooms = $2) and ($3::numeric is null or ${'(case when u.price_currency = \'AZN\' then u.price_list / (select azn_per_unit from currency_rates where currency = \'USD\' order by valid_from desc limit 1) else u.price_list end)'} <= $3 * 1000)
+      and ($4::text is null or ($4 = 'g' and u.plot_area_m2 > 0) or ($4 = 't' and u.area_external_m2 > 0))
+      and ($5 not in ('agent','agency_head') or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`,
+    [f.project, f.rooms ?? null, f.max ?? null, f.outdoor ?? null, s.role])).map((r) => r.id)
+  const fresh = s.checked_at ? ids.filter((id) => !s.seen_ids.includes(id)) : []
+  if (fresh.length) {
+    await notify(s.user_id, 'search', 'По поиску «{s}» новых квартир: {n}', '/waitlist', { s: s.name, n: fresh.length }, 'search:' + s.id + ':' + fresh.sort().join(',').slice(0, 200))
+    searchN++
+  }
+  await q(`update portal.saved_searches set seen_ids = $2, checked_at = now() where id = $1`, [s.id, ids])
+}
+out.searches = searchN
+
 // 8. Курсы ЦБ Азербайджана (USD, EUR, ILS) — раз в сутки, для показа цены в валюте рынка (М7). Сбой сайта ЦБ не роняет tick.
 const today = new Date().toISOString().slice(0, 10)
 if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from = $1::date limit 1`, [today])).length) {
