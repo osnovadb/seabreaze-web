@@ -22,6 +22,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const cs = clientScope(c.user)
     ok = !!(await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, cd.client_id]))
   }
+  // Шаблоны документов (М8) — тем, кто их ведёт
+  if (!ok && (c.user.role === 'owner' || c.user.role === 'content')) ok = !!(await one('select 1 from portal.doc_templates where file_id = $1', [params.id]))
   // Документы к заявке партнёра — владельцу и проверяющим её рынка (руководитель рынка, менеджер)
   if (!ok) {
     const ap = await one<{ market: string }>('select a.market from portal.application_files af join portal.agent_applications a on a.id = af.application_id where af.file_id = $1', [params.id])
