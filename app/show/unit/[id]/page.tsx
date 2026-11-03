@@ -4,7 +4,8 @@ import { requireCtx } from '@/lib/auth'
 import { one } from '@/lib/db'
 import { t, usd, m2 } from '@/lib/i18n'
 import { unitById, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
-import { PlanList } from '@/components/PlanList'
+import { Calculator } from '@/components/Calculator'
+import { fxFor } from '@/lib/fx'
 import { DESIGN, LOBBY } from '@/components/ui'
 import { likeInShow } from '@/lib/actions'
 import { ShowBook } from './book'
@@ -19,6 +20,8 @@ export default async function ShowUnit({ params, searchParams }: { params: { id:
   const liked = c.show?.clientId ? await one(`select 1 from portal.selection_items si join portal.selections s on s.id = si.selection_id where s.client_id = $1 and si.unit_id = $2 and si.liked`, [c.show.clientId, u.id]) : null
   const imgs = [DESIGN[u.rooms || 0]?.[0], proj?.slug === 'premium-residence' ? LOBBY[u.block] : null].filter(Boolean) as string[]
   const plans = await plansFor(u.project_id, u.building_id)
+  const cl = c.show?.clientId ? await one<{ market: string }>('select market from portal.clients where id = $1', [c.show.clientId]) : null
+  const fx = await fxFor(cl?.market || c.user.market, L)
   return (
     <div className="page split">
       <div className="stack">
@@ -42,7 +45,7 @@ export default async function ShowUnit({ params, searchParams }: { params: { id:
         )}
         <div className="tiny muted mt16">{T('Квартиры сдаются без ремонта; на фото — пример дизайна застройщика.')}</div>
       </div>
-      {free && u.usd && <PlanList plans={plans} price={u.usd} lang={L} />}
+      {free && u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} />}
       </div>
     </div>
   )

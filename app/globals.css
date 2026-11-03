@@ -279,3 +279,7 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .fz .z-sel { stroke: #fff; stroke-width: 3px; }
 .fz .z-dim { fill: rgba(30, 30, 30, .35); }
 .compass { position: absolute; right: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .9); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--deep); }
+/* v2 · М7: график платежей — середина длинной рассрочки свёрнута на экране, в печати видна целиком */
+.sched td { padding: 7px 12px; }
+.sched .sched-more { display: none; }
+@media print { .sched .sched-more { display: table-row !important; } }

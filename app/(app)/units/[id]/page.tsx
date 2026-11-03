@@ -4,7 +4,8 @@ import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, m2, date, dateTime } from '@/lib/i18n'
 import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
-import { PlanList } from '@/components/PlanList'
+import { Calculator } from '@/components/Calculator'
+import { fxFor } from '@/lib/fx'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
@@ -37,6 +38,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const inSel = await q<{ id: string; client: string }>(`select s.id, cl.name client from portal.selection_items si join portal.selections s on s.id = si.selection_id join portal.clients cl on cl.id = s.client_id where si.unit_id = $1 and (${ext ? 's.user_id = $2' : 'true'})`, ext ? [u.id, c.user.id] : [u.id])
   const bk = u.booking_id ? (await q<{ client: string; agent: string; status: string; ends_at: string; final_price: number }>(`select cl.name client, us.name agent, b.status, b.ends_at, b.final_price::float from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [u.booking_id]))[0] : null
   const plans = await plansFor(u.project_id, u.building_id)
+  const fx = await fxFor(c.user.market, L)
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]
   return (
@@ -82,7 +84,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>
             )}
           </div>
-          {u.usd && <PlanList plans={plans} price={u.usd} lang={L} />}
+          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} />}
           {!ext && (
             <div className="card card--sand">
               <div className="label" style={{ color: 'var(--bronze)' }}>{T('Только для команды')}</div>

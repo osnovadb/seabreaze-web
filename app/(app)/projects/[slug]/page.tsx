@@ -4,7 +4,7 @@ import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
 import { t, usd, pct, date } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, conditionsFor, plansFor } from '@/lib/catalog'
-import { isFull, schedule, planBase } from '@/lib/plans'
+import { isFull, termUnknown, schedule, planBase } from '@/lib/plans'
 import { isExternal, seesDeveloperTerms } from '@/lib/perm'
 import { fmtSize } from '@/lib/files'
 import { Top, Pill, SALES } from '@/components/ui'
@@ -114,7 +114,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
           {!short && <div className="kv"><span>{T('Лимит броней')}</span><span>{T('клиент {c} · агент {a} · всего {t}', { c: cond.max_bookings_client, a: cond.max_bookings_agent, t: cond.max_bookings_total })}</span></div>}
           <div className="kv"><span>{T('Фиксация у застройщика')}</span><span>{T('через команду, 3–5 дней')}</span></div>
           {!short && <div className="kv"><span>{T('Выплата')}</span><span>{T('после оплаты застройщиком')}</span></div>}
-          {plans.map((pl) => <div key={pl.id} className="kv"><span>{pl.name}</span><span className="small">{isFull(pl) ? (Number(pl.full_payment_discount_pct) ? T('скидка {p}', { p: pct(L, Number(pl.full_payment_discount_pct)) }) : '100%') : T('взнос {p}, {m} мес.', { p: pct(L, Number(pl.down_payment_pct)), m: pl.months || 0 })}</span></div>)}
+          {plans.map((pl) => <div key={pl.id} className="kv"><span>{pl.name}</span><span className="small">{isFull(pl) ? (Number(pl.full_payment_discount_pct) ? T('скидка {p}', { p: pct(L, Number(pl.full_payment_discount_pct)) }) : '100%') : (termUnknown(pl) ? T('взнос {p}, срок уточняется', { p: pct(L, Number(pl.down_payment_pct)) }) : T('взнос {p}, {m} мес.', { p: pct(L, Number(pl.down_payment_pct)), m: pl.months || 0 }))}</span></div>)}
           <div className="kv"><span>{T('Отделка')}</span><span>{T('без ремонта')}</span></div>
         </div>
         <div className="tiny muted mt8">{T('Версия условий {v} от {d}', { v: cond.version, d: date(L, cond.valid_from) })}</div>
@@ -134,8 +134,8 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
             const base = planBase(pl, ex), sc = schedule(pl, base)
             return (
               <div key={pl.id} className="kv"><span style={{ color: 'var(--ink)' }}>{pl.name}{pl.source_note && <div className="tiny muted">{pl.source_note}</div>}{(pl.valid_from || pl.valid_to) && <div className="tiny muted">{pl.valid_from ? T('с {d}', { d: date(L, pl.valid_from) }) : ''} {pl.valid_to ? T('до {d}', { d: date(L, pl.valid_to) }) : ''}</div>}</span>
-                <span className="small" style={{ textAlign: 'end' }}>{isFull(pl) ? <>{Number(pl.full_payment_discount_pct) ? T('скидка {p}', { p: pct(L, Number(pl.full_payment_discount_pct)) }) : '100%'}</> : T('взнос {p}, {m} мес.', { p: pct(L, Number(pl.down_payment_pct)), m: pl.months || 0 })}
-                  {ex ? <div className="tiny muted">{sc.full ? T('к оплате {a}', { a: usd(L, base) }) : T('взнос {d}, затем {m} × {x}', { d: usd(L, sc.down), m: sc.months, x: usd(L, sc.monthly) })}</div> : null}</span></div>
+                <span className="small" style={{ textAlign: 'end' }}>{isFull(pl) ? <>{Number(pl.full_payment_discount_pct) ? T('скидка {p}', { p: pct(L, Number(pl.full_payment_discount_pct)) }) : '100%'}</> : (termUnknown(pl) ? T('взнос {p}, срок уточняется', { p: pct(L, Number(pl.down_payment_pct)) }) : T('взнос {p}, {m} мес.', { p: pct(L, Number(pl.down_payment_pct)), m: pl.months || 0 }))}
+                  {ex ? <div className="tiny muted">{sc.full ? T('к оплате {a}', { a: usd(L, base) }) : termUnknown(pl) ? T('взнос {d}, остаток по графику застройщика', { d: usd(L, sc.down) }) : T('взнос {d}, затем {m} × {x}', { d: usd(L, sc.down), m: sc.months, x: usd(L, sc.monthly) })}</div> : null}</span></div>
             )
           })}
           {ex ? <div className="tiny muted mt8">{T('Пример на квартире за {p}', { p: usd(L, ex) })}</div> : null}

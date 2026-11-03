@@ -74,5 +74,23 @@ const changed = await q(`select ph.id, ph.unit_id, se.id sel, se.user_id, se.cli
 for (const r of changed) await notify(r.user_id, 'selection', 'Изменилась цена {u} в подборке для {c}', '/selections/' + r.sel, { u: r.unit, c: r.name }, 'selprice:' + r.id + ':' + r.sel)
 out.selection_prices = changed.length
 
+// 8. Курсы ЦБ Азербайджана (USD, EUR, ILS) — раз в сутки, для показа цены в валюте рынка (М7). Сбой сайта ЦБ не роняет tick.
+const today = new Date().toISOString().slice(0, 10)
+if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from = $1::date limit 1`, [today])).length) {
+  try {
+    const d = today.split('-').reverse().join('.')
+    const res = await fetch(`https://www.cbar.az/currencies/${d}.xml`, { signal: AbortSignal.timeout(15000) })
+    const xml = res.ok ? await res.text() : ''
+    let n = 0
+    for (const cur of ['USD', 'EUR', 'ILS']) {
+      const m = xml.match(new RegExp(`<Valute Code="${cur}">[\\s\\S]*?<Nominal>([\\d.]+)[^<]*</Nominal>[\\s\\S]*?<Value>([\\d.]+)</Value>`))
+      if (!m) continue
+      await q(`insert into currency_rates (currency, azn_per_unit, source, override, valid_from, note) values ($1, $2, 'cbar', false, $3::date, $4)`, [cur, Number(m[2]) / Number(m[1]), today, 'cbar.az ' + d])
+      n++
+    }
+    out.rates = n
+  } catch (e) { out.rates_error = String(e.message || e) }
+}
+
 await db.end()
 console.log(new Date().toISOString(), JSON.stringify(out))

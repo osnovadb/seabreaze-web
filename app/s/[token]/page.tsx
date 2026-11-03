@@ -1,20 +1,27 @@
 import { PrintButton } from '@/components/PrintButton'
 import { notFound } from 'next/navigation'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, isRtl, type Lang } from '@/lib/i18n'
-import { unitsByIds, planUrl, unitNo, codeFor } from '@/lib/catalog'
+import { t, usd, m2, date, isRtl, type Lang } from '@/lib/i18n'
+import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
+import { planBase } from '@/lib/plans'
+import { fxFor } from '@/lib/fx'
+import { ScheduleTable } from '@/components/Calculator'
 import { openedSelection } from '@/lib/actions'
 import { DESIGN } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 export default async function PublicSelection({ params, searchParams }: { params: { token: string }; searchParams: { preview?: string } }) {
-  const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string }>(
-    `select s.id, s.lang, cl.name client, u.name agent, u.email agent_email, s.title from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id where s.token = $1`, [params.token])
+  const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string; market: string | null }>(
+    `select s.id, s.lang, cl.name client, cl.market, u.name agent, u.email agent_email, s.title from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id where s.token = $1`, [params.token])
   if (!s) notFound()
   if (!searchParams.preview) await openedSelection(params.token)
   const L = s.lang, T = (x: string, v?: Record<string, string | number>) => t(L, x, v)
-  const items = await q<{ unit_id: string; note: string | null }>('select unit_id, note from portal.selection_items where selection_id = $1 order by sort', [s.id])
+  const items = await q<{ unit_id: string; note: string | null; plan_id: string | null }>('select unit_id, note, plan_id from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
+  const fx = await fxFor(s.market, L)
+  // План, выбранный консультантом, и только если он ещё действует для этой квартиры
+  const planOf = new Map<string, Awaited<ReturnType<typeof plansFor>>[number]>()
+  for (const i of items) { const u = units.get(i.unit_id); if (u && i.plan_id) { const p = (await plansFor(u.project_id, u.building_id)).find((x) => x.id === i.plan_id); if (p) planOf.set(i.unit_id, p) } }
   return (
     <div dir={isRtl(L) ? 'rtl' : 'ltr'} style={{ background: 'var(--sand)', minHeight: '100vh' }}>
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 20px 64px' }}>
@@ -40,6 +47,12 @@ export default async function PublicSelection({ params, searchParams }: { params
                   </div>
                   {planUrl(u.plan_file) && <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" style={{ maxHeight: 220 }} /></div>}
                 </div>
+                {free && u.usd && planOf.get(u.id) && (() => { const p = planOf.get(u.id)!; return (
+                  <div style={{ padding: '0 20px 20px' }}>
+                    <div className="label">{T('График платежей')} · {p.name}</div>
+                    <ScheduleTable plan={p} price={planBase(p, u.usd)} lang={L} fx={fx} />
+                    <div className="tiny muted mt8">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
+                  </div>) })()}
               </div>
             )
           })}

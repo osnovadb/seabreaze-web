@@ -366,6 +366,8 @@ export async function selectionUpdate(f: FormData) {
   if (s(f, 'remove')) await q('delete from portal.selection_items where selection_id = $1 and unit_id = $2', [id, s(f, 'remove')])
   if (s(f, 'lang')) await q('update portal.selections set lang = $2 where id = $1', [id, s(f, 'lang')])
   for (const [k, v] of f.entries()) if (k.startsWith('note:')) await q('update portal.selection_items set note = $3 where selection_id = $1 and unit_id = $2', [id, k.slice(5), String(v) || null])
+  // План оплаты у квартиры подборки — по нему клиент видит график платежей (М7)
+  for (const [k, v] of f.entries()) if (k.startsWith('plan:')) await q('update portal.selection_items set plan_id = $3 where selection_id = $1 and unit_id = $2', [id, k.slice(5), /^[0-9a-f-]{36}$/.test(String(v)) ? String(v) : null])
   revalidatePath(`/selections/${id}`)
 }
 export async function openedSelection(token: string) {

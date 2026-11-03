@@ -4,16 +4,17 @@ import { useState } from 'react'
 import { useFormState, useFormStatus } from 'react-dom'
 import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
-import { planBase, schedule, isFull, type Plan } from '@/lib/plans'
+import { planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
+import { ScheduleTable, type FxView } from '@/components/Calculator'
 import { t, usd, pct, type Lang } from '@/lib/i18n'
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{label}</button>
 }
-export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, preset, showOurs }: {
+export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, preset, showOurs }: {
   lang: Lang; unitId: string; list: number; ext: boolean; cap: number; ceiling: number; cond: SplitCond; days: number; ext_days: number
-  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; preset?: string; showOurs: boolean
+  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; preset?: string; showOurs: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [disc, setDisc] = useState(0)
@@ -21,7 +22,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const plan = plans.find((p) => p.id === planId)
   // Скидка застройщика за 100% снижает цену до раздела денег
   const list = planBase(plan, priceList)
-  const sc = plan ? schedule(plan, list * (1 - disc / 100)) : null
+  const [open, setOpen] = useState(false)
   const [st, act] = useFormState(createBooking, null)
   const sp = split(cond, list, disc, ext)
   return (
@@ -32,7 +33,9 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
             <div className="h3">{T('План оплаты')}</div>
             <div className="chips mt8">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => setPlanId(p.id)}>{p.name}</button>)}</div>
             <input type="hidden" name="plan" value={planId} />
-            {plan && sc && <div className="small muted mt8">{sc.full ? (Number(plan.full_payment_discount_pct) ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, list) }) : T('Полная оплата')) : T('Первый взнос {d} ({p}), затем {m} платежей по {x}', { d: usd(lang, sc.down), p: pct(lang, Number(plan.down_payment_pct)), m: sc.months, x: usd(lang, sc.monthly) })}</div>}
+            {plan && <div className="small muted mt8">{isFull(plan) ? (Number(plan.full_payment_discount_pct) ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, list) }) : T('Полная оплата'))
+              : termUnknown(plan) ? T('Первый взнос {p}; срок и платежи — по графику застройщика', { p: pct(lang, Number(plan.down_payment_pct)) })
+                : T('Первый взнос {p}, затем {m} ежемесячных платежей', { p: pct(lang, Number(plan.down_payment_pct)), m: plan.months || 0 })}</div>}
           </div>
         )}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
@@ -47,6 +50,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
             : showOurs ? <div className="card card--tight" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)' }}><div className="small okc">{T('Наш доход по сделке')}</div><div className="big num okc">{usd(lang, sp.ours)}</div><div className="tiny okc">{T('фикс {f} + пул {p} · продавцу {s}', { f: usd(lang, sp.ourFix), p: usd(lang, sp.ourPool), s: usd(lang, sp.seller) })}</div></div>
               : <div className="card card--tight"><div className="small muted">{T('Скидка')}</div><div className="big num">{pct(lang, disc)}</div></div>}
         </div>
+        {plan && <><div className="label mt16">{T('График платежей')}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
         <div className="mt16">
           <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, list)}</span></div>
           <div className="kv"><span>{T('Итоговая цена')}</span><span>{usd(lang, sp.final)}</span></div>

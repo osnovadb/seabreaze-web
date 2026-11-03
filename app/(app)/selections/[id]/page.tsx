@@ -4,7 +4,8 @@ import { headers } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, m2, dateTime } from '@/lib/i18n'
-import { unitsByIds, planUrl, unitNo, codeFor } from '@/lib/catalog'
+import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
+import type { Plan } from '@/lib/plans'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
@@ -16,8 +17,10 @@ export default async function SelectionEdit({ params }: { params: { id: string }
   const s = await one<{ id: string; token: string; title: string; lang: string; opened: number; last_opened_at: string | null; client: string; client_id: string; user_id: string }>(
     `select s.*, cl.name client from portal.selections s join portal.clients cl on cl.id = s.client_id where s.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
   if (!s) notFound()
-  const items = await q<{ unit_id: string; note: string | null; liked: boolean }>('select unit_id, note, liked from portal.selection_items where selection_id = $1 order by sort', [s.id])
+  const items = await q<{ unit_id: string; note: string | null; liked: boolean; plan_id: string | null }>('select unit_id, note, liked, plan_id from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
+  const plansBy = new Map<string, Plan[]>()
+  for (const u of units.values()) { const k = u.project_id + ':' + (u.building_id || ''); if (!plansBy.has(k)) plansBy.set(k, await plansFor(u.project_id, u.building_id)) }
   const host = headers().get('x-forwarded-host') || headers().get('host')
   const proto = headers().get('x-forwarded-proto') || 'http'
   const link = `${proto}://${host}/s/${s.token}`
@@ -42,12 +45,19 @@ export default async function SelectionEdit({ params }: { params: { id: string }
                   <div className="small muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
                   <div className="mt8"><b>{u.usd ? usd(L, u.usd) : ''}</b></div>
                   <input className="in mt8" name={`note:${u.id}`} defaultValue={i.note || ''} placeholder={T('Заметка для клиента…')} />
+                  {(plansBy.get(u.project_id + ':' + (u.building_id || '')) || []).length > 0 && (
+                    <label className="field mt8"><span>{T('График платежей для клиента')}</span>
+                      <select className="in" name={`plan:${u.id}`} defaultValue={i.plan_id || ''}>
+                        <option value="">{T('Не показывать')}</option>
+                        {plansBy.get(u.project_id + ':' + (u.building_id || ''))!.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select></label>
+                  )}
                 </div>
                 <button className="btn btn--sm" name="remove" value={u.id}>✕</button>
               </div>
             )
           })}
-          <button className="btn">{T('Сохранить заметки')}</button>
+          <button className="btn">{T('Сохранить заметки и графики')}</button>
         </form>
         <div className="stack">
           <form action={selectionUpdate} className="card stack" style={{ gap: 10 }}>

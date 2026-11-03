@@ -7,3 +7,6 @@ grant select, insert, delete on catalog_units, catalog_projects to portal_app;
 grant select on pricing_rules, markets, currency_rates, sources, zones, project_markets, payment_plans, developers to portal_app;
 grant insert, select on directus_files to portal_app;
 grant usage on sequence project_markets_id_seq, price_history_id_seq to portal_app;
+-- v2 · М7: курсы ЦБ Азербайджана обновляет tick портала раз в сутки
+grant insert on currency_rates to portal_app;
+grant usage on sequence currency_rates_id_seq to portal_app;

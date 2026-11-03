@@ -4,7 +4,7 @@ import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, pct, num } from '@/lib/i18n'
 import { planUrl, toUsdSql } from '@/lib/catalog'
-import { PLAN_COLS, schedule, planBase, isFull, type Plan } from '@/lib/plans'
+import { PLAN_COLS, schedule, planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { saveGenplan, saveFacade, saveFloorPlan, saveRisers } from '@/lib/markup'
@@ -213,7 +213,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
             <label className="field"><span>{T('по')}</span><input className="in" name="valid_to" type="date" defaultValue={pl?.valid_to || ''} /></label>
             <label className="field"><span>{T('Примечание')}</span><input className="in" name="note" defaultValue={pl?.source_note || ''} /></label>
           </div>
-          {pl && ex?.usd ? (() => { const base = planBase(pl, ex.usd); const sc = schedule(pl, base); return <div className="small muted">{T('Пример на квартире за {p}', { p: usd(L, ex.usd) })}: {sc.full ? T('к оплате {a}', { a: usd(L, base) }) : T('взнос {d}, затем {m} × {x}', { d: usd(L, sc.down), m: sc.months, x: usd(L, sc.monthly) })}</div> })() : null}
+          {pl && ex?.usd ? (() => { const base = planBase(pl, ex.usd); const sc = schedule(pl, base); return <div className="small muted">{T('Пример на квартире за {p}', { p: usd(L, ex.usd) })}: {sc.full ? T('к оплате {a}', { a: usd(L, base) }) : termUnknown(pl) ? T('взнос {d}, остаток по графику застройщика', { d: usd(L, sc.down) }) : T('взнос {d}, затем {m} × {x}', { d: usd(L, sc.down), m: sc.months, x: usd(L, sc.monthly) })}</div> })() : null}
           <div className="row"><button className="btn btn--sm btn--p">{pl ? T('Сохранить') : T('Добавить план')}</button>{pl && <button className="btn btn--sm" name="delete" value="1">{T('Удалить')}</button>}</div>
         </ActionForm>
       )
