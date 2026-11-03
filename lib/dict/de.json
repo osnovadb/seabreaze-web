@@ -1409,5 +1409,7 @@
 "скидка за 100% (сумма)": "Vollzahlungsrabatt (Betrag)",
 "комнат (как на сайтах: спальни + 1)": "Zimmer (wie auf den Websites: Schlafzimmer + 1)",
 "Штуки — целым числом": "Stückzahl als ganze Zahl",
-"Выполнение, %": "Erfüllung, %"
+"Выполнение, %": "Erfüllung, %",
+"Импорт — не чаще раза в 10 минут": "Import höchstens alle 10 Minuten",
+"Импорт клиентов у {u}: совпадений с базой {n}": "Kundenimport von {u}: {n} Treffer in der Datenbank"
 }

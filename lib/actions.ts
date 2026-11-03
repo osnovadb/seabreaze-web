@@ -25,6 +25,9 @@ async function writeCtx() {
   return c
 }
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
+// Язык клиента — код ru/en/de/he (из импорта приходит «Deutsch», «English»…); неизвестное — пусто
+const LANG_NAMES: Record<string, string> = { ru: 'ru', русский: 'ru', russian: 'ru', russisch: 'ru', en: 'en', english: 'en', английский: 'en', englisch: 'en', de: 'de', deutsch: 'de', german: 'de', немецкий: 'de', he: 'he', hebrew: 'he', иврит: 'he', hebräisch: 'he', 'עברית': 'he' }
+const langCode = (v: string) => LANG_NAMES[v.trim().toLowerCase()] || ''
 // Телефон: только цифры, без международного префикса 00; дубль ищем по последним 9 цифрам (+49 160…, 0049-160…, 0160…)
 const norm = { phone: (p: string) => p.replace(/\D/g, '').replace(/^00/, ''), email: (e: string) => e.trim().toLowerCase() }
 const back = (path: string, params: Record<string, string>) => redirect(path + (path.includes('?') ? '&' : '?') + new URLSearchParams(params).toString())
@@ -126,7 +129,7 @@ export async function registerClient(_: unknown, f: FormData) {
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage, protected_until)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead', current_date + ($18 || ' months')::interval) returning id, protected_until::text`,
-    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), s(f, 'language'), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])
+    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент зарегистрирован ({r}), закреплён до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.protected_until }])
   if (c.user.curator_id) await notify(c.user.curator_id, 'client', 'Новый клиент агента {a}: {c}', `/clients/${r!.id}`, { a: c.user.name, c: name })
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
@@ -703,7 +706,7 @@ export async function updateClientContacts(_: unknown, f: FormData) {
   const pn = norm.phone(phone), em = norm.email(email)
   const dup = await one(`select 1 from portal.clients where id <> $3 and ((length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or (email_norm <> '' and email_norm = $2)) limit 1`, [pn, em, id])
   if (dup) return { error: 'Этот телефон или e-mail уже есть у другого клиента' }
-  await q(`update portal.clients set name = $2, phone = $3, phone_norm = $4, email = $5, email_norm = $6, country = $7, language = $8 where id = $1`, [id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'language') || null])
+  await q(`update portal.clients set name = $2, phone = $3, phone_norm = $4, email = $5, email_norm = $6, country = $7, language = $8 where id = $1`, [id, name, phone, pn, email, em, s(f, 'country') || null, langCode(s(f, 'language')) || null])
   await audit(c.real.id, 'client.contacts', 'client', id, null, c.impersonating ? c.user.id : null)
   revalidatePath(`/clients/${id}`)
   return { ok: true }
@@ -796,17 +799,23 @@ export async function dealStage(f: FormData) {
 }
 
 /* ── Импорт клиентов из xlsx (v2 · М13): первая строка — заголовки; согласие клиента подтверждает тот, кто загружает ── */
+// заголовки — RU / EN / DE / HE
 const IMPORT_COLS: Record<string, string[]> = {
-  name: ['имя', 'name', 'клиент'], phone: ['телефон', 'phone'], email: ['e-mail', 'email', 'почта'], country: ['страна', 'country'], language: ['язык', 'language', 'lang'],
-  source: ['источник', 'source'], goal: ['цель', 'goal'], budget: ['бюджет', 'budget'], consent: ['согласие', 'consent'],
+  name: ['имя', 'name', 'клиент', 'kunde', 'שם'], phone: ['телефон', 'phone', 'telefon', 'טלפון'], email: ['e-mail', 'email', 'почта', 'mail', 'דוא״ל', 'אימייל'],
+  country: ['страна', 'country', 'land', 'מדינה', 'ארץ'], language: ['язык', 'language', 'lang', 'sprache', 'שפה'],
+  source: ['источник', 'source', 'quelle', 'מקור'], goal: ['цель', 'goal', 'ziel', 'מטרה'], budget: ['бюджет', 'budget', 'תקציב'], consent: ['согласие', 'consent', 'einwilligung', 'zustimmung', 'הסכמה'],
 }
+const YES = ['да', 'yes', 'ja', '1', 'true', 'x', '+', 'כן', 'y']
 export async function importClients(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canRegisterClient(c.user.role)) return { error: 'Нет прав на регистрацию клиента' }
+  // импорт — заодно массовая проверка «есть ли такой клиент»: не чаще раза в 10 минут
+  if (await one(`select 1 from portal.audit where user_id = $1 and action = 'client.import' and created_at > now() - interval '10 minutes'`, [c.real.id])) return { error: t(c.lang, 'Импорт — не чаще раза в 10 минут') }
   const file = f.get('file')
   if (!isFile(file) || !file.name.toLowerCase().endsWith('.xlsx')) return { error: t(c.lang, 'Нужен файл .xlsx') }
   let rows: string[][]
   try { rows = readXlsx(Buffer.from(await file.arrayBuffer())) } catch { return { error: t(c.lang, 'Не получилось прочитать файл') } }
+  rows = rows.filter((r, i) => i === 0 || r.some((x) => x)) // пустые строки после форматирования Excel не считаются
   if (rows.length < 2) return { error: t(c.lang, 'В файле нет строк с клиентами') }
   if (rows.length > 501) return { error: t(c.lang, 'Не больше 500 клиентов за раз') }
   const head = rows[0].map((h) => h.toLowerCase().trim())
@@ -817,7 +826,7 @@ export async function importClients(_: unknown, f: FormData) {
   for (const [i, r] of rows.slice(1).entries()) {
     const get = (k: string) => (col[k] >= 0 ? r[col[k]] || '' : '')
     if (!get('name') && !get('phone') && !get('email')) continue
-    if (!['да', 'yes', 'ja', '1', 'true', 'x', '+'].includes(get('consent').toLowerCase())) { skipped.push(t(c.lang, 'строка {n}: нет согласия', { n: i + 2 })); continue }
+    if (!YES.includes(get('consent').toLowerCase())) { skipped.push(t(c.lang, 'строка {n}: нет согласия', { n: i + 2 })); continue }
     const fd = new FormData()
     for (const k of ['name', 'phone', 'email', 'country', 'language', 'source', 'goal', 'budget']) fd.set(k, get(k))
     fd.set('consent', 'on')
@@ -826,6 +835,9 @@ export async function importClients(_: unknown, f: FormData) {
     else skipped.push(t(c.lang, 'строка {n}: {e}', { n: i + 2, e: res?.duplicate ? t(c.lang, 'уже есть в базе') : t(c.lang, res?.error || 'ошибка') }))
   }
   await audit(c.real.id, 'client.import', 'client', '', { made, skipped: skipped.length }, c.impersonating ? c.user.id : null)
+  // много совпадений с чужими клиентами — сигнал руководителю рынка
+  const dups = skipped.filter((x) => x.includes(t(c.lang, 'уже есть в базе'))).length
+  if (dups >= 20) for (const h of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [c.user.market])) await notify(h.id, 'client', 'Импорт клиентов у {u}: совпадений с базой {n}', '/admin/journal', { u: c.user.name, n: dups })
   revalidatePath('/clients')
   return { ok: true, made, skipped }
 }

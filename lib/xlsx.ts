@@ -30,7 +30,10 @@ export function makeXlsx(sheets: { name: string; rows: Cell[][] }[]): Buffer {
 export function readXlsx(buf: Buffer): string[][] {
   const z = new PizZip(buf)
   const shared = (z.file('xl/sharedStrings.xml')?.asText() || '').match(/<si>[\s\S]*?<\/si>/g)?.map((si) => (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map((t) => t.replace(/<[^>]+>/g, '')).join('')) || []
-  const sheetPath = Object.keys(z.files).filter((f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort()[0]
+  // первая вкладка по порядку в workbook.xml (имя файла листа может не совпадать с порядком вкладок)
+  const rid = (z.file('xl/workbook.xml')?.asText() || '').match(/<sheet [^>]*r:id="([^"]+)"/)?.[1]
+  const target = rid ? (z.file('xl/_rels/workbook.xml.rels')?.asText() || '').match(new RegExp(`<Relationship [^>]*Id="${rid}"[^>]*Target="([^"]+)"`))?.[1] || (z.file('xl/_rels/workbook.xml.rels')?.asText() || '').match(new RegExp(`<Relationship [^>]*Target="([^"]+)"[^>]*Id="${rid}"`))?.[1] : null
+  const sheetPath = target ? (target.startsWith('/') ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '')) : Object.keys(z.files).filter((f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort()[0]
   if (!sheetPath) return []
   const un = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
   const rows: string[][] = []
