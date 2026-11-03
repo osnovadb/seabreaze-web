@@ -8,7 +8,7 @@ export function ImportExport({ lang }: { lang: Lang }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [st, act] = useFormState(importClients, null)
   return (
-    <details className="card mt16">
+    <details className="card">
       <summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Импорт и выгрузка xlsx')}</summary>
       <div className="row mt8" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <a className="btn" href="/clients/export">{T('Выгрузить клиентов в xlsx')}</a>

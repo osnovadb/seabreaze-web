@@ -1409,5 +1409,7 @@
 "скидка за 100% (сумма)": "100% payment discount (amount)",
 "комнат (как на сайтах: спальни + 1)": "rooms (as on the websites: bedrooms + 1)",
 "Штуки — целым числом": "Units must be a whole number",
-"Выполнение, %": "Achieved, %"
+"Выполнение, %": "Achieved, %",
+"Импорт — не чаще раза в 10 минут": "Import at most once every 10 minutes",
+"Импорт клиентов у {u}: совпадений с базой {n}": "Client import by {u}: {n} matches with the database"
 }
