@@ -124,6 +124,26 @@ for (const s of searches) {
 }
 out.searches = searchN
 
+// 7д. Очередь в Bitrix24 (М5): пока BITRIX_WEBHOOK не задан — копим; задан — отправляем с повторами (≤ 2 запроса в секунду)
+if (process.env.BITRIX_WEBHOOK) {
+  const base = process.env.BITRIX_WEBHOOK.replace(/\/?$/, '/')
+  const jobs = await q(`select id, method, payload from portal.bitrix_outbox where status <> 'sent' and attempts < 8 order by created_at limit 50`)
+  let sent = 0
+  for (const j of jobs) {
+    try {
+      const res = await fetch(base + j.method + '.json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fields: j.payload.fields, params: { REGISTER_SONET_EVENT: 'Y' } }), signal: AbortSignal.timeout(15000) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) throw new Error(data.error_description || data.error || 'HTTP ' + res.status)
+      await q(`update portal.bitrix_outbox set status = 'sent', sent_at = now(), attempts = attempts + 1, result = $2, last_error = null where id = $1`, [j.id, JSON.stringify(data)])
+      sent++
+    } catch (e) {
+      await q(`update portal.bitrix_outbox set status = 'error', attempts = attempts + 1, last_error = $2 where id = $1`, [j.id, String(e.message || e).slice(0, 300)])
+    }
+    await new Promise((r) => setTimeout(r, 600))
+  }
+  out.bitrix_sent = sent
+} else out.bitrix_pending = Number((await q(`select count(*)::int n from portal.bitrix_outbox where status <> 'sent'`))[0].n)
+
 // 8. Курсы ЦБ Азербайджана (USD, EUR, ILS) — раз в сутки, для показа цены в валюте рынка (М7). Сбой сайта ЦБ не роняет tick.
 const today = new Date().toISOString().slice(0, 10)
 if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from = $1::date limit 1`, [today])).length) {

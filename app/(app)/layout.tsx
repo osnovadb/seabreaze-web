@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (canSeeFinance(u.role)) items.push({ href: '/finance', label: T('Финансы') })
   if (canReviewAgents(u.role)) items.push({ href: '/admin/agents', label: T('Агенты'), cnt: cnt!.apps })
   if (u.role === 'owner' || u.role === 'office') items.push({ href: '/admin/objects', label: T('Объекты') })
+  if (['owner', 'market_head', 'office'].includes(u.role)) items.push({ href: '/admin/leads', label: T('Заявки с сайтов') })
   if (canSeeSources(u.role)) items.push({ href: '/sources', label: T('Источники') })
   items.push({ href: '/materials', label: T('Материалы') })
   if (u.role === 'owner' || u.role === 'content') items.push({ href: '/admin/templates', label: T('Шаблоны') })
