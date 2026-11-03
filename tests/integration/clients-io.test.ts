@@ -158,3 +158,11 @@ test('импорт: не чаще раза в 10 минут; при 20+ совп
   assert.ok(/10 min|10 Min|10 минут|10 דקות/.test(again), 'второй импорт сразу — без ошибки лимита')
   assert.ok(!(await mine()).some((x) => x.name.endsWith(' R')))
 })
+
+test('импорт: две вкладки одновременно — второй получает лимит 10 минут', { skip: SKIP }, async () => {
+  const c = await login(U.agent); await unlimit()
+  const [a, b] = await Promise.all([1, 2].map((i) => upload(c, xlsx(`par${i}.xlsx`, [H, [`QA Импорт ${run} P${i}`, ph(80 + i), '', '', '', '', 'да']]), true)))
+  const lim = /10 min|10 Min|10 минут|10 דקות/
+  assert.equal([a, b].filter((t) => lim.test(t)).length, 1, 'обе параллельные загрузки прошли (или обе упали)')
+  assert.equal((await mine()).filter((x) => / P\d$/.test(x.name)).length, 1)
+})
