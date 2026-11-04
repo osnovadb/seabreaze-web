@@ -1824,5 +1824,8 @@
 "{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно": "{n} units · {p} · prices from the developer's list in US dollars, transaction costs extra",
 "Сдаётся без ремонта": "Delivered unfinished",
 "на фото — пример дизайна застройщика": "the photo shows a developer design example",
-"К выплате партнёрам по актам": "Due to partners under acts"
+"К выплате партнёрам по актам": "Due to partners under acts",
+"Ошибка на странице {p} (код {d}) — подробности в журнале сервера": "Error on page {p} (code {d}) — details in the server log",
+"Фоновая обработка: ошибки — {e}": "Background processing: errors — {e}",
+"Фоновая обработка портала упала — проверьте журнал службы tick": "The portal background job has failed — check the tick service log"
 }

@@ -1824,5 +1824,8 @@
 "{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно": "{n} Whg. · {p} · Preise laut Preisliste des Bauträgers in US-Dollar, Kaufnebenkosten separat",
 "Сдаётся без ремонта": "Übergabe im Rohbau",
 "на фото — пример дизайна застройщика": "das Foto zeigt ein Designbeispiel des Bauträgers",
-"К выплате партнёрам по актам": "An Partner fällig laut Akten"
+"К выплате партнёрам по актам": "An Partner fällig laut Akten",
+"Ошибка на странице {p} (код {d}) — подробности в журнале сервера": "Fehler auf Seite {p} (Code {d}) — Details im Serverprotokoll",
+"Фоновая обработка: ошибки — {e}": "Hintergrundverarbeitung: Fehler — {e}",
+"Фоновая обработка портала упала — проверьте журнал службы tick": "Die Hintergrundverarbeitung des Portals ist ausgefallen — Protokoll des tick-Dienstes prüfen"
 }

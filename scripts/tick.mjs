@@ -219,5 +219,9 @@ if (pbSources.length) out.pb_sent = await pbFlush(q, pbSources, { task })
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
 
+// Наблюдаемость: ошибки шагов (…_error, ошибки прогонов Profitbase) — владельцу, не чаще раза в час
+const errs = Object.entries(out).filter(([k, v]) => k.endsWith('_error') || (v && typeof v === 'object' && v.error)).map(([k, v]) => `${k}: ${String(typeof v === 'object' ? v.error : v).slice(0, 120)}`)
+if (errs.length) for (const o of await q(`select id from portal.users where active and role = 'owner'`))
+  await notify(o.id, 'access', 'Фоновая обработка: ошибки — {e}', '/sources', { e: errs.join('; ').slice(0, 300) }, 'tick-err:' + new Date().toISOString().slice(0, 13) + ':' + o.id)
 await db.end()
 console.log(new Date().toISOString(), JSON.stringify(out))
