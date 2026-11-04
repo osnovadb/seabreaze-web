@@ -55,11 +55,11 @@ test('шаг по этажам: на базовом этаже и ниже «н�
 })
 
 const ctx = { blocks: ['A', 'Block A · Marina', 'B'], layouts: ['A1'] }
-test('parseChess: заголовки RU/EN/DE, «A-101» → «101», пустая ячейка не меняет поле', () => {
+test('parseChess: заголовки RU/EN/DE, номер как в файле, bare без префикса; пустая ячейка не меняет поле', () => {
   for (const head of [['Корпус', 'Номер', 'Цена'], ['Building', 'Unit', 'Price'], ['Gebäude', 'Nummer', 'Preis']]) {
     const p = parseChess([head, ['A', 'A-101', '150 000'], ['B', '101', '']], ctx)
     assert.equal(p.error, ''); assert.deepEqual(p.errors, [])
-    assert.deepEqual(p.rows.map((r) => [r.block, r.number, r.set]), [['A', '101', { price_list: 150000 }], ['B', '101', {}]])
+    assert.deepEqual(p.rows.map((r) => [r.block, r.number, (r as { bare?: string }).bare, r.set]), [['A', 'A-101', '101', { price_list: 150000 }], ['B', '101', '101', {}]])
   }
 })
 

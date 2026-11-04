@@ -116,7 +116,7 @@ test('«Установить цену» квартире без цены и от
   units.push(u)
   const c = await login(U.owner)
   const id = (await draft(c, MARINA, { op: 'set', value: '200000', currency: 'USD', round: '1', title: 'QA set', floor_from: '9', floor_to: '9', statuses: 'available' }))!
-  assert.deepEqual((await items(id)).map((i) => [i.unit_id, i.old_price, i.new_price]), [[u, 0, 200000]])
+  assert.deepEqual((await items(id)).map((i) => [i.unit_id, i.old_price, i.new_price]), [[u, null, 200000]])
   await submit(c, `/admin/prices/${id}`, (await listForm(c, id, /Опубликовать|Publish/))!, {})
   assert.equal(await price(u), 200000)
   await submit(c, `/admin/prices/${id}`, (await listForm(c, id, /Откатить|Roll back|Revert/))!, {})
@@ -153,4 +153,15 @@ test('правка квартиры в Объектах → Квартиры п�
     const e = (await db.query(`select user_id, source from portal.unit_events where unit_id=$1 and kind='price' order by id desc limit 1`, [U601])).rows[0]
     assert.deepEqual(e, { user_id: uid, source: 'portal' }, who)
   }
+})
+
+test('публикация пропускает квартиру, которую продали между расчётом и публикацией (202f0a1)', { skip: SKIP }, async () => {
+  const c = await login(U.owner)
+  const id = (await draft(c, MARINA, { op: 'pct', value: '4', round: '1', title: 'QA статус', statuses: 'available' }))!
+  const p601 = await price(U601)
+  await db.query(`update units set status='sold' where id=$1`, [U601])
+  await submit(c, `/admin/prices/${id}`, (await listForm(c, id, /Опубликовать|Publish/))!, {})
+  assert.equal(await price(U601), p601, 'цена проданной квартиры изменена')
+  assert.equal((await items(id)).find((i) => i.unit_id === U601).applied, false)
+  await submit(c, `/admin/prices/${id}`, (await listForm(c, id, /Откатить|Roll back|Revert/))!, {})
 })

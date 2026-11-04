@@ -45,7 +45,7 @@ after(async () => {
   for (const u of marina0) await db.query(`update units set floor=$2, unit_type=$3, bedrooms=$4, area_total_m2=$5, price_list=$6, price_currency=$7, status=$8, view_side=$9, is_corner=$10, layout_id=$11 where id=$1`,
     [u.id, u.floor, u.unit_type, u.bedrooms, u.area_total_m2, u.price_list, u.price_currency, u.status, u.view_side, u.is_corner, u.layout_id])
   // копии этажа в BRABUS (номера без префикса, созданные тестом)
-  await db.query(`delete from units where project_id=$1 and source_id='manual' and number !~ '^[A-Z]-' and id in (select unit_id from portal.unit_events where kind='created' and at >= $2)`, [BR, t0])
+  await db.query(`delete from units where project_id=$1 and source_id='manual' and id in (select unit_id from portal.unit_events where kind='created' and at >= $2)`, [BR, t0])
   await db.query(`delete from portal.unit_events where at >= $1 and unit_id not in (select id from units)`, [t0])
   fs.rmSync(TMP, { recursive: true, force: true })
   await db.end()
@@ -141,4 +141,5 @@ test('копия этажа BRABUS (номера «A-0301»): существую
   const fl4 = (await db.query(`select number from units where building_id=$1 and floor=4 order by number`, [BR_A])).rows.map((r) => r.number)
   assert.ok(!fl4.includes('405'), `на этаже 4 рядом с A-0405 появилась копия «405»: ${fl4.join(', ')}`)
   assert.ok(fl4.every((n) => /^A-04\d\d$/.test(n)), `номера копии не в формате корпуса: ${fl4.join(', ')}`)
+  assert.deepEqual(fl4, ['A-0401', 'A-0405'], 'копия A-0301 → A-0401, A-0405 пропущена')
 })
