@@ -34,7 +34,10 @@ before(async () => {
 })
 after(async () => {
   if (SKIP) return
+  const cls = (await db.query(`select distinct client_id from portal.bookings where id = any($1)`, [bookings])).rows.map((r) => r.client_id)
   await db.query(`delete from portal.bookings where id = any($1)`, [bookings])
+  // брони снимали и удаляли прямым SQL — стадию клиента пересчитываем, как это делает портал
+  for (const id of cls) await db.query('select portal.sync_client_stage($1)', [id])
   await db.query(`delete from portal.unit_options where title like 'QA опц%'`)
   await db.end()
 })
