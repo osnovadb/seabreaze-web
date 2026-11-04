@@ -11,11 +11,14 @@ import { q, one, tx, audit, notify as notifyUser } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { t } from './i18n'
 import { autoPost, dropAutoPost } from './posts'
+import { asActor } from './unitEvents'
+import { UNIT_TYPES, riser } from './catalog'
+import { readXlsx } from './xlsx'
+import { parseChess } from './chessImport'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
 const slugify = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 60)
-const UNIT_TYPES = ['studio', '1br', '2br', '3br', '4br', 'duplex', 'penthouse', 'townhouse', 'villa', 'commercial', 'parking']
 const UNIT_STATUSES = ['available', 'reserved', 'sold', 'unavailable']
 
 // Объекты и планы оплаты правит владелец; цены и статусы квартир — ещё и офис в Баку (ТЗ, матрица прав)
@@ -147,18 +150,22 @@ export const saveUnit = safe(async (_: unknown, f: FormData) => {
   const status = UNIT_STATUSES.includes(s(f, 'status')) ? s(f, 'status') : 'available'
   const price = num(f, 'price'), cur = ['USD', 'AZN', 'EUR'].includes(s(f, 'currency')) ? s(f, 'currency') : 'USD'
   if (price != null && (Number.isNaN(price) || price < 0)) return { error: t(c.lang, 'Проверьте цену') }
+  // Правка — от имени пользователя: журнал квартиры запишет автора (lib/unitEvents.ts)
+  const err = await asActor(c.user.id, 'portal', async (db) => {
   if (c.user.role === 'office') {
-    await q(`update units set price_list = $2, price_currency = $3, status = $4 where id = $1 and project_id = $5`, [id, price, cur, status, pid])
+    await db.query(`update units set price_list = $2, price_currency = $3, status = $4 where id = $1 and project_id = $5`, [id, price, cur, status, pid])
   } else {
-    const lay = s(f, 'layout') ? await one<{ unit_type: string; bedrooms: number | null; total_area_m2: number | null; internal_area_m2: number | null; external_area_m2: number | null }>('select unit_type, bedrooms, total_area_m2, internal_area_m2, external_area_m2 from layouts where id = $1', [s(f, 'layout')]) : null
+    const lay = s(f, 'layout') ? (await db.query<{ unit_type: string; bedrooms: number | null; total_area_m2: number | null; internal_area_m2: number | null; external_area_m2: number | null }>('select unit_type, bedrooms, total_area_m2, internal_area_m2, external_area_m2 from layouts where id = $1', [s(f, 'layout')])).rows[0] : null
     const vals = [s(f, 'number'), num(f, 'floor'), s(f, 'building') || null, s(f, 'layout') || null, lay?.unit_type || (UNIT_TYPES.includes(s(f, 'unit_type')) ? s(f, 'unit_type') : '2br'),
       lay?.bedrooms ?? num(f, 'bedrooms'), num(f, 'area') ?? lay?.total_area_m2 ?? null, lay?.internal_area_m2 ?? null, num(f, 'ext_area') ?? lay?.external_area_m2 ?? null, num(f, 'plot_area'), price, cur, status, s(f, 'published') !== '0']
-    if (!vals[0]) return { error: t(c.lang, 'Нужен номер квартиры') }
-    if (id) await q(`update units set number = $2, floor = $3, building_id = $4, layout_id = $5, unit_type = $6, bedrooms = $7, area_total_m2 = $8, area_internal_m2 = $9, area_external_m2 = $10, plot_area_m2 = $11,
+    if (!vals[0]) return t(c.lang, 'Нужен номер квартиры')
+    if (id) await db.query(`update units set number = $2, floor = $3, building_id = $4, layout_id = $5, unit_type = $6, bedrooms = $7, area_total_m2 = $8, area_internal_m2 = $9, area_external_m2 = $10, plot_area_m2 = $11,
         price_list = $12, price_currency = $13, status = $14, published = $15 where id = $1 and project_id = $16`, [id, ...vals, pid])
-    else await q(`insert into units (number, floor, building_id, layout_id, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, published, project_id, source_id)
+    else await db.query(`insert into units (number, floor, building_id, layout_id, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, published, project_id, source_id)
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'manual')`, [...vals, pid])
   }
+  })
+  if (err) return { error: err }
   // Скрыть от партнёров — отдельная отметка портала, на сайты не влияет
   if (id && f.has('hidden_set')) {
     if (s(f, 'hidden') === '1') {
@@ -201,17 +208,6 @@ export const generateUnits = safe(async (_: unknown, f: FormData) => {
   await log(c, 'object.units_generate', 'project', pid, { building: bid, made }); done(pid)
   return { ok: true, made }
 })
-// Изменение цен свободных квартир блока на процент (повышение прайса застройщиком) или удаление пустых квартир
-export const bulkUnits = safe(async (_: unknown, f: FormData) => {
-  const c = await unitsEditor()
-  const pid = s(f, 'project'), bid = s(f, 'building')
-  const pctv = num(f, 'pct')
-  if (pctv == null || Number.isNaN(pctv) || Math.abs(pctv) > 50) return { error: t(c.lang, 'Процент — от −50 до 50') }
-  const r = await q(`update units set price_list = round(price_list * (1 + $3 / 100.0)) where project_id = $1 and ($2 = '' or building_id::text = $2) and status = 'available' and price_list is not null returning id`, [pid, bid, pctv])
-  await log(c, 'object.units_price_pct', 'project', pid, { building: bid || null, pct: pctv, n: r.length }); done(pid)
-  return { ok: true, made: r.length }
-})
-
 /* ── Планы оплаты (каталог: их же видят сайты) ── */
 export const savePlan = safe(async (_: unknown, f: FormData) => {
   const c = await owner()
@@ -303,4 +299,117 @@ export const savePromoMode = safe(async (_: unknown, f: FormData) => {
   await q(`insert into portal.project_settings (project_id, promo_mode) values ($1, $2) on conflict (project_id) do update set promo_mode = excluded.promo_mode`, [pid, mode])
   await log(c, 'object.promo_mode', 'project', pid, { mode }); done(pid)
   return { ok: true }
+})
+
+/* ── Опции: платные дополнения к квартире (группа 4) ── */
+export const saveOption = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), id = s(f, 'id')
+  if (s(f, 'delete')) { await q('delete from portal.unit_options where id = $1 and project_id = $2', [id, pid]); await log(c, 'object.option_delete', 'project', pid, { id }); done(pid); return { ok: true } }
+  const title = s(f, 'title'), price = num(f, 'price'), cur = s(f, 'currency')
+  if (!title) return { error: t(c.lang, 'Нужно название') }
+  if (price == null || Number.isNaN(price) || price <= 0) return { error: t(c.lang, 'Проверьте цену') }
+  if (!['USD', 'AZN', 'EUR'].includes(cur)) return { error: t(c.lang, 'Проверьте валюту') }
+  const blocks = (await q<{ id: string; external_id: string | null }>('select id, external_id from buildings where project_id = $1', [pid]))
+  const bids = f.getAll('buildings').map(String).filter((x) => blocks.some((b) => b.id === x))
+  const types = f.getAll('types').map(String).filter((x) => UNIT_TYPES.includes(x))
+  // Квартиры — номерами через запятую, как в шахматке (A-101 или 101); неизвестный номер — ошибка, а не тихий пропуск
+  const nums = s(f, 'units').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)
+  let uids: string[] = []
+  if (nums.length) {
+    const us = await q<{ id: string; no: string; number: string }>(`select u.id, upper(coalesce(b.external_id || '-', '') || u.number) no, upper(u.number) number from units u join buildings b on b.id = u.building_id where u.project_id = $1`, [pid])
+    const miss = nums.filter((n) => !us.some((u) => u.no === n || u.number === n))
+    if (miss.length) return { error: t(c.lang, 'Нет таких квартир: {n}', { n: miss.slice(0, 5).join(', ') }) }
+    uids = Array.from(new Set(us.filter((u) => nums.includes(u.no) || nums.includes(u.number)).map((u) => u.id)))
+  }
+  const vals = [title, s(f, 'note') || null, price, cur, bids, types, uids, s(f, 'active') !== '0', num(f, 'sort') ?? 0]
+  if (id) await q(`update portal.unit_options set title = $3, note = $4, price = $5, currency = $6, building_ids = $7, unit_types = $8, unit_ids = $9, active = $10, sort = $11 where id = $1 and project_id = $2`, [id, pid, ...vals])
+  else await q(`insert into portal.unit_options (project_id, title, note, price, currency, building_ids, unit_types, unit_ids, active, sort) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [pid, ...vals])
+  await log(c, id ? 'object.option_update' : 'object.option_create', 'project', pid, { title, price, cur }); done(pid)
+  return { ok: true }
+})
+
+/* ── Импорт шахматки из xlsx и копирование этажа (группа 4) ── */
+// mode=check — только отчёт; mode=apply — всё одной транзакцией, и только если в файле нет ошибок
+export const importChess = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), apply = s(f, 'mode') === 'apply'
+  const file = f.get('file')
+  if (!isFile(file) || !/\.xlsx$/i.test(file.name)) return { error: t(c.lang, 'Нужен файл .xlsx') }
+  if (file.size > 5 * 1024 * 1024) return { error: t(c.lang, 'Файл больше 5 МБ') }
+  let rows: string[][]
+  try { rows = readXlsx(Buffer.from(await file.arrayBuffer())) } catch { return { error: t(c.lang, 'Не удалось прочитать xlsx') } }
+  if (rows.length > 3001) return { error: t(c.lang, 'Не больше 3000 строк за раз') }
+  const blocks = await q<{ id: string; name: string; external_id: string | null }>('select id, name, external_id from buildings where project_id = $1', [pid])
+  const layouts = await q<{ id: string; code: string; unit_type: string; bedrooms: number | null; total_area_m2: number | null }>('select id, code, unit_type, bedrooms, total_area_m2::float from layouts where project_id = $1', [pid])
+  const p = parseChess(rows, { blocks: blocks.flatMap((b) => [b.name, b.external_id || ''].filter(Boolean)), layouts: layouts.map((l) => l.code) })
+  if (p.error) return { error: t(c.lang, p.error) }
+  const bid = (name: string) => blocks.find((b) => b.name.toLowerCase() === name.toLowerCase() || (b.external_id || '').toLowerCase() === name.toLowerCase())!.id
+  const cur = await q<Record<string, any>>(`select id, building_id, upper(number) number, floor, unit_type, bedrooms, area_total_m2::float, area_external_m2::float, plot_area_m2::float, price_list::float, price_currency, status, view_side, is_corner, layout_id from units where project_id = $1`, [pid])
+  const errors = [...p.errors]
+  const plan: { kind: 'create' | 'update'; id?: string; building: string; number: string; set: Record<string, unknown> }[] = []
+  let same = 0
+  for (const r of p.rows) {
+    const b = bid(r.block), set = { ...r.set }
+    if (set.layout) { const l = layouts.find((x) => x.code.toLowerCase() === String(set.layout).toLowerCase())!; delete set.layout; set.layout_id = l.id; set.unit_type ??= l.unit_type; set.bedrooms ??= l.bedrooms; set.area_total_m2 ??= l.total_area_m2 }
+    const u = cur.find((x) => x.building_id === b && x.number === r.number)
+    if (u) {
+      const diff = Object.fromEntries(Object.entries(set).filter(([k, v]) => u[k] !== v && !(u[k] == null && v == null)))
+      if (Object.keys(diff).length) plan.push({ kind: 'update', id: u.id, building: b, number: r.number, set: diff }); else same++
+    } else {
+      if (set.floor == null) { errors.push(`${r.line}: ${t(c.lang, 'для новой квартиры нужен этаж')}`); continue }
+      if (!set.unit_type) { errors.push(`${r.line}: ${t(c.lang, 'для новой квартиры нужен тип или планировка')}`); continue }
+      plan.push({ kind: 'create', building: b, number: r.number, set })
+    }
+  }
+  const report = { create: plan.filter((x) => x.kind === 'create').length, update: plan.filter((x) => x.kind === 'update').length, same, errors: errors.slice(0, 50), errorsTotal: errors.length }
+  if (!apply || errors.length || !plan.length) return { ok: !errors.length, report, applied: false }
+  const COLS_OK = ['floor', 'unit_type', 'bedrooms', 'area_total_m2', 'area_external_m2', 'plot_area_m2', 'price_list', 'price_currency', 'status', 'view_side', 'is_corner', 'layout_id']
+  await asActor(c.user.id, 'portal', async (db) => {
+    await db.query(`select set_config('app.skip_refresh', 'on', true)`)
+    for (const x of plan) {
+      const keys = Object.keys(x.set).filter((k) => COLS_OK.includes(k))
+      if (x.kind === 'update') await db.query(`update units set ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} where id = $1`, [x.id, ...keys.map((k) => x.set[k])])
+      else {
+        const v = { price_currency: 'USD', status: x.set.price_list ? 'available' : 'unavailable', ...x.set }
+        const ks = Object.keys(v).filter((k) => COLS_OK.includes(k))
+        await db.query(`insert into units (project_id, building_id, number, source_id, ${ks.join(', ')}) values ($1,$2,$3,'manual',${ks.map((_, i) => '$' + (i + 4)).join(',')})`, [pid, x.building, x.number, ...ks.map((k) => (v as Record<string, unknown>)[k])])
+      }
+    }
+    await db.query(`select set_config('app.skip_refresh', '', true)`)
+    await db.query('select refresh_catalog()')
+  })
+  await log(c, 'object.chess_import', 'project', pid, { create: report.create, update: report.update, file: file.name }); done(pid)
+  return { ok: true, report, applied: true }
+})
+
+// Копировать этаж: квартиры этажа-образца на этажи «с–по» с теми же позициями (стояками); номер = этаж + позиция, как при создании
+export const copyFloor = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), bid = s(f, 'building')
+  const src = num(f, 'source'), from = num(f, 'floor_from'), to = num(f, 'floor_to')
+  if (src == null || from == null || to == null || to < from) return { error: t(c.lang, 'Укажите этаж-образец и этажи «с–по»') }
+  if (src >= from && src <= to) return { error: t(c.lang, 'Этаж-образец не должен входить в диапазон') }
+  if (to - from > 60) return { error: t(c.lang, 'Не больше 60 этажей за раз') }
+  const base = await q<{ number: string; floor: number; layout_id: string | null; unit_type: string; bedrooms: number | null; area_total_m2: number | null; area_internal_m2: number | null; area_external_m2: number | null; plot_area_m2: number | null; price_list: number | null; price_currency: string; view_side: string | null; is_corner: boolean | null }>(
+    `select number, floor, layout_id, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, view_side, is_corner from units where building_id = $1 and project_id = $2 and floor = $3`, [bid, pid, src])
+  if (!base.length) return { error: t(c.lang, 'На этаже-образце нет квартир') }
+  const withPrice = s(f, 'prices') === '1'
+  const exist = new Set((await q<{ number: string }>('select upper(number) number from units where building_id = $1', [bid])).map((r) => r.number))
+  let made = 0
+  await asActor(c.user.id, 'portal', async (db) => {
+    await db.query(`select set_config('app.skip_refresh', 'on', true)`)
+    for (let fl = from; fl <= to; fl++) for (const u of base) {
+      const number = `${fl}${riser(u)}`
+      if (exist.has(number.toUpperCase())) continue
+      const price = withPrice ? u.price_list : null
+      await db.query(`insert into units (project_id, building_id, layout_id, number, floor, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, view_side, is_corner, source_id)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'manual')`, [pid, bid, u.layout_id, number, fl, u.unit_type, u.bedrooms, u.area_total_m2, u.area_internal_m2, u.area_external_m2, u.plot_area_m2, price, u.price_currency, price ? 'available' : 'unavailable', u.view_side, u.is_corner])
+      made++
+    }
+    await db.query(`select set_config('app.skip_refresh', '', true)`)
+    await db.query('select refresh_catalog()')
+  })
+  await log(c, 'object.floor_copy', 'project', pid, { building: bid, src, from, to, made }); done(pid)
+  return { ok: true, made }
 })

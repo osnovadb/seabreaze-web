@@ -6,15 +6,16 @@ import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
 import { priceChain, isFull, termUnknown, hasSchedule, planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import { ScheduleTable, type FxView } from '@/components/Calculator'
-import { t, usd, pct, type Lang } from '@/lib/i18n'
+import { t, usd, pct, num, type Lang } from '@/lib/i18n'
+import type { Opt } from '@/lib/options'
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{label}</button>
 }
-export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs }: {
+export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs, options = [] }: {
   lang: Lang; unitId: string; list: number; ext: boolean; cap: number; ceiling: number; cond: SplitCond; days: number; ext_days: number
-  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean
+  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean; options?: Opt[]
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [disc, setDisc] = useState(0)
@@ -28,6 +29,9 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const [open, setOpen] = useState(false)
   const [st, act] = useFormState(createBooking, null)
   const sp = split(cond, list, disc, ext)
+  const [picked, setPicked] = useState<string[]>([])
+  // Опции — сверху итоговой цены, без скидок и вне раздела денег (комиссия считается с квартиры)
+  const optSum = options.filter((o) => picked.includes(o.id)).reduce((a, o) => a + o.usd, 0)
   return (
     <form action={act} className="stack">
       <div className="card">
@@ -42,6 +46,12 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
                 : T('Первый взнос {p}, затем ежемесячные платежи: {m}', { p: pct(lang, Number(plan.down_payment_pct)), m: plan.months || 0 })}</div>}
           </div>
         )}
+        {options.length > 0 && <div style={{ marginBottom: 16 }}>
+          <div className="h3">{T('Опции')}</div>
+          {options.map((o) => <label key={o.id} className="kv check" style={{ cursor: 'pointer' }}><span><input type="checkbox" name="options" value={o.id} checked={picked.includes(o.id)} onChange={(e) => setPicked((a) => (e.target.checked ? [...a, o.id] : a.filter((x) => x !== o.id)))} /> {o.title}{o.note ? <div className="tiny muted">{o.note}</div> : null}</span>
+            <span className="small">+{usd(lang, o.usd)}{o.currency !== 'USD' ? <div className="tiny muted">{o.currency} {num(lang, o.price)}</div> : null}</span></label>)}
+          <div className="tiny muted mt8">{T('Опции оплачиваются застройщику сверх цены квартиры; скидки и ваша комиссия на них не распространяются.')}</div>
+        </div>}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
         <div className="small muted">{ext ? T('Вам выделено {p} от прайса: сколько отдать клиенту, а сколько оставить себе — решаете вы', { p: pct(lang, cond.agent_pool_pct) }) : T('Сами — до {p}, больше — с согласованием руководителя', { p: pct(lang, cap) })}</div>
         <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} name="discount" />
@@ -62,6 +72,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
           {promo && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
           {disc > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, sp.discount)} ({pct(lang, disc)})</span></div>}
           <div className="kv"><span>{T('Итоговая цена')}</span><span>{usd(lang, sp.final)}</span></div>
+          {optSum > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optSum)} · {T('всего {a}', { a: usd(lang, sp.final + optSum) })}</span></div>}
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}
           {ext && <div className="kv"><span>{T('Ваша часть пула, не отданная клиенту')}</span><span>{pct(lang, Math.max(0, cond.agent_pool_pct - disc))} · {usd(lang, sp.agentPoolLeft)}</span></div>}
           <div className="kv"><span>{T('Срок брони')}</span><span>{T('{a} дней + одно продление на {b}', { a: days, b: ext_days })}</span></div>
