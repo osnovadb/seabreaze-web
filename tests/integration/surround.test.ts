@@ -75,11 +75,18 @@ test('cleanMarks и стороны не принимают имена из пр�
 
 test('стороны схемы видны партнёру на экране «Этаж»; метки плана — команде', { skip: SKIP }, async () => {
   const o = await login(U.owner)
-  const sf = (await sidesForm(o, POSITANO))!
-  await submit(o, `/admin/objects/${PR}?tab=markup`, sf, { k_top: 'sea', l_top: 'QA Каспий', k_right: '', k_bottom: 'road', l_bottom: '', k_left: '' })
-  assert.deepEqual(await sides(), { top: { kind: 'sea', label: 'QA Каспий' }, bottom: { kind: 'road' } })
-  const h = (await page(await login(U.agent), `/projects/premium-residence/floor?b=${POSITANO}`)).html
-  assert.ok(h.includes('QA Каспий'), 'сторона «сверху» не видна партнёру')
+  // условная схема со сторонами — у корпуса без планов этажей (с 295fd8c у Premium планы есть на всех этажах): BRABUS Block A
+  const BR = '00000000-0000-0000-0000-0000000000a1', BR_A = '00000000-0000-0000-0000-0000000000b1'
+  const had = (await db.query('select sides from portal.building_sides where building_id=$1', [BR_A])).rows[0]?.sides
+  const sf = forms((await page(o, `/admin/objects/${BR}?tab=markup`)).html).find((f) => f.fields.some(([k, v]) => k === 'building' && v === BR_A) && f.fields.some(([k]) => k === 'k_top'))!
+  try {
+    await submit(o, `/admin/objects/${BR}?tab=markup`, sf, { k_top: 'sea', l_top: 'QA Каспий', k_right: '', k_bottom: 'road', l_bottom: '', k_left: '' })
+    assert.deepEqual((await db.query('select sides from portal.building_sides where building_id=$1', [BR_A])).rows[0].sides, { top: { kind: 'sea', label: 'QA Каспий' }, bottom: { kind: 'road' } })
+    const h = (await page(await login(U.agent), `/projects/brabus-island-baku/floor?b=${BR_A}`)).html
+    assert.ok(h.includes('QA Каспий'), 'сторона «сверху» не видна партнёру')
+  } finally {
+    if (had) await db.query('update portal.building_sides set sides=$2 where building_id=$1', [BR_A, had]); else await db.query('delete from portal.building_sides where building_id=$1', [BR_A])
+  }
   const mf = (await marksForm(o, `/admin/objects/${MARINA}/floor/${FP}?m=marks`))!
   await submit(o, `/admin/objects/${MARINA}/floor/${FP}?m=marks`, mf, { marks: JSON.stringify([{ kind: 'beach', x: 0.4, y: 0.4, label: 'QA пляж' }]) })
   for (const f of [1, 2, 3]) {
