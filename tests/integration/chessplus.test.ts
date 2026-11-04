@@ -159,3 +159,12 @@ test('номер квартиры BRABUS у команды — «A-0405», бе�
     assert.deepEqual(bad, [], `${p}: ${bad.join(', ')}`)
   }
 })
+
+// 475bc57: мусор в project у массовых действий — без 500; бейдж акции без повтора процента
+test('массовые действия: мусор в project — не 500; бейдж акции «−5%» без повтора', { skip: SKIP }, async () => {
+  for (const [fn, extra] of [['bulkStatus', ['status', 'available']], ['bulkHide', ['hidden', '1']]] as const)
+    assert.ok((await call(U.owner, 'lib/objects.ts', fn, [['project', 'zzz'], extra as [string, string], ['units', A0605]])) < 500, fn)
+  assert.equal(await isHidden(A0605), false)
+  const h = (await page(await login(U.seller), '/catalog?p=brabus-island-baku&view=table')).html
+  assert.ok(!/−\d+(?:[.,]\d+)?%\s*−\d+(?:[.,]\d+)?%/.test(h.replace(/<[^>]+>/g, ' ')), 'бейдж «−5% −5%»')
+})
