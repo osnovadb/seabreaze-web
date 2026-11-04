@@ -11,6 +11,7 @@ import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, u
 import { priceChain } from './plans'
 import { optionsFor } from './options'
 import { toUsd } from './fx'
+import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mailOn } from './access'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, type Lang } from './i18n'
@@ -37,8 +38,15 @@ const back = (path: string, params: Record<string, string>) => redirect(path + (
 
 /* ── Вход, язык, «войти как» ── */
 export async function login(_: unknown, f: FormData) {
-  const u = await one<{ id: string; password_hash: string; active: boolean }>('select id, password_hash, active from portal.users where lower(email) = lower($1)', [s(f, 'email')])
-  if (!u || !u.active || !bcrypt.compareSync(s(f, 'password'), u.password_hash)) return { error: 'Неверный e-mail или пароль' }
+  const email = s(f, 'email').toLowerCase(), ip = clientIp()
+  // Подбор пароля: после 5 неудач по e-mail (или 20 с адреса) за 15 минут — пауза, даже при верном пароле
+  if (await loginBlocked(email, ip)) return { error: 'Слишком много попыток входа — подождите 15 минут или восстановите пароль' }
+  const u = await one<{ id: string; password_hash: string; active: boolean; password_set: boolean }>('select id, password_hash, active, password_set from portal.users where lower(email) = $1', [email])
+  if (!u || !u.active || !u.password_set || !bcrypt.compareSync(s(f, 'password'), u.password_hash)) {
+    await noteLogin(email, ip, false); if (u) await audit(u.id, 'login.fail')
+    return { error: 'Неверный e-mail или пароль' }
+  }
+  await noteLogin(email, ip, true)
   await signSession(u.id)
   await q('update portal.users set prev_login_at = last_login_at, last_login_at = now() where id = $1', [u.id])
   await audit(u.id, 'login')
@@ -572,35 +580,44 @@ export async function saveConditions(_: unknown, f: FormData) {
 }
 
 /* ── Пользователи ── */
+// Новый пользователь без пароля: случайный хеш, пароль задаёт сам по ссылке-приглашению
+const noPassword = () => bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10)
+async function invite(uid: string, by: string) {
+  const u = (await one<{ id: string; email: string; name: string; locale: Lang }>('select id, email, name, locale from portal.users where id = $1', [uid]))!
+  const link = await issueLink(uid, 'invite', by)
+  await mailLink(u, 'invite', link)
+  return { link, mailed: mailOn() }
+}
 export async function createUser(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canManageUsers(c.user.role)) return { error: 'Только владелец' }
-  const pw = crypto.randomBytes(6).toString('base64url')
+  if (!ROLES_ALL.includes(s(f, 'role') as Role)) return { error: 'Нет прав' }
+  let uid: string
   try {
-    await q(`insert into portal.users (email, name, password_hash, role, market, locale, agency_id) values ($1,$2,$3,$4,$5,$6,$7)`,
-      [s(f, 'email'), s(f, 'name'), bcrypt.hashSync(pw, 10), s(f, 'role'), s(f, 'market') || null, s(f, 'locale') || 'ru', s(f, 'agency') || null])
+    uid = (await one<{ id: string }>(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id) values ($1,$2,$3,false,$4,$5,$6,$7) returning id`,
+      [s(f, 'email').toLowerCase(), s(f, 'name'), noPassword(), s(f, 'role'), s(f, 'market') || null, s(f, 'locale') || 'ru', s(f, 'agency') || null]))!.id
   } catch {
     return { error: 'Такой e-mail уже есть' }
   }
-  await audit(c.real.id, 'user.create', 'user', s(f, 'email'))
+  await audit(c.real.id, 'user.create', 'user', uid, { email: s(f, 'email') })
   revalidatePath('/admin/users')
-  return { ok: true, password: pw }
+  return { ok: true, ...(await invite(uid, c.real.id)) }
 }
 // Руководитель агентства заводит и отключает своих сотрудников (роль «саб-агент», агентство и рынок — его)
 export async function createAgencyAgent(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (c.user.role !== 'agency_head' || !c.user.agency_id) return { error: 'Нет прав' }
   if (!s(f, 'name') || !s(f, 'email')) return { error: 'Нужны имя и e-mail' }
-  const pw = crypto.randomBytes(6).toString('base64url')
+  let uid: string
   try {
-    await q(`insert into portal.users (email, name, password_hash, role, market, locale, agency_id, curator_id) values ($1,$2,$3,'agent',$4,$5,$6,$7)`,
-      [s(f, 'email').toLowerCase(), s(f, 'name'), bcrypt.hashSync(pw, 10), c.user.market, LANGS.includes(s(f, 'locale') as Lang) ? s(f, 'locale') : c.user.locale, c.user.agency_id, c.user.curator_id])
+    uid = (await one<{ id: string }>(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id, curator_id) values ($1,$2,$3,false,'agent',$4,$5,$6,$7) returning id`,
+      [s(f, 'email').toLowerCase(), s(f, 'name'), noPassword(), c.user.market, LANGS.includes(s(f, 'locale') as Lang) ? s(f, 'locale') : c.user.locale, c.user.agency_id, c.user.curator_id]))!.id
   } catch {
     return { error: 'Такой e-mail уже есть' }
   }
-  await audit(c.real.id, 'user.create', 'user', s(f, 'email'), { by: 'agency_head' }, c.impersonating ? c.user.id : null)
+  await audit(c.real.id, 'user.create', 'user', uid, { by: 'agency_head', email: s(f, 'email') }, c.impersonating ? c.user.id : null)
   revalidatePath('/team')
-  return { ok: true, password: pw }
+  return { ok: true, ...(await invite(uid, c.real.id)) }
 }
 export async function toggleAgencyAgent(f: FormData) {
   const c = await writeCtx()
@@ -645,10 +662,13 @@ export async function resetPassword(_: unknown, f: FormData) {
   const c = await writeCtx()
   const u = await editableUser(c, s(f, 'id'))
   if (!u) return { error: 'Нет прав' }
-  const pw = crypto.randomBytes(6).toString('base64url')
-  await q('update portal.users set password_hash = $2, session_ver = session_ver + 1 where id = $1', [u.id, bcrypt.hashSync(pw, 10)])
-  await audit(c.real.id, 'user.password_reset', 'user', u.id, null, c.impersonating ? c.user.id : null)
-  return { ok: true, password: pw }
+  // Ссылка на новый пароль (48 часов); старый пароль действует, пока пользователь не задаст новый
+  const full = (await one<{ id: string; email: string; name: string; locale: Lang; password_set: boolean }>('select id, email, name, locale, password_set from portal.users where id = $1', [u.id]))!
+  const kind = full.password_set ? 'reset' : 'invite'
+  const link = await issueLink(u.id, kind, c.real.id, kind === 'invite' ? 168 : 48)
+  await mailLink(full, kind, link)
+  await audit(c.real.id, 'user.password_link', 'user', u.id, { kind }, c.impersonating ? c.user.id : null)
+  return { ok: true, link, mailed: mailOn() }
 }
 export async function resetPin(_: unknown, f: FormData) {
   const c = await writeCtx()
@@ -718,21 +738,20 @@ export async function setOwnLocale(f: FormData) {
   revalidatePath('/', 'layout')
 }
 
-/* ── Заявка агента → доступ: агентство (если заявка от агентства), пользователь, куратор, временный пароль ── */
+/* ── Заявка агента → доступ: агентство (если заявка от агентства), пользователь, куратор, ссылка-приглашение ── */
 export async function createFromApplication(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) return { error: 'Нет прав' }
   const a = await one<{ id: string; kind: string; name: string; company: string | null; email: string; market: string; license: string | null; user_id: string | null; status: string }>('select * from portal.agent_applications where id = $1', [s(f, 'id')])
   if (!a || a.user_id) return { error: 'Доступ уже создан' }
   if (c.user.role === 'market_head' && a.market !== c.user.market) return { error: 'Нет прав' }
-  const pw = crypto.randomBytes(6).toString('base64url')
-  const pin = String(crypto.randomInt(1000, 10000))
+  let uid: string
   try {
-    const uid = await tx(async (t) => {
+    uid = await tx(async (t) => {
       let agency: string | null = null
       if (a.kind === 'agency') agency = (await t.query(`insert into portal.agencies (name, market) values ($1,$2) returning id`, [a.company || a.name, a.market])).rows[0].id
-      const u = await t.query(`insert into portal.users (email, name, password_hash, pin_hash, role, market, locale, agency_id, curator_id, license_note, contract_signed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
-        [a.email.toLowerCase(), a.name, bcrypt.hashSync(pw, 10), bcrypt.hashSync(pin, 10), a.kind === 'agency' ? 'agency_head' : 'agent', a.market, a.market === 'IL' ? 'he' : 'de', agency, s(f, 'curator') || null, a.license, s(f, 'contract') || null])
+      const u = await t.query(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id, curator_id, license_note, contract_signed_at) values ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10) returning id`,
+        [a.email.toLowerCase(), a.name, noPassword(), a.kind === 'agency' ? 'agency_head' : 'agent', a.market, a.market === 'IL' ? 'he' : 'de', agency, s(f, 'curator') || null, a.license, s(f, 'contract') || null])
       await t.query(`update portal.agent_applications set status = 'approved', user_id = $2, reviewed_by = $3 where id = $1`, [a.id, u.rows[0].id, c.user.id])
       return u.rows[0].id as string
     })
@@ -740,8 +759,8 @@ export async function createFromApplication(_: unknown, f: FormData) {
   } catch {
     return { error: 'Такой e-mail уже есть' }
   }
-  // Без revalidatePath: иначе строка заявки перерисуется и одноразовый пароль исчезнет с экрана
-  return { ok: true, password: pw, pin, email: a.email }
+  // Без revalidatePath: иначе строка заявки перерисуется и ссылка-приглашение исчезнет с экрана
+  return { ok: true, email: a.email, ...(await invite(uid, c.real.id)) }
 }
 
 /* ── Исключения по ставкам агентов и агентств ── */
@@ -913,4 +932,57 @@ export async function importClients(_: unknown, f: FormData) {
   if (dups >= 20) for (const h of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [c.user.market])) await notify(h.id, 'client', 'Импорт клиентов у {u}: совпадений с базой {n}', '/admin/journal', { u: c.user.name, n: dups })
   revalidatePath('/clients')
   return { ok: true, made, skipped }
+}
+
+/* ── Без входа: «Забыли пароль?» и задание пароля по ссылке ── */
+// Ответ всегда одинаковый — по нему нельзя узнать, есть ли такой e-mail. Не чаще 3 ссылок в час на пользователя.
+export async function requestReset(_: unknown, f: FormData) {
+  const email = s(f, 'email').toLowerCase()
+  const u = /^[^@\s]+@[^@\s]+$/.test(email) ? await one<{ id: string; email: string; name: string; locale: Lang; market: string | null; password_set: boolean }>('select id, email, name, locale, market, password_set from portal.users where lower(email) = $1 and active', [email]) : undefined
+  if (u && !(await one(`select 1 from portal.auth_tokens where user_id = $1 and created_at > now() - interval '1 hour' having count(*) >= 3`, [u.id]))) {
+    const kind = u.password_set ? 'reset' : 'invite'
+    const link = await issueLink(u.id, kind, null, kind === 'invite' ? 168 : 2)
+    await mailLink(u, kind, link)
+    // Пока почта не подключена — руководителю в портале: выдать ссылку из карточки пользователя
+    if (!mailOn()) for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [u.market]))
+      await notify(o.id, 'access', 'Запрошен сброс пароля: {n} — выдайте ссылку в карточке пользователя', `/admin/users/${u.id}`, { n: u.name })
+    await audit(u.id, 'user.password_request')
+  }
+  return { ok: true }
+}
+export async function setPassword(_: unknown, f: FormData) {
+  const tk = await tokenUser(s(f, 'token'))
+  if (!tk) return { error: 'Ссылка устарела или уже использована — запросите новую' }
+  const pw = s(f, 'password'), pin = s(f, 'pin')
+  if (pw.length < 10) return { error: 'Пароль — не короче 10 символов' }
+  if (pw !== s(f, 'password2')) return { error: 'Пароли не совпадают' }
+  const needPin = !(await one<{ pin_hash: string | null }>('select pin_hash from portal.users where id = $1', [tk.user_id]))?.pin_hash
+  if ((needPin || pin) && !/^\d{4}$/.test(pin)) return { error: 'PIN — 4 цифры' }
+  const ok = await tx(async (t) => {
+    // Ссылка одноразовая: гасим её в той же транзакции; две вкладки не зададут пароль дважды
+    if (!(await t.query('update portal.auth_tokens set used_at = now() where id = $1 and used_at is null', [tk.id])).rowCount) return false
+    await t.query(`update portal.users set password_hash = $2, password_set = true, session_ver = session_ver + 1 ${pin ? ', pin_hash = $3' : ''} where id = $1`, pin ? [tk.user_id, bcrypt.hashSync(pw, 10), bcrypt.hashSync(pin, 10)] : [tk.user_id, bcrypt.hashSync(pw, 10)])
+    await t.query(`update portal.auth_tokens set used_at = now() where user_id = $1 and used_at is null`, [tk.user_id])
+    return true
+  })
+  if (!ok) return { error: 'Ссылка устарела или уже использована — запросите новую' }
+  await audit(tk.user_id, tk.kind === 'invite' ? 'user.invite_accept' : 'user.password_set')
+  await signSession(tk.user_id)
+  redirect('/')
+}
+
+/* ── Профиль: уведомления вне портала (e-mail, Telegram, сводка) ── */
+export async function saveNotifyPrefs(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) return
+  await q('update portal.users set notify_email = $2, notify_telegram = $3, notify_digest = $4 where id = $1', [c.real.id, f.get('email') === '1', f.get('telegram') === '1', f.get('digest') === '1'])
+  revalidatePath('/profile')
+}
+// Привязка Telegram: одноразовый код в ссылке на бота; бот (tick) по /start <код> запоминает чат. «Отвязать» — стирает чат.
+export async function linkTelegram(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) return
+  if (s(f, 'unlink')) await q('update portal.users set telegram_chat_id = null, tg_link_code = null where id = $1', [c.real.id])
+  else await q('update portal.users set tg_link_code = $2 where id = $1', [c.real.id, crypto.randomBytes(9).toString('base64url')])
+  revalidatePath('/profile')
 }

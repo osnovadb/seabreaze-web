@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import pg from 'pg'
 import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
 import { bestOffer } from '../lib/promoMatch.mjs'
+import { notifyOut } from './notify-out.mjs'
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -196,6 +197,9 @@ if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from
     out.rates = n
   } catch (e) { out.rates_error = String(e.message || e) }
 }
+
+// 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
+try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
 
 await db.end()
 console.log(new Date().toISOString(), JSON.stringify(out))

@@ -1,4 +1,5 @@
 'use client'
+import { InviteLink } from '@/components/InviteLink'
 import { useFormState, useFormStatus } from 'react-dom'
 import { updateUser, resetPassword, resetPin } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
@@ -44,13 +45,13 @@ export function Secrets({ lang, id }: { lang: Lang; id: string }) {
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <div className="h3" style={{ margin: 0 }}>{T('Пароль и PIN')}</div>
-      <form action={actPw} className="row"><input type="hidden" name="id" value={id} /><Btn label={T('Выдать временный пароль')} /></form>
-      {pw?.password && <div className="okbox">{T('Создан. Временный пароль — передайте лично и попросите сменить:')} <b>{pw.password}</b></div>}
+      <form action={actPw} className="row"><input type="hidden" name="id" value={id} /><Btn label={T('Ссылка на новый пароль')} /></form>
+      {pw?.link && <InviteLink lang={lang} link={pw.link} mailed={pw.mailed} title={T('Ссылка готова: по ней пользователь задаст новый пароль. Старый пароль действует, пока новый не задан.')} />}
       {pw?.error && <div className="err">{T(pw.error)}</div>}
       <form action={actPin} className="row"><input type="hidden" name="id" value={id} /><Btn label={T('Новый PIN режима показа')} /></form>
       {pin?.pin && <div className="okbox">{T('Новый PIN')}: <b>{pin.pin}</b></div>}
       {pin?.error && <div className="err">{T(pin.error)}</div>}
-      <div className="tiny muted">{T('Новый пароль сразу завершает все сеансы пользователя. Свой пароль и PIN пользователь меняет в профиле.')}</div>
+      <div className="tiny muted">{T('Новый пароль, заданный по ссылке, завершает все сеансы пользователя. Свой пароль и PIN пользователь меняет в профиле.')}</div>
     </div>
   )
 }
