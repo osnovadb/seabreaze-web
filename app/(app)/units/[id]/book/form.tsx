@@ -13,10 +13,11 @@ function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{label}</button>
 }
-export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs, options = [] }: {
+export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs, options = [], pkgs = [], fee = null }: {
   lang: Lang; unitId: string; list: number; ext: boolean; cap: number; ceiling: number; cond: SplitCond; days: number; ext_days: number
-  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean; options?: Opt[]
+  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean; options?: Opt[]; pkgs?: { id: string; client_id: string; unit: string }[]; fee?: { amount: number; cur: string } | null
 }) {
+  const [cid, setCid] = useState(preset || '')
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [disc, setDisc] = useState(0)
   const [planId, setPlanId] = useState(plans[0]?.id || '')
@@ -75,18 +76,22 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
           {optSum > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optSum)} · {T('всего {a}', { a: usd(lang, sp.final + optSum) })}</span></div>}
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}
           {ext && <div className="kv"><span>{T('Ваша часть пула, не отданная клиенту')}</span><span>{pct(lang, Math.max(0, cond.agent_pool_pct - disc))} · {usd(lang, sp.agentPoolLeft)}</span></div>}
+          {fee && <div className="kv"><span>{T('Платная бронь')}</span><span className="small">{T('взнос {a} — офис подтвердит бронь после оплаты; при договоре засчитывается в цену', { a: `${fee.cur} ${num(lang, fee.amount)}` })}</span></div>}
           <div className="kv"><span>{T('Срок брони')}</span><span>{T('{a} дней + одно продление на {b}', { a: days, b: ext_days })}</span></div>
           <div className="kv"><span>{T('Выплата')}</span><span>{T('после оплаты застройщиком')}</span></div>
         </div>
       </div>
       <div className="card">
         <label className="field"><span>{T('Клиент (закреплённый за вами)')}</span>
-          <select className="in" name="client" defaultValue={preset || ''} required>
+          <select className="in" name="client" value={cid} onChange={(e) => setCid(e.target.value)} required>
             <option value="" disabled>{T('Выберите клиента')}</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.reg_no}</option>)}
           </select>
         </label>
         {clients.length === 0 && <div className="note mt8">{T('Нет закреплённых клиентов.')} <Link className="bronze" href="/clients/new">{T('Зарегистрировать клиента →')}</Link></div>}
+        {pkgs.some((p) => p.client_id === cid) && <label className="field mt8"><span>{T('Пакетом с бронью (один договор)')}</span>
+          <select className="in" name="package" defaultValue=""><option value="">{T('нет — отдельная бронь')}</option>{pkgs.filter((p) => p.client_id === cid).map((p) => <option key={p.id} value={p.id}>{p.unit}</option>)}</select>
+          <span className="tiny muted">{T('Например, машиноместо или кладовка к квартире: договор по всем броням пакета оформляется разом, комиссия — по каждой квартире.')}</span></label>}
         <input type="hidden" name="unit" value={unitId} />
         {st?.error && <div className="err mt8">{T(st.error)}</div>}
         <div className="mt16"><Submit label={T('Поставить бронь по {p}', { p: usd(lang, sp.final) })} /></div>

@@ -64,8 +64,10 @@ export async function saveProject(_: unknown, f: FormData) {
       // Обложка для списка проектов: картинка до 25 МБ; «убрать» — вернуть картинку по умолчанию
       const cover = f.get('cover')
       if (isFile(cover)) {
-        if (!/^image\//.test(cover.type)) return { error: t(c.lang, 'Нужна картинка: JPG, PNG или WEBP') }
-        const fid = await storeFile(cover, c.user.id)
+        // gif, heic и прочее — понятная ошибка, а не общий catch про адрес проекта
+        if (!/^image\/(jpeg|png|webp)$/.test(cover.type) || !/\.(jpe?g|png|webp)$/i.test(cover.name)) return { error: t(c.lang, 'Нужна картинка: JPG, PNG или WEBP') }
+        if (cover.size > 25 * 1024 * 1024) return { error: t(c.lang, 'Файл больше 25 МБ') }
+        const fid = await storeFile(cover, c.user.id, { exts: ['jpg', 'jpeg', 'png', 'webp'] })
         await q(`insert into portal.project_settings (project_id, cover_file_id) values ($1,$2) on conflict (project_id) do update set cover_file_id = $2`, [id, fid])
       } else if (s(f, 'cover_drop')) await q('update portal.project_settings set cover_file_id = null where project_id = $1', [id])
       await log(c, 'object.project_update', 'project', id)

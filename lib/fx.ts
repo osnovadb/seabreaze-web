@@ -25,3 +25,11 @@ export async function fxFor(market: string | null | undefined, lang?: Lang): Pro
   if (!usd || !x) return null
   return { cur, perUsd: usd.azn / x.azn, date: x.date < usd.date ? x.date : usd.date }
 }
+
+// Сумма в USD по курсу ЦБ (через AZN); 0 — курса нет
+export async function toUsd(amount: number, cur: string) {
+  if (cur === 'USD') return amount
+  const r = await rates(), usd = r.get('USD'), x = r.get(cur)
+  if (cur === 'AZN') return usd ? amount / usd.azn : 0
+  return usd && x ? amount * x.azn / usd.azn : 0
+}

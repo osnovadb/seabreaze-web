@@ -10,6 +10,7 @@ import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegis
 import { conditionsFor, split, unitById, projectVisible, plansFor } from './catalog'
 import { priceChain } from './plans'
 import { optionsFor } from './options'
+import { toUsd } from './fx'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, type Lang } from './i18n'
@@ -25,6 +26,7 @@ async function writeCtx() {
   if (c.impersonating && process.env.ALLOW_IMPERSONATE_WRITE !== '1') throw new Error('read-only: impersonation')
   return c
 }
+const FEE_ROLES: Role[] = ['owner', 'office', 'finance']
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 // Язык клиента — код ru/en/de/he (из импорта приходит «Deutsch», «English»…); неизвестное — пусто
 const LANG_NAMES: Record<string, string> = { ru: 'ru', русский: 'ru', russian: 'ru', russisch: 'ru', en: 'en', english: 'en', английский: 'en', englisch: 'en', de: 'de', deutsch: 'de', german: 'de', немецкий: 'de', he: 'he', hebrew: 'he', иврит: 'he', hebräisch: 'he', 'עברית': 'he' }
@@ -341,6 +343,10 @@ export async function createBooking(_: unknown, f: FormData) {
   const { promo, mode } = await promoForUnit(unit)
   const ch = priceChain(unit.usd!, plan, promo, mode)
   if (!ch.poolAllowed && disc > 0) return { error: t(c.lang, 'По условиям акции скидка из пула не применяется — уберите скидку') }
+  // Пакет: вторая квартира клиента (машиноместо, кладовка) к его активной брони — один договор на все
+  const pkgId = s(f, 'package')
+  const pkg = pkgId ? await one<{ id: string; group_id: string | null }>(`select id, group_id from portal.bookings where id = $1 and client_id = $2 and status in ('requested','confirmed')`, [pkgId, clientId]) : null
+  if (pkgId && !pkg) return { error: t(c.lang, 'Бронь для пакета уже неактивна — обновите страницу') }
   const usdPrice = ch.base
   const sp = split(cond, usdPrice, disc, isExternal(c.user.role))
   // Опции (группа 4): только действующие для этой квартиры, цена в USD — на сервере, не из формы
@@ -349,16 +355,21 @@ export async function createBooking(_: unknown, f: FormData) {
   if (want.some((id) => !avail.some((o) => o.id === id))) return { error: t(c.lang, 'Опция больше не действует — обновите страницу') }
   const opts = avail.filter((o) => want.includes(o.id)).map((o) => ({ id: o.id, title: o.title, price: o.price, currency: o.currency, usd: o.usd }))
   const optUsd = opts.reduce((a, o) => a + o.usd, 0)
-  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval, JSON.stringify(opts), optUsd])
-  await q(`update portal.clients set stage = 'booking', last_activity_at = now() where id = $1`, [clientId])
+  const group = pkg ? pkg.group_id || pkg.id : null
+  // Платная бронь: взнос из условий проекта; офис подтвердит бронь только после отметки об оплате
+  const fee = cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency, usd: Math.round(await toUsd(cond.booking_fee, cond.booking_fee_currency)) } : null
+  if (pkg && !pkg.group_id) await q('update portal.bookings set group_id = $1 where id = $1', [pkg.id])
+  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd, group_id, fee_amount, fee_currency, fee_usd, fee_status)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18) returning id`,
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none'])
+  // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
+  await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: `${unit.block}-${unit.number}`, d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
   const u = `${unit.block}-${unit.number}`
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
-  } else for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
+  } else for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
   if (c.show) redirect(`/show/unit/${unit.id}?booked=1`)
   redirect(`/bookings?created=${b!.id}`)
@@ -366,7 +377,7 @@ export async function createBooking(_: unknown, f: FormData) {
 export async function bookingAction(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'id'), act = s(f, 'act')
-  const b = await one<{ id: string; agent_id: string; client_id: string; status: string; extended: boolean; unit_id: string; final_price: number; project_id: string; snapshot: any; approval: string | null; discount_pct: number }>('select * from portal.bookings where id = $1', [id])
+  const b = await one<{ id: string; agent_id: string; client_id: string; status: string; extended: boolean; unit_id: string; final_price: number; project_id: string; snapshot: any; approval: string | null; discount_pct: number; fee_status: string }>('select * from portal.bookings where id = $1', [id])
   if (!b) return
   const mine = b.agent_id === c.user.id || c.user.role === 'owner'
   if ((act === 'approve' || act === 'decline') && canApproveDiscount(c.user.role) && b.approval === 'pending' && b.status === 'requested') {
@@ -378,27 +389,42 @@ export async function bookingAction(f: FormData) {
       await q(`update portal.bookings set approval = 'rejected', approved_by = $2, status = 'cancelled' where id = $1`, [id, c.user.id])
       await notify(b.agent_id, 'booking', 'Скидка по брони не согласована — бронь снята', '/bookings')
     }
-  } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending') {
+  } else if (act === 'fee_paid' && FEE_ROLES.includes(c.user.role) && b.fee_status === 'due' && ['requested', 'confirmed'].includes(b.status)) {
+    await q(`update portal.bookings set fee_status = 'paid', fee_paid_at = now(), fee_by = $2 where id = $1 and fee_status = 'due'`, [id, c.user.id])
+    await notify(b.agent_id, 'booking', 'Взнос за бронь получен — офис подтверждает бронь у застройщика', '/bookings')
+  } else if ((act === 'fee_refund' || act === 'fee_keep') && ['owner', 'finance'].includes(c.user.role) && b.fee_status === 'paid' && ['cancelled', 'expired'].includes(b.status)) {
+    await q(`update portal.bookings set fee_status = $2, fee_by = $3 where id = $1 and fee_status = 'paid'`, [id, act === 'fee_refund' ? 'refunded' : 'kept', c.user.id])
+  } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending' && b.fee_status !== 'due') {
     await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now() where id = $1`, [id, c.user.id])
     await notify(b.agent_id, 'booking', 'Бронь подтверждена у застройщика', '/bookings')
   } else if (act === 'extend' && (mine || canConfirmBooking(c.user.role)) && !b.extended && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set ends_at = ends_at + ((snapshot->>'booking_ext_days') || ' days')::interval, extended = true where id = $1`, [id])
   } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
+    if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
   } else if (act === 'contract' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && b.status === 'confirmed') {
     // Договор — только после пройденного KYC (v2)
     if ((await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [b.client_id]))?.kyc_status !== 'passed') return
-    const sp = b.snapshot?.split || {}
-    const seller = await one<{ curator_id: string | null; role: string }>('select curator_id, role from portal.users where id = $1', [b.agent_id])
+    // Пакет: подтверждённые брони того же клиента с тем же group_id оформляются одним договором — по сделке на квартиру
+    const g = (await one<{ group_id: string | null }>('select group_id from portal.bookings where id = $1', [id]))?.group_id
+    const list = g ? await q<{ id: string; unit_id: string; project_id: string; agent_id: string; final_price: number; snapshot: any }>(`select id, unit_id, project_id, agent_id, final_price, snapshot from portal.bookings where group_id = $1 and client_id = $2 and status = 'confirmed'`, [g, b.client_id])
+      : [{ id, unit_id: b.unit_id, project_id: b.project_id, agent_id: b.agent_id, final_price: b.final_price, snapshot: b.snapshot }]
+    const made: string[] = []
     await tx(async (t) => {
-      await t.query(`update portal.bookings set status = 'converted' where id = $1`, [id])
-      await t.query(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, b.client_id, b.unit_id, b.project_id, isExternal((seller?.role || 'seller') as any) ? b.agent_id : null, seller?.curator_id || b.agent_id, b.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0)])
-      await t.query(`update portal.clients set stage = 'contract' where id = $1`, [b.client_id])
+      for (const x of list) {
+        const sp = x.snapshot?.split || {}
+        const seller = (await t.query<{ curator_id: string | null; role: string }>('select curator_id, role from portal.users where id = $1', [x.agent_id])).rows[0]
+        // Бронь уже оформлена параллельно (вторая вкладка) — пропускаем
+        // Взнос за платную бронь засчитывается в цену по договору
+        if (!(await t.query(`update portal.bookings set status = 'converted', fee_status = case when fee_status = 'paid' then 'credited' else fee_status end where id = $1 and status = 'confirmed'`, [x.id])).rowCount) continue
+        const d = await t.query<{ id: string }>(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount, group_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+          [x.id, b.client_id, x.unit_id, x.project_id, isExternal((seller?.role || 'seller') as any) ? x.agent_id : null, seller?.curator_id || x.agent_id, x.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0), g])
+        made.push(d.rows[0].id)
+      }
+      if (made.length) await t.query(`update portal.clients set stage = case when stage in ('payments','fee','support','handed') then stage else 'contract' end where id = $1`, [b.client_id])
     })
-    await notify(b.agent_id, 'deal', 'Договор подписан — сделка в работе', '/commission')
-    const nd = await one<{ id: string }>('select id from portal.deals where booking_id = $1', [id])
-    if (nd) await syncAct(nd.id)
+    if (made.length) await notify(b.agent_id, 'deal', made.length > 1 ? 'Договор подписан — сделок в работе: {n}' : 'Договор подписан — сделка в работе', '/commission', made.length > 1 ? { n: made.length } : undefined)
+    for (const d of made) await syncAct(d)
   }
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
   revalidatePath('/bookings')
@@ -489,18 +515,21 @@ export async function saveConditions(_: unknown, f: FormData) {
   if (!canEditConditions(c.user.role)) return { error: 'Только владелец' }
   const pid = s(f, 'project')
   const n = (k: string) => Number(s(f, k).replace(',', '.'))
-  const fields = ['fix_pct', 'pool_pct', 'agent_fix_pct', 'agent_pool_pct', 'agent_our_pool_share', 'seller_share_pct', 'seller_self_disc', 'seller_max_disc', 'booking_days', 'booking_ext_days', 'protect_months', 'max_bookings_client', 'max_bookings_agent', 'max_bookings_total']
+  const fields = ['fix_pct', 'pool_pct', 'agent_fix_pct', 'agent_pool_pct', 'agent_our_pool_share', 'seller_share_pct', 'seller_self_disc', 'seller_max_disc', 'booking_days', 'booking_ext_days', 'protect_months', 'max_bookings_client', 'max_bookings_agent', 'max_bookings_total', 'booking_fee']
+  if (!s(f, 'booking_fee')) f.set('booking_fee', '0')
   for (const k of fields) if (Number.isNaN(n(k))) return { error: 'Проверьте числа: ' + k }
   if (n('agent_pool_pct') > n('pool_pct')) return { error: 'Часть пула агента больше всего пула' }
   if (n('agent_fix_pct') > n('fix_pct')) return { error: 'Фикс агента больше нашего фикса' }
+  if (n('booking_fee') < 0) return { error: 'Взнос за бронь не может быть отрицательным' }
+  const feeCur = ['USD', 'AZN', 'EUR'].includes(s(f, 'booking_fee_currency')) ? s(f, 'booking_fee_currency') : 'USD'
   const draft = await one<{ id: string }>(`select id from portal.conditions where project_id = $1 and status = 'draft' order by version desc limit 1`, [pid])
   const vals = fields.map(n)
   if (draft) {
-    await q(`update portal.conditions set ${fields.map((k, i) => `${k} = $${i + 3}`).join(', ')}, valid_from = $2, pay_timing = $${fields.length + 3}, note = $${fields.length + 4} where id = $1`, [draft.id, s(f, 'valid_from'), ...vals, s(f, 'pay_timing'), s(f, 'note') || null])
+    await q(`update portal.conditions set ${fields.map((k, i) => `${k} = $${i + 3}`).join(', ')}, valid_from = $2, pay_timing = $${fields.length + 3}, note = $${fields.length + 4}, booking_fee_currency = $${fields.length + 5} where id = $1`, [draft.id, s(f, 'valid_from'), ...vals, s(f, 'pay_timing'), s(f, 'note') || null, feeCur])
   } else {
     const v = await one<{ v: number }>('select coalesce(max(version),0)+1 v from portal.conditions where project_id = $1', [pid])
-    await q(`insert into portal.conditions (project_id, version, status, valid_from, ${fields.join(', ')}, pay_timing, note, payment_plans, created_by) values ($1,$2,'draft',$3, ${fields.map((_, i) => '$' + (i + 4)).join(', ')}, $${fields.length + 4}, $${fields.length + 5},
-      coalesce((select payment_plans from portal.conditions where project_id = $1 order by version desc limit 1), '[]'), $${fields.length + 6})`, [pid, v!.v, s(f, 'valid_from'), ...vals, s(f, 'pay_timing'), s(f, 'note') || null, c.user.id])
+    await q(`insert into portal.conditions (project_id, version, status, valid_from, ${fields.join(', ')}, pay_timing, note, payment_plans, created_by, booking_fee_currency) values ($1,$2,'draft',$3, ${fields.map((_, i) => '$' + (i + 4)).join(', ')}, $${fields.length + 4}, $${fields.length + 5},
+      coalesce((select payment_plans from portal.conditions where project_id = $1 order by version desc limit 1), '[]'), $${fields.length + 6}, $${fields.length + 7})`, [pid, v!.v, s(f, 'valid_from'), ...vals, s(f, 'pay_timing'), s(f, 'note') || null, c.user.id, feeCur])
   }
   await audit(c.real.id, 'conditions.save', 'project', pid)
   if (s(f, 'publish')) {

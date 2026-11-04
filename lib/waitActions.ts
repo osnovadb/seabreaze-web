@@ -40,6 +40,8 @@ export async function saveSearch(f: FormData) {
   const c = await writeCtx()
   const p = await one<{ id: string; name: string }>('select id, name from projects where slug = $1', [s(f, 'p')])
   if (!p) return
+  // Партнёр — только по открытому ему проекту (черновик или закрытый не сохраняется)
+  if (isExternal(c.user.role) && !(await projectVisible(p.id, c.user))) return
   // Тот же фильтр, что в каталоге (lib/unitMatch.mjs); цена в форме — в тысячах долларов
   const k = (n: string) => (Number(s(f, n)) ? Number(s(f, n)) * 1000 : null)
   const b = s(f, 'b') ? await one<{ id: string; name: string }>('select id, name from buildings where id = $1 and project_id = $2', [s(f, 'b'), p.id]) : null

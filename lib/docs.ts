@@ -26,7 +26,7 @@ export const VARS: Record<string, string> = {
   'project.name': 'проект', 'project.developer': 'застройщик', 'project.city': 'город проекта',
   'unit.number': 'номер квартиры', 'unit.block': 'блок', 'unit.floor': 'этаж', 'unit.rooms': 'комнат (как на сайтах: спальни + 1)', 'unit.area': 'площадь, м²',
   'booking.price_list': 'прайс застройщика', 'booking.plan_discount': 'скидка за 100% (сумма)', 'booking.promo': 'акция (название и сумма)', 'booking.discount_pct': 'скидка, %', 'booking.discount': 'скидка, сумма',
-  'booking.final': 'итоговая цена', 'booking.options': 'опции (список с ценами)', 'booking.options_total': 'опции, сумма', 'booking.total': 'итого с опциями', 'booking.currency': 'валюта', 'booking.plan': 'план оплаты', 'booking.starts_at': 'дата брони', 'booking.ends_at': 'бронь до', 'booking.days': 'срок брони, дней',
+  'booking.final': 'итоговая цена', 'booking.options': 'опции (список с ценами)', 'booking.options_total': 'опции, сумма', 'booking.total': 'итого с опциями', 'booking.fee': 'взнос за платную бронь', 'booking.currency': 'валюта', 'booking.plan': 'план оплаты', 'booking.starts_at': 'дата брони', 'booking.ends_at': 'бронь до', 'booking.days': 'срок брони, дней',
   'act.amount': 'комиссия по акту', 'act.deducted': 'удержано в счёт возвратов', 'act.net': 'к выплате по акту',
   'fixation.sent_at': 'дата отправки на фиксацию', 'fixation.decided_at': 'дата решения застройщика', 'fixation.protected_until': 'клиент закреплён до',
 }
@@ -106,7 +106,7 @@ async function collect(kind: DocKind, lang: Lang, src: { clientId: string; booki
       'booking.price_list': money(lang, list0), 'booking.plan_discount': money(lang, Math.max(0, list0 - Number(promo?.amount || 0) - Number(b.price_list))), 'booking.promo': promo ? `${promo.name} (−${money(lang, promo.amount)})` : '',
       'booking.discount_pct': num(lang, Number(b.discount_pct), Number(b.discount_pct) % 1 ? 1 : 0), 'booking.discount': money(lang, Number(b.price_list) - Number(b.final_price)),
       'booking.final': money(lang, b.final_price), 'booking.currency': 'USD', 'booking.plan': plan?.name || '',
-      'booking.options': (b.options || []).map((o: { title: string; usd: number }) => `${o.title} — ${money(lang, o.usd)}`).join('; '), 'booking.options_total': money(lang, Number(b.options_usd || 0)), 'booking.total': money(lang, Number(b.final_price) + Number(b.options_usd || 0)),
+      'booking.options': (b.options || []).map((o: { title: string; usd: number }) => `${o.title} — ${money(lang, o.usd)}`).join('; '), 'booking.options_total': money(lang, Number(b.options_usd || 0)), 'booking.total': money(lang, Number(b.final_price) + Number(b.options_usd || 0)), 'booking.fee': Number(b.fee_amount) ? `${b.fee_currency} ${num(lang, Number(b.fee_amount))}` : '',
       'booking.starts_at': date(lang, b.starts_at), 'booking.ends_at': date(lang, b.ends_at), 'booking.days': String(b.snapshot?.booking_days ?? ''),
     })
   }

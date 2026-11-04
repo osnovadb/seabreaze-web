@@ -7,7 +7,7 @@ import { requireCtx } from './auth'
 import { t } from './i18n'
 import { storeFile, isFile } from './files'
 import { riser } from './catalog'
-import { cleanMarks, MARKS, SIDES } from './surround'
+import { cleanMarks, isMark, SIDES } from './surround'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function owner() {
@@ -140,7 +140,7 @@ export async function saveSides(_: unknown, f: FormData) {
   const sides: Record<string, { kind: string; label?: string }> = {}
   for (const k of SIDES) {
     const kind = s(f, 'k_' + k), label = s(f, 'l_' + k).slice(0, 40)
-    if (MARKS[kind]) sides[k] = { kind, ...(label ? { label } : {}) }
+    if (isMark(kind)) sides[k] = { kind, ...(label ? { label } : {}) }
   }
   await q(`insert into portal.building_sides (building_id, sides) values ($1,$2) on conflict (building_id) do update set sides = $2, updated_at = now()`, [bid, sides])
   await audit(c.real.id, 'markup.sides', 'building', bid, sides, c.impersonating ? c.user.id : null)
