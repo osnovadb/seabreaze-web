@@ -38,5 +38,7 @@ export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | 
   v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? date(lang, x) : x])) : undefined
 
 // «Сегодня» по Баку (YYYY-MM-DD): портал работает по времени офиса, сервер — в UTC
+// «ноябрь 2026» из «2026-11»
+export const monthName = (lang: Lang, ym: string) => new Intl.DateTimeFormat(LOCALE[lang], { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ym + '-01T00:00:00Z'))
 export const bakuToday = (d: Date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(d)
 export const bakuYear = () => Number(bakuToday().slice(0, 4))

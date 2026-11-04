@@ -45,7 +45,7 @@ export default async function Reports() {
   )
   return (
     <>
-      <Top title={T('Отчёты')} right={['owner', 'market_head'].includes(c.user.role) ? <a className="btn" href="/reports/plan">{T('План и факт')} →</a> : null} sub={c.user.role === 'seller' ? T('Ваши клиенты и клиенты ваших агентов') : c.user.role === 'market_head' ? T('Ваш рынок') : T('Все рынки')} />
+      <Top title={T('Отчёты')} right={<>{<a className="btn" href="/reports/stock">{T('Остатки и темп')} →</a>}{['owner', 'market_head'].includes(c.user.role) && <><a className="btn" href="/reports/team">{T('Команда')} →</a><a className="btn" href="/reports/plan">{T('План и факт')} →</a></>}</>} sub={c.user.role === 'seller' ? T('Ваши клиенты и клиенты ваших агентов') : c.user.role === 'market_head' ? T('Ваш рынок') : T('Все рынки')} />
       <div className="page stack">
         {fin && (
           <div className="grid g4">
