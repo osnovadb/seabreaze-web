@@ -970,3 +970,19 @@ export async function setPassword(_: unknown, f: FormData) {
   await signSession(tk.user_id)
   redirect('/')
 }
+
+/* ── Профиль: уведомления вне портала (e-mail, Telegram, сводка) ── */
+export async function saveNotifyPrefs(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) return
+  await q('update portal.users set notify_email = $2, notify_telegram = $3, notify_digest = $4 where id = $1', [c.real.id, f.get('email') === '1', f.get('telegram') === '1', f.get('digest') === '1'])
+  revalidatePath('/profile')
+}
+// Привязка Telegram: одноразовый код в ссылке на бота; бот (tick) по /start <код> запоминает чат. «Отвязать» — стирает чат.
+export async function linkTelegram(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) return
+  if (s(f, 'unlink')) await q('update portal.users set telegram_chat_id = null, tg_link_code = null where id = $1', [c.real.id])
+  else await q('update portal.users set tg_link_code = $2 where id = $1', [c.real.id, crypto.randomBytes(9).toString('base64url')])
+  revalidatePath('/profile')
+}

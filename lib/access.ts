@@ -40,4 +40,4 @@ export async function loginBlocked(email: string, ip: string) {
 }
 export const noteLogin = (email: string, ip: string, ok: boolean) => q('insert into portal.login_attempts (email, ip, ok) values ($1,$2,$3)', [email, ip, ok])
 export const clientIp = () => (headers().get('cf-connecting-ip') || headers().get('x-forwarded-for') || headers().get('x-real-ip') || '').split(',')[0].trim()
-export const mailOn = () => !!process.env.SMTP_URL
+export const mailOn = () => !!process.env.SMTP_URL && process.env.SMTP_URL !== 'log' // log — режим проверки, письма не уходят
