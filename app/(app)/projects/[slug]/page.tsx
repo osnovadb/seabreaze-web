@@ -3,13 +3,14 @@ import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
 import { t, usd, pct, date } from '@/lib/i18n'
-import { projectBySlug, buildingsOf, conditionsFor, plansFor } from '@/lib/catalog'
+import { projectBySlug, buildingsOf, conditionsFor, plansFor, roomsSql, toUsdSql, TYPE_NAME } from '@/lib/catalog'
 import { isFull, termUnknown, schedule, planBase, planLabel } from '@/lib/plans'
 import { isExternal, seesDeveloperTerms } from '@/lib/perm'
 import { fmtSize } from '@/lib/files'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { saveProjectFile, deleteProjectFile } from '@/lib/content'
+import { cleanMarks, markIcon, markText } from '@/lib/surround'
 
 type PF = { id: string; kind: string; title: string; lang: string; audience: string; file_id: string | null; url: string | null; size: number | null; mime: string | null; created_at: string }
 const LANG_FLAG: Record<string, string> = { all: 'RU EN DE HE', ru: 'RU', en: 'EN', de: 'DE', he: 'HE' }
@@ -33,6 +34,13 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
   const tab = ['terms', 'materials', 'docs'].includes(searchParams.tab || '') ? searchParams.tab! : 'plan'
   const mats = files.filter((f) => f.kind !== 'document'), docs = files.filter((f) => f.kind === 'document')
   const sales = SALES[p.sales_status] || SALES.draft
+  // Свободные по типам и комнатам: сколько, площадь и цена от — сводка для партнёра без открытия шахматки
+  const mix = await q<{ k: string; n: number; amin: number; amax: number; pmin: number | null }>(`select case when ${roomsSql} is null then u.unit_type else least(${roomsSql}, 4)::text end k, count(*)::int n,
+      min(u.area_total_m2)::float amin, max(u.area_total_m2)::float amax, min(${toUsdSql})::float pmin from units u where u.project_id = $1 and u.status = 'available' and u.price_list is not null
+      and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed')) and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')
+      ${ext ? 'and not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id)' : ''} group by 1 order by 1`, [p.id])
+  const finishes = (await q<{ finish: string }>('select distinct finish from units where project_id = $1 and finish is not null', [p.id])).map((r) => r.finish)
+  const FIN: Record<string, string> = { shell: 'без ремонта', white_box: 'white box', turnkey: 'с ремонтом', furnished: 'с мебелью' }
   const deliveries = Array.from(new Set(bs.map((b) => b.delivery).filter(Boolean)))
   const tabs: [string, string, string][] = [['plan', 'Генплан', `/projects/${p.slug}`], ['chess', 'Шахматка', `/projects/${p.slug}/chess`], ['list', 'Список', `/catalog?p=${p.slug}`],
     ['terms', 'Условия', `?tab=terms`], ['materials', `${T('Материалы')} · ${mats.length}`, `?tab=materials`], ['docs', `${T('Документы')} · ${docs.length}`, `?tab=docs`]]
@@ -43,7 +51,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
         right={<>{site && <a className="btn" href={site} target="_blank" rel="noopener">{T('На сайте')} ↗</a>}<Link className="btn btn--p" href={`/projects/${p.slug}/chess`}>{T('Шахматка')}</Link></>} />
       <div className="page">
         <div className="grid g4" style={{ marginBottom: 16 }}>
-          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveries.join(' · ') || p.delivery || T('уточняется'), T('срок сдачи')], [String(bs.length), T('блоков · без ремонта')]].map(([a, b]) => (
+          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveries.join(' · ') || p.delivery || T('уточняется'), T('срок сдачи')], [String(bs.length), T('корпусов')]].map(([a, b]) => (
             <div key={b} className="card card--tight kpi"><div className="v" style={{ fontSize: 22 }}>{a}</div><div className="small muted">{b}</div></div>
           ))}
         </div>
@@ -59,13 +67,15 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
   )
 
   async function PlanTab() {
-    const gp = await one<{ image: string; polygons: { block: string; points: [number, number][]; label: [number, number] }[]; note: string }>('select image, polygons, note from portal.genplans where project_id = $1', [p!.id])
+    const gp = await one<{ image: string; polygons: { block: string; points: [number, number][]; label: [number, number] }[]; note: string; marks: unknown }>('select image, polygons, note, marks from portal.genplans where project_id = $1', [p!.id])
     const byExt = Object.fromEntries(bs.map((b) => [b.external_id || b.name, b]))
     return (
       <div className="split">
         <div>
+          {gp && cleanMarks(gp.marks).length > 0 && <><input type="checkbox" id="sur" className="sur-t" defaultChecked /><label htmlFor="sur" className="chip sur-l">{T('Окружение')}</label></>}
           {gp ? (
             <div className="gp">
+              {cleanMarks(gp.marks).map((m, i) => <span key={i} className="smark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}><i>{markIcon(m.kind)}</i><b>{markText(L, m)}</b></span>)}
               <img src={gp.image} alt="" />
               <svg viewBox="0 0 1 1" preserveAspectRatio="none">
                 {gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`/projects/${p!.slug}/chess?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}
@@ -83,6 +93,12 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
           </div>
         </div>
         <div className="stack">
+          {mix.length > 0 && <div className="card">
+            <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Свободно сейчас')}</div><Link className="small bronze" href={`/catalog?p=${p!.slug}`}>{T('В каталог')} →</Link></div>
+            <table className="tbl mt8" style={{ fontSize: 13 }}><tbody>{mix.map((m) => (
+              <tr key={m.k}><td><Link href={`/catalog?p=${p!.slug}${/^\d$/.test(m.k) ? '&r=' + m.k : '&t=' + m.k}`}><b>{/^\d$/.test(m.k) ? (m.k === '4' ? '4+' : m.k) + ' ' + T('комн.') : T(TYPE_NAME[m.k] || m.k)}</b></Link></td>
+                <td className="num">{m.n}</td><td className="small muted">{m.amin === m.amax ? m.amin : `${m.amin}–${m.amax}`} м²</td><td className="num small">{m.pmin ? T('от {p}', { p: usd(L, m.pmin) }) : '—'}</td></tr>))}</tbody></table>
+          </div>}
           <TermsCard short />
           <div className="card">
             <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Материалы для клиента')}</div><Link className="small bronze" href="?tab=materials">{T('Все')} →</Link></div>
@@ -115,7 +131,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
           <div className="kv"><span>{T('Фиксация у застройщика')}</span><span>{T('через команду, 3–5 дней')}</span></div>
           {!short && <div className="kv"><span>{T('Выплата')}</span><span>{T('после оплаты застройщиком')}</span></div>}
           {plans.map((pl) => <div key={pl.id} className="kv"><span>{planLabel(T, pl.name)}</span><span className="small">{isFull(pl) ? (Number(pl.full_payment_discount_pct) ? T('скидка {p}', { p: pct(L, Number(pl.full_payment_discount_pct)) }) : '100%') : (termUnknown(pl) ? T('взнос {p}, срок уточняется', { p: pct(L, Number(pl.down_payment_pct)) }) : T('взнос {p}, {m} мес.', { p: pct(L, Number(pl.down_payment_pct)), m: pl.months || 0 }))}</span></div>)}
-          <div className="kv"><span>{T('Отделка')}</span><span>{T('без ремонта')}</span></div>
+          {finishes.length > 0 && <div className="kv"><span>{T('Отделка')}</span><span>{finishes.map((x) => T(FIN[x] || x)).join(', ')}</span></div>}
         </div>
         <div className="tiny muted mt8">{T('Версия условий {v} от {d}', { v: cond.version, d: date(L, cond.valid_from) })}</div>
       </div>

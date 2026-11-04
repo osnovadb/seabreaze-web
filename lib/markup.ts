@@ -7,6 +7,7 @@ import { requireCtx } from './auth'
 import { t } from './i18n'
 import { storeFile, isFile } from './files'
 import { riser } from './catalog'
+import { cleanMarks, MARKS, SIDES } from './surround'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function owner() {
@@ -117,4 +118,32 @@ export async function saveRisers(_: unknown, f: FormData) {
   await audit(c.real.id, 'markup.risers', 'building', bid, { risers: risers.length }, c.impersonating ? c.user.id : null)
   done(pid)
   return { ok: true, made: n }
+}
+
+/* ── Окружение: метки на плане этажа или генплане; стороны условной схемы этажа ── */
+export async function saveMarks(_: unknown, f: FormData) {
+  const c = await owner()
+  const pid = s(f, 'project'), target = s(f, 'target'), id = s(f, 'id')
+  let marks
+  try { marks = JSON.stringify(cleanMarks(JSON.parse(s(f, 'marks') || '[]'))) } catch { return { error: t(c.lang, 'Не удалось прочитать метки') } }
+  if (target === 'floor') await q('update portal.floor_plans set marks = $2 where id = $1', [id, marks])
+  else if (target === 'genplan') await q('update portal.genplans set marks = $2, updated_at = now() where project_id = $1', [pid, marks])
+  else return { error: 'target' }
+  await audit(c.real.id, 'markup.marks', target, id || pid, { n: JSON.parse(marks).length }, c.impersonating ? c.user.id : null)
+  done(pid)
+  return { ok: true }
+}
+export async function saveSides(_: unknown, f: FormData) {
+  const c = await owner()
+  const pid = s(f, 'project'), bid = s(f, 'building')
+  if (!(await one('select 1 from buildings where id = $1 and project_id = $2', [bid, pid]))) return { error: 'building' }
+  const sides: Record<string, { kind: string; label?: string }> = {}
+  for (const k of SIDES) {
+    const kind = s(f, 'k_' + k), label = s(f, 'l_' + k).slice(0, 40)
+    if (MARKS[kind]) sides[k] = { kind, ...(label ? { label } : {}) }
+  }
+  await q(`insert into portal.building_sides (building_id, sides) values ($1,$2) on conflict (building_id) do update set sides = $2, updated_at = now()`, [bid, sides])
+  await audit(c.real.id, 'markup.sides', 'building', bid, sides, c.impersonating ? c.user.id : null)
+  done(pid)
+  return { ok: true }
 }

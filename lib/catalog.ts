@@ -11,7 +11,7 @@ export type Unit = {
   rooms: number | null; area: number; ext_area: number | null; plot_area: number | null; status: string; external_status: string | null; price: number | null
   usd: number | null; currency: string; plan_file: string | null; layout_code: string | null; synced_at: string; source_id: string
   booking_id: string | null; booking_status: string | null; booking_agent: string | null; booking_ends: string | null; deal_id: string | null
-  hidden: boolean; sales_status: string; locked: string[]; delivery: string | null; view_side: string | null
+  hidden: boolean; sales_status: string; locked: string[]; delivery: string | null; view_side: string | null; is_corner: boolean | null; finish: string | null
 }
 // Код статуса в шахматке: F свободно, B бронь застройщика, S продано, N не в продаже, SB квота SeaBreeze,
 // O наша бронь, M моя бронь, D наша сделка, X недоступно (для агента и показа)
@@ -34,7 +34,7 @@ const UNIT_SELECT = `
     u.area_total_m2::float as area, u.area_external_m2::float as ext_area, u.plot_area_m2::float as plot_area, u.status, u.external_status,
     u.price_list::float as price, (${toUsdSql})::float as usd, u.price_currency as currency, l.plan_file, l.code as layout_code, u.synced_at, u.source_id,
     bk.id as booking_id, bk.status as booking_status, bk.agent_id as booking_agent, bk.ends_at as booking_ends, dl.id as deal_id,
-    exists (select 1 from portal.unit_hidden h where h.unit_id = u.id) as hidden, b.delivery, u.view_side,
+    exists (select 1 from portal.unit_hidden h where h.unit_id = u.id) as hidden, b.delivery, u.view_side, u.is_corner, u.finish,
     (select coalesce(array_agg(x), '{}') from jsonb_array_elements_text(u.locked_fields) x) as locked, coalesce(ps.sales_status, 'draft') as sales_status
   from units u
   left join portal.project_settings ps on ps.project_id = u.project_id
@@ -79,6 +79,7 @@ export async function buildingsOf(projectId: string, viewer?: User | null): Prom
 }
 
 export const unitsOfBuilding = (buildingId: string) => q<Unit>(`${UNIT_SELECT} where u.building_id = $1 order by u.floor desc, u.number`, [buildingId])
+export const unitsOfProjects = (ids: string[]) => (ids.length ? q<Unit>(`${UNIT_SELECT} where u.project_id = any($1) order by b.sort, b.name, u.floor, u.number`, [ids]) : Promise.resolve([] as Unit[]))
 export const unitsOfProject = (projectId: string) => q<Unit>(`${UNIT_SELECT} where u.project_id = $1 order by b.sort, b.name, u.floor, u.number`, [projectId])
 export const unitById = (id: string) => one<Unit>(`${UNIT_SELECT} where u.id = $1`, [id])
 export const unitsByIds = (ids: string[]) => (ids.length ? q<Unit>(`${UNIT_SELECT} where u.id = any($1)`, [ids]) : Promise.resolve([] as Unit[]))
@@ -148,6 +149,12 @@ export function orientOf(u: { number: string; floor: number; view_side: string |
 }
 export const orientText = (lang: Lang, o: ReturnType<typeof orientOf>) =>
   [o.view ? t(lang, VIEW_NAME[o.view]) : '', o.direction ? t(lang, 'окна на {d}', { d: t(lang, DIR_NAME[o.direction]) }) : ''].filter(Boolean).join(' · ')
+// Типы помещений (14 у Profitbase → наши 12): квартиры, дома, коммерция, машиноместа и кладовки
+export const TYPE_NAME: Record<string, string> = { studio: 'Студия', '1br': '1 спальня', '2br': '2 спальни', '3br': '3 спальни', '4br': '4 спальни', duplex: 'Дуплекс', penthouse: 'Пентхаус',
+  townhouse: 'Таунхаус', villa: 'Вилла', commercial: 'Коммерция', parking: 'Машиноместо', storage: 'Кладовка' }
+export const UNIT_TYPES = Object.keys(TYPE_NAME)
+// Жильё — то, у чего есть комнаты; машиноместа, кладовки и коммерция в «квартиры» не считаются
+export const isLiving = (t: string) => !['commercial', 'parking', 'storage'].includes(t)
 export const VIEW_NAME: Record<string, string> = { sea: 'на море', marina: 'на марину', park: 'на парк', yard: 'во двор', city: 'на улицу', mixed: 'на две стороны' }
 export const DIR_NAME: Record<string, string> = { N: 'север', NE: 'северо-восток', E: 'восток', SE: 'юго-восток', S: 'юг', SW: 'юго-запад', W: 'запад', NW: 'северо-запад' }
 

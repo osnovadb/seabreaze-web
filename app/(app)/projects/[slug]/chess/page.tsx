@@ -16,7 +16,8 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const p = await projectBySlug(params.slug, c.user)
   if (!p) notFound()
   const bs = await buildingsOf(p.id, c.user)
-  const b = bs.find((x) => x.id === searchParams.b) || bs[bs.length - 1]
+  // Без выбора — блок, где больше всего свободных
+  const b = bs.find((x) => x.id === searchParams.b) || [...bs].sort((a, z) => z.free - a.free)[0]
   const units = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
   const cellMode = (searchParams.m as 'price' | 'rooms' | 'm2') || 'price'
@@ -64,13 +65,14 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
           {lim.b >= lim.max && <span className="small warnc">{T('Лимит броней исчерпан — снимите одну, чтобы поставить новую')}</span>}
         </div>}
         <div className="mt16"><Legend lang={L} team={mode === 'team'} /></div>
-        <div className="chess-wrap mt16">
+        <div className={sel ? 'chess-wrap mt16' : 'mt16'}>
           <Chess units={units} viewer={c.user} mode={mode} lang={L} cellMode={cellMode} rooms={rooms} match={match} selected={sel?.id} hrefFor={(u) => qs({ u: u.id })} />
           {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} />
-            : <div className="card upanel small muted">{T('Нажмите на квартиру в шахматке — она откроется здесь.')}</div>}
+            : null}
         </div>
         <div className="row mt16 small muted">
           <span>{T('Свободно {f} из {n}', { f: free.length, n: units.length })}</span>
+          {!sel && <span>· {T('Нажмите на квартиру — карточка откроется справа')}</span>}
           {free.length > 0 && <span>· {T('цены свободных')} {usd(L, Math.min(...free.map((u) => u.usd || 0)))} – {usd(L, Math.max(...free.map((u) => u.usd || 0)))}</span>}
           {mode === 'team' && <span>· {T('наша бронь')} {(counts.O || 0) + (counts.M || 0)} · {T('бронь застройщика')} {counts.B || 0} · {T('продано')} {counts.S || 0}</span>}
           {isExternal(c.user.role) && <span>· {T('Недоступные квартиры показаны серым без причины')}</span>}

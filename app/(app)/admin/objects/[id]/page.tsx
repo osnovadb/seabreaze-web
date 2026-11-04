@@ -7,7 +7,8 @@ import { planUrl, toUsdSql } from '@/lib/catalog'
 import { PLAN_COLS, schedule, planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
-import { saveGenplan, saveFacade, saveFloorPlan, saveRisers } from '@/lib/markup'
+import { saveGenplan, saveFacade, saveFloorPlan, saveRisers, saveSides } from '@/lib/markup'
+import { MARKS, SIDES, SIDE_NAME, type Sides } from '@/lib/surround'
 import { riser as riserOf } from '@/lib/catalog'
 import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, bulkUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode } from '@/lib/objects'
 
@@ -22,8 +23,9 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   const owner = c.user.role === 'owner'
   const p = await one<{ id: string; slug: string; name: string; developer_id: string; city: string | null; location: string | null; delivery: string | null; status: string; sort: number }>('select id, slug, name, developer_id, city, location, delivery, status, sort from projects where id = $1', [params.id])
   if (!p) notFound()
-  const ps = await one<{ sales_status: string; agent_markets: string[]; site_urls: Record<string, string> }>('select sales_status, agent_markets, site_urls from portal.project_settings where project_id = $1', [p.id])
+  const ps = await one<{ sales_status: string; agent_markets: string[]; site_urls: Record<string, string>; cover_file_id: string | null }>('select sales_status, agent_markets, site_urls, cover_file_id from portal.project_settings where project_id = $1', [p.id])
   const tab = owner ? searchParams.tab || 'main' : 'units'
+  const cover = ps?.cover_file_id
   const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры']]
   const blocks = await q<{ id: string; name: string; external_id: string | null; kind: string; floors_total: number | null; delivery: string | null; sort: number; n: number }>(
     'select b.id, b.name, b.external_id, b.kind, b.floors_total, b.delivery, b.sort, (select count(*)::int from units u where u.building_id = b.id) n from buildings b where b.project_id = $1 order by b.sort, b.name', [p.id])
@@ -69,6 +71,9 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
           <label className="field"><span>{T('Расположение')}</span><input className="in" name="location" defaultValue={p!.location || ''} /></label>
           <label className="field"><span>{T('Порядок в списках')}</span><input className="in" name="sort" type="number" defaultValue={p!.sort} /></label>
         </div>
+        <div className="field"><span>{T('Обложка в списке проектов')}</span>
+          <div className="row" style={{ gap: 10 }}>{cover && <img src={`/files/${cover}`} alt="" style={{ height: 56, borderRadius: 6 }} />}<input className="in" type="file" name="cover" accept="image/png,image/jpeg,image/webp" style={{ flex: 1, paddingTop: 6 }} />
+            {cover && <label className="check"><input type="checkbox" name="cover_drop" value="1" /> <span>{T('убрать')}</span></label>}</div></div>
         <div><button className="btn btn--p">{T('Сохранить')}</button></div>
         <div className="tiny muted">{T('Тексты, фото и дизайн страницы проекта на сайте — в CMS. Здесь — то, что влияет на деньги, наличие и доступ.')}</div>
       </ActionForm>
@@ -314,9 +319,10 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   }
   // Разметка: генплан (контуры домов), фасады (сетка окон), поэтажные планы (контуры квартир по стоякам)
   async function Markup() {
-    const gp = await one<{ image: string; polygons: unknown[] }>('select image, polygons from portal.genplans where project_id = $1', [p!.id])
+    const gp = await one<{ image: string; polygons: unknown[]; marks: unknown[] }>('select image, polygons, marks from portal.genplans where project_id = $1', [p!.id])
     const facades = await q<{ id: string; building_id: string; title: string; risers: string[]; floor_from: number; floor_to: number; file_id: string }>(`select f.id, f.building_id, f.title, f.risers, f.floor_from, f.floor_to, f.file_id from portal.facades f join buildings b on b.id = f.building_id where b.project_id = $1 order by b.sort, f.sort, f.created_at`, [p!.id])
-    const plans = await q<{ id: string; building_id: string; title: string; floor_from: number; floor_to: number; file_id: string; cells: unknown[] }>(`select f.id, f.building_id, f.title, f.floor_from, f.floor_to, f.file_id, f.cells from portal.floor_plans f join buildings b on b.id = f.building_id where b.project_id = $1 order by b.sort, f.floor_from`, [p!.id])
+    const plans = await q<{ id: string; building_id: string; title: string; floor_from: number; floor_to: number; file_id: string; cells: unknown[]; marks: unknown[] }>(`select f.id, f.building_id, f.title, f.floor_from, f.floor_to, f.file_id, f.cells, f.marks from portal.floor_plans f join buildings b on b.id = f.building_id where b.project_id = $1 order by b.sort, f.floor_from`, [p!.id])
+    const sides = await q<{ building_id: string; sides: unknown }>('select s.building_id, s.sides from portal.building_sides s join buildings b on b.id = s.building_id where b.project_id = $1', [p!.id])
     const bname = (id: string) => blocks.find((b) => b.id === id)?.name || ''
     return (
       <div className="stack">
@@ -324,7 +330,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
           <div className="card stack" style={{ gap: 8 }}>
             <div className="h3" style={{ margin: 0 }}>{T('Генплан')}</div>
             {gp ? <div className="fz"><img src={gp.image} alt="" /></div> : <div className="small muted">{T('Картинки генплана пока нет.')}</div>}
-            {gp && <div className="small">{T('Размечено домов: {n} из {t}', { n: (gp.polygons || []).length, t: blocks.length })} · <Link className="bronze" href={`/admin/objects/${p!.id}/genplan`}>{T('Разметить дома')} →</Link></div>}
+            {gp && <div className="small">{T('Размечено домов: {n} из {t}', { n: (gp.polygons || []).length, t: blocks.length })} · <Link className="bronze" href={`/admin/objects/${p!.id}/genplan`}>{T('Разметить дома')} →</Link> · <Link className="bronze" href={`/admin/objects/${p!.id}/genplan?m=marks`}>{T('Окружение')} ({(gp.marks || []).length}) →</Link></div>}
             <ActionForm action={saveGenplan} lang={L} className="row" style={{ gap: 6 }}>
               <input type="hidden" name="project" value={p!.id} />
               <input className="in" type="file" name="file" accept="image/png,image/jpeg,image/webp" required style={{ flex: 1, paddingTop: 6 }} />
@@ -356,8 +362,8 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         <div className="card stack" style={{ gap: 8 }}>
           <div className="h3" style={{ margin: 0 }}>{T('Поэтажные планы')}</div>
           {plans.length === 0 && <div className="small muted">{T('Планов этажей пока нет — в портале показывается условная схема этажа.')}</div>}
-          {plans.map((f) => <div key={f.id} className="kv"><span style={{ color: 'var(--ink)' }}>{bname(f.building_id)} · {f.title}<div className="tiny muted">{T('этажи')} {f.floor_from}–{f.floor_to} · {T('размечено квартир')}: {(f.cells || []).length}</div></span>
-            <span className="row" style={{ gap: 6 }}><Link className="btn btn--sm" href={`/admin/objects/${p!.id}/floor/${f.id}`}>{T('Разметить квартиры')}</Link>
+          {plans.map((f) => <div key={f.id} className="kv"><span style={{ color: 'var(--ink)' }}>{bname(f.building_id)} · {f.title}<div className="tiny muted">{T('этажи')} {f.floor_from}–{f.floor_to} · {T('размечено квартир')}: {(f.cells || []).length} · {T('меток окружения')}: {(f.marks || []).length}</div></span>
+            <span className="row" style={{ gap: 6 }}><Link className="btn btn--sm" href={`/admin/objects/${p!.id}/floor/${f.id}`}>{T('Разметить квартиры')}</Link><Link className="btn btn--sm" href={`/admin/objects/${p!.id}/floor/${f.id}?m=marks`}>{T('Окружение')} · {(f.marks || []).length}</Link>
               <ActionForm action={saveFloorPlan} lang={L}><input type="hidden" name="project" value={p!.id} /><input type="hidden" name="id" value={f.id} /><button className="btn btn--sm" name="delete" value="1">×</button></ActionForm></span></div>)}
           <ActionForm action={saveFloorPlan} lang={L} className="row mt8" style={{ gap: 6 }} reset>
             <input type="hidden" name="project" value={p!.id} />
@@ -370,6 +376,20 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
             <button className="btn btn--sm btn--p">{T('Добавить план')}</button>
           </ActionForm>
           <div className="tiny muted">{T('План типового этажа от застройщика. Один план на диапазон этажей; после загрузки обведите квартиры по стоякам — на экране «Этаж» они станут кликабельными и окрасятся по статусу.')}</div>
+        </div>
+        <div className="card stack" style={{ gap: 8 }}>
+          <div className="h3" style={{ margin: 0 }}>{T('Окружение на схеме этажа')}</div>
+          <div className="tiny muted">{T('Для блоков без плана этажа: что за окнами верхнего и нижнего ряда квартир на условной схеме и что у торцов. Партнёр видит это на экране «Этаж» и в карточке квартиры.')}</div>
+          {blocks.map((b) => { const sd = (sides.find((x) => x.building_id === b.id)?.sides || {}) as Sides; return (
+            <ActionForm key={b.id} action={saveSides} lang={L} className="objrow" style={{ gridTemplateColumns: '160px repeat(4, minmax(0,1fr)) auto', alignItems: 'end' }}>
+              <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="building" value={b.id} />
+              <b className="small">{b.name}</b>
+              {SIDES.map((k) => <div key={k} className="stack" style={{ gap: 4 }}><span className="tiny muted">{T(SIDE_NAME[k])}</span>
+                <select className="in" name={'k_' + k} defaultValue={sd[k]?.kind || ''}><option value="">—</option>{Object.entries(MARKS).map(([m, [ic, n]]) => <option key={m} value={m}>{ic} {T(n)}</option>)}</select>
+                <input className="in" name={'l_' + k} defaultValue={sd[k]?.label || ''} placeholder={T('подпись')} maxLength={40} /></div>)}
+              <button className="btn btn--sm">{T('Сохранить')}</button>
+            </ActionForm>
+          ) })}
         </div>
       </div>
     )
