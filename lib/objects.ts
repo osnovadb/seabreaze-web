@@ -4,6 +4,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { storeFile, isFile } from './files'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { q, one, tx, audit, notify as notifyUser } from './db'
@@ -57,6 +58,13 @@ export async function saveProject(_: unknown, f: FormData) {
     if (id) {
       await q(`update projects set name = $2, developer_id = $3, city = $4, location = $5, delivery = $6, status = $7, sort = $8 where id = $1`,
         [id, name, dev, s(f, 'city') || null, s(f, 'location') || null, s(f, 'delivery') || null, status, num(f, 'sort') ?? 0])
+      // Обложка для списка проектов: картинка до 25 МБ; «убрать» — вернуть картинку по умолчанию
+      const cover = f.get('cover')
+      if (isFile(cover)) {
+        if (!/^image\//.test(cover.type)) return { error: t(c.lang, 'Нужна картинка: JPG, PNG или WEBP') }
+        const fid = await storeFile(cover, c.user.id)
+        await q(`insert into portal.project_settings (project_id, cover_file_id) values ($1,$2) on conflict (project_id) do update set cover_file_id = $2`, [id, fid])
+      } else if (s(f, 'cover_drop')) await q('update portal.project_settings set cover_file_id = null where project_id = $1', [id])
       await log(c, 'object.project_update', 'project', id)
       done(id)
       return { ok: true }

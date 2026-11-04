@@ -5,7 +5,8 @@ import { q, one, audit } from './db'
 import { requireCtx } from './auth'
 import { isExternal } from './perm'
 import { clientScope } from './scope'
-import { projectVisible } from './catalog'
+import { projectVisible, TYPE_NAME, VIEW_NAME } from './catalog'
+import { normFilter } from './unitMatch.mjs'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function writeCtx() {
@@ -39,8 +40,16 @@ export async function saveSearch(f: FormData) {
   const c = await writeCtx()
   const p = await one<{ id: string; name: string }>('select id, name from projects where slug = $1', [s(f, 'p')])
   if (!p) return
-  const filters = { project: p.id, rooms: Number(s(f, 'r')) || null, max: Number(s(f, 'max')) || null, outdoor: ['g', 't'].includes(s(f, 'o')) ? s(f, 'o') : null }
-  const name = [p.name, filters.rooms ? `${filters.rooms}к` : '', filters.max ? `≤ $${filters.max}k` : '', filters.outdoor === 'g' ? 'сад' : filters.outdoor === 't' ? 'терраса' : ''].filter(Boolean).join(' · ')
+  // Тот же фильтр, что в каталоге (lib/unitMatch.mjs); цена в форме — в тысячах долларов
+  const k = (n: string) => (Number(s(f, n)) ? Number(s(f, n)) * 1000 : null)
+  const b = s(f, 'b') ? await one<{ id: string; name: string }>('select id, name from buildings where id = $1 and project_id = $2', [s(f, 'b'), p.id]) : null
+  const filters = normFilter({ project: p.id, building: b?.id, types: s(f, 't'), rooms: s(f, 'r'), pmin: k('pmin'), pmax: k('pmax') ?? k('max'), amin: s(f, 'amin'), amax: s(f, 'amax'),
+    fmin: s(f, 'fmin'), fmax: s(f, 'fmax'), view: s(f, 'v') || null, outdoor: s(f, 'o'), corner: !!s(f, 'c'), promo: !!s(f, 'promo') })
+  const th = (n: number) => `$${Math.round(n / 1000)}k`
+  const name = [p.name, b?.name, filters.types.map((x) => TYPE_NAME[x] || x).join('/'), filters.rooms.length ? filters.rooms.map((r) => (r >= 4 ? '4+' : r)).join('/') + 'к' : '',
+    filters.pmin != null || filters.pmax != null ? `${filters.pmin != null ? th(filters.pmin) : ''}–${filters.pmax != null ? th(filters.pmax) : ''}` : '',
+    filters.amin != null || filters.amax != null ? `${filters.amin ?? ''}–${filters.amax ?? ''} м²` : '', filters.fmin != null || filters.fmax != null ? `эт. ${filters.fmin ?? ''}–${filters.fmax ?? ''}` : '',
+    filters.view ? VIEW_NAME[filters.view] || filters.view : '', filters.outdoor === 'g' ? 'сад' : filters.outdoor === 't' ? 'терраса' : '', filters.corner ? 'угловая' : '', filters.promo ? 'акция' : ''].filter(Boolean).join(' · ')
   // Первая проверка в tick запомнит текущие квартиры без уведомления — сообщаем только о новых
   await q(`insert into portal.saved_searches (user_id, name, filters) values ($1,$2,$3)`, [c.user.id, name, filters])
   await audit(c.real.id, 'search.save', 'project', p.id, filters)

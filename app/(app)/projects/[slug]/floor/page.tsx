@@ -4,7 +4,8 @@ import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riser, planUrl, unitNo, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { one } from '@/lib/db'
-import { polyStr } from '@/lib/geom'
+import { polyStr, centroid } from '@/lib/geom'
+import { cleanMarks, nearMarks, markIcon, markText, type Sides, type Side } from '@/lib/surround'
 import { ViewTabs } from '@/components/ViewTabs'
 import { Top, Legend } from '@/components/ui'
 
@@ -18,16 +19,31 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
   const all = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
   const floors = Array.from(new Set(all.map((u) => u.floor))).sort((a, b) => b - a)
-  const f = Number(searchParams.f) || floors[0]
+  // Без выбора — этаж, где больше всего свободных квартир (а не верхний, где часто всё продано)
+  const freeOn = (x: number) => all.filter((u) => u.floor === x && codeFor(u, c.user, mode) === 'F').length
+  const f = Number(searchParams.f) || [...floors].sort((a, b) => freeOn(b) - freeOn(a) || b - a)[0]
   const units = all.filter((u) => u.floor === f).sort((a, b) => (parseInt(riser(a)) || 0) - (parseInt(riser(b)) || 0) || riser(a).localeCompare(riser(b)))
   const half = Math.ceil(units.length / 2)
   const rows = [units.slice(0, half), units.slice(half).reverse()]
   const sel = units.find((u) => u.id === searchParams.u) || units.find((u) => codeFor(u, c.user, mode) === 'F')
   // Настоящий план этажа, если загружен (Объекты → Разметка), и ориентация стояков
-  const plan = await one<{ file_id: string; north_deg: number; cells: { riser: string; points: number[][] }[] }>('select file_id, north_deg, cells from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by floor_to - floor_from limit 1', [b.id, f])
+  const plan = await one<{ file_id: string; north_deg: number; cells: { riser: string; points: number[][] }[]; marks: unknown }>('select file_id, north_deg, cells, marks from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by floor_to - floor_from limit 1', [b.id, f])
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
   const ri = await riserInfo(b.id)
   const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri))
+  const marks = cleanMarks(plan?.marks)
+  const sides = ((await one<{ sides: Sides }>('select sides from portal.building_sides where building_id = $1', [b.id]))?.sides || {}) as Sides
+  // Что рядом с квартирой: на плане — ближние метки к контуру; на схеме — сторона ряда и торец для крайних квартир
+  const near = (u: (typeof units)[number]): Side[] => {
+    if (plan) { const cell = plan.cells.find((x) => x.riser === riser(u)); return nearMarks(marks, cell ? centroid(cell.points) : null) }
+    const r = rows.findIndex((row) => row.some((x) => x.id === u.id)); if (r < 0) return []
+    const row = rows[r], i = row.findIndex((x) => x.id === u.id)
+    const out = [r === 0 ? sides.top : sides.bottom]
+    if (i === 0) out.push(sides.left)
+    if (i === row.length - 1) out.push(sides.right)
+    return out.filter(Boolean) as Side[]
+  }
+  const sideBand = (k: keyof Sides, cls: string) => sides[k] ? <div className={'fside ' + cls}>{markIcon(sides[k]!.kind)} {markText(L, sides[k]!)}</div> : null
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [b.name, `/projects/${p.slug}/chess?b=${b.id}`], [T('Этаж {f}', { f })]]}
@@ -42,6 +58,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
           })}
         </div>
         <div>
+          {plan && marks.length > 0 && <><input type="checkbox" id="sur" className="sur-t" defaultChecked /><label htmlFor="sur" className="chip sur-l">{T('Окружение')}</label></>}
           {plan ? (
             <div className="fz">
               <img src={`/files/${plan.file_id}`} alt="" />
@@ -54,11 +71,14 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
                   return code === 'X' ? <g key={cell.riser}>{poly}</g> : <Link key={cell.riser} href={`?b=${b.id}&f=${f}&u=${u.id}`} scroll={false}>{poly}</Link>
                 })}
               </svg>
+              {marks.map((m, i) => <span key={i} className="smark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}><i>{markIcon(m.kind)}</i><b>{markText(L, m)}</b></span>)}
               <div className="compass" title={T('Север')}><span style={{ transform: `rotate(${plan.north_deg}deg)`, display: 'inline-block' }}>↑</span><span style={{ position: 'absolute', bottom: 4, fontSize: 9 }}>N</span></div>
             </div>
           ) : (
           <div className="floor">
             <div className="label" style={{ marginBottom: 10 }}>{T('Схема этажа · порядок и стороны — по поэтажному плану застройщика')}</div>
+            {sideBand('top', 'fside--top')}
+            <div className="fwrap">{sideBand('left', 'fside--left')}<div style={{ flex: 1, minWidth: 0 }}>
             {rows.map((r, i) => {
               const tot = r.reduce((a, u) => a + u.area, 0)
               return (
@@ -67,7 +87,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
                   <div className="floor__row">
                     {r.map((u) => {
                       const code = codeFor(u, c.user, mode)
-                      const inner = <><b>{code === 'X' ? '' : riser(u)}</b><span>{code === 'X' ? '' : `${u.rooms ?? ''}${T('к')} · ${u.area}`}</span><span>{code === 'F' && u.usd ? usd(L, u.usd) : ''}</span></>
+                      const inner = <><b>{code === 'X' ? '' : riser(u)}</b><span>{code === 'X' ? '' : `${u.rooms ?? ''}${T('к')} · ${u.area}`}</span><span>{code === 'F' && u.usd ? '$' + Math.round(u.usd / 1000) + 'k' : ''}</span></>
                       const st = { flex: `${u.area / tot} 0 0`, outline: sel?.id === u.id ? '2px solid var(--ink)' : undefined }
                       return code === 'X' ? <div key={u.id} className="floor__u c-X" style={st} /> : <Link key={u.id} href={`?b=${b.id}&f=${f}&u=${u.id}`} className={`floor__u c-${code}`} style={st}>{inner}</Link>
                     })}
@@ -75,6 +95,8 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
                 </div>
               )
             })}
+            </div>{sideBand('right', 'fside--right')}</div>
+            {sideBand('bottom', 'fside--bottom')}
             <div className="small muted mt16">{T('Ширина квартиры на схеме пропорциональна площади.')}</div>
           </div>
           )}
@@ -85,6 +107,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
             <div className="h3">{unitNo(sel)} · {T(codeFor(sel, c.user, mode) === 'F' ? 'свободно' : 'занято')}</div>
             <div className="small muted">{T('{r} комн.', { r: sel.rooms ?? '' })} · {m2(L, sel.area)} · {T('{f} этаж', { f: sel.floor })}</div>
             {orient(sel) && <div className="small mt8">{T('Вид из окон')}: <b>{orient(sel)}</b>{orientOf(sel, ri).note ? ' · ' + orientOf(sel, ri).note : ''}</div>}
+            {near(sel).length > 0 && <div className="small mt8">{T('Рядом')}: {near(sel).map((m, i) => <span key={i} className="pill" style={{ marginInlineEnd: 4 }}>{markIcon(m.kind)} {markText(L, m)}</span>)}</div>}
             {planUrl(sel.plan_file) && <div className="planbox mt16"><img src={planUrl(sel.plan_file)!} alt="" style={{ maxHeight: 340 }} /></div>}
             {sel.usd && <div className="big mt16">{usd(L, sel.usd)}</div>}
             <Link className="btn btn--p btn--block mt16" href={`/units/${sel.id}`}>{T('Карточка квартиры')}</Link>
