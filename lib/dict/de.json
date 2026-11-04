@@ -1708,5 +1708,8 @@
 "от {p}/м²": "ab {p}/m²",
 "свободных нет": "keine frei",
 "В подборку добавлено квартир: {n}": "Zur Auswahl hinzugefügt: {n}",
-"Продано всего": "Verkauft gesamt"
+"Продано всего": "Verkauft gesamt",
+"На этаже": "Auf der Etage",
+"Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.": "Die Wohnung im Etagenplan — klicken, um die ganze Etage zu öffnen.",
+"План этажа — квартира на нём ещё не размечена.": "Etagenplan — die Wohnung ist darin noch nicht markiert."
 }

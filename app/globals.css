@@ -330,3 +330,4 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .legend__b i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; display: inline-block; }
 .chess th { vertical-align: bottom; }
 .chess td.fl { min-width: 70px; white-space: nowrap; }
+.fz .z-here { fill: rgba(125, 88, 56, .55); stroke: #7D5838; stroke-width: 3px; }

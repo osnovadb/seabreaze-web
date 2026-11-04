@@ -1708,5 +1708,8 @@
 "от {p}/м²": "from {p}/m²",
 "свободных нет": "none available",
 "В подборку добавлено квартир: {n}": "Units added to selection: {n}",
-"Продано всего": "Sold total"
+"Продано всего": "Sold total",
+"На этаже": "On the floor",
+"Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.": "The unit on the floor plan — click to open the whole floor.",
+"План этажа — квартира на нём ещё не размечена.": "Floor plan — this unit is not marked on it yet."
 }
