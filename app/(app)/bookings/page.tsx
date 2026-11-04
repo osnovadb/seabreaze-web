@@ -8,13 +8,13 @@ import { bookingScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
 
-type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string; options_usd: number }
+type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string; options_usd: number; group_id: string | null }
 export default async function Bookings({ searchParams }: { searchParams: { f?: string; created?: string } }) {
   const c = await requireCtx()
   if (!(canBook(c.user.role) || c.user.role === 'finance')) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
-  const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.price_list::float, b.discount_pct::float, coalesce(bl.external_id,'') || '-' || un.number unit, un.id unit_id, un.status unit_status,
+  const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.group_id, b.price_list::float, b.discount_pct::float, coalesce(bl.external_id,'') || '-' || un.number unit, un.id unit_id, un.status unit_status,
       cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, cl.kyc_status
     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id
     where ${bs.sql} order by case when b.status in ('requested','confirmed') then 0 else 1 end, b.ends_at`, bs.params)
@@ -50,7 +50,7 @@ export default async function Bookings({ searchParams }: { searchParams: { f?: s
                 const act = (a: string, l: string, p = false) => <form action={bookingAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value={a} /><button className={'btn btn--sm' + (p ? ' btn--p' : '')}>{T(l)}</button></form>
                 return (
                   <tr key={r.id}>
-                    <td><Link href={`/units/${r.unit_id}`}><b>{r.unit}</b></Link></td>
+                    <td><Link href={`/units/${r.unit_id}`}><b>{r.unit}</b></Link>{r.group_id && <div className="tiny bronze">{T('пакет')}: {rows.filter((x) => x.group_id === r.group_id && x.id !== r.id).map((x) => x.unit).join(', ') || '—'}</div>}</td>
                     <td><Link href={`/clients/${r.client_id}`}>{r.client}</Link></td>
                     <td className="small muted">{ext ? '' : `${r.agent}${r.market ? ' · ' + r.market : ''}`}</td>
                     <td className="num">{usd(L, r.final_price)}{r.options_usd > 0 && <div className="tiny">+ {T('опции')} {usd(L, r.options_usd)}</div>}<div className="tiny muted">{T('скидка')} {pct(L, r.discount_pct)}{ext && r.agent_amount ? ' · ' + T('ваш доход') + ' ' + usd(L, r.agent_amount) : ''}</div></td>

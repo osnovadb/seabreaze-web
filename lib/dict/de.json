@@ -1645,5 +1645,15 @@
 "сделок на {a}": "Deals über {a}",
 "средняя цена м² свободных": "Ø Preis pro m² frei",
 "стоимость свободных по прайсу": "Wert der freien Wohnungen zum Listenpreis",
-"темп ещё не набран — журнал продаж ведётся с 04.11.2026": "noch kein Tempo — Verkaufsjournal seit 04.11.2026"
+"темп ещё не набран — журнал продаж ведётся с 04.11.2026": "noch kein Tempo — Verkaufsjournal seit 04.11.2026",
+"Бронь для пакета уже неактивна — обновите страницу": "Die Paket-Reservierung ist nicht mehr aktiv — Seite neu laden",
+"Договор подписан — сделок в работе: {n}": "Vertrag unterschrieben — Deals in Arbeit: {n}",
+"Пакетом с бронью (один договор)": "Als Paket mit Reservierung (ein Vertrag)",
+"нет — отдельная бронь": "nein — separate Reservierung",
+"Например, машиноместо или кладовка к квартире: договор по всем броням пакета оформляется разом, комиссия — по каждой квартире.": "Zum Beispiel Stellplatz oder Abstellraum zur Wohnung: Der Vertrag für alle Reservierungen des Pakets wird zusammen geschlossen, Provision je Einheit.",
+"пакет {n}": "Paket {n}",
+"пакет": "Paket",
+"вознаграждение получено": "Vergütung erhalten",
+"оплачено {p}%": "bezahlt {p}%",
+"наш доход": "unser Einkommen"
 }

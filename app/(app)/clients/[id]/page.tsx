@@ -16,6 +16,8 @@ import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
 import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 
+const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'отменена' }
+
 export default async function ClientCard({ params }: { params: { id: string } }) {
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -28,7 +30,11 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const fixes = await q<{ project_id: string; name: string; status: string; protected_until: string | null }>(`select f.project_id, p.name, f.status, f.protected_until from portal.fixations f join projects p on p.id = f.project_id where f.client_id = $1`, [cl.id])
   const projects = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
   const sels = await q<{ id: string; title: string; opened: number; last_opened_at: string | null; n: number; lang: string }>(`select s.id, s.title, s.opened, s.last_opened_at, s.lang, (select count(*)::int from portal.selection_items i where i.selection_id = s.id) n from portal.selections s where s.client_id = $1 order by s.created_at desc`, [cl.id])
-  const books = await q<{ id: string; unit: string; status: string; ends_at: string; final_price: number }>(`select b.id, coalesce(bl.external_id,'') || '-' || un.number unit, b.status, b.ends_at, b.final_price::float from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = $1 order by b.created_at desc`, [cl.id])
+  const books = await q<{ id: string; unit: string; status: string; ends_at: string; final_price: number; group_id: string | null; options_usd: number }>(`select b.id, coalesce(bl.external_id,'') || '-' || un.number unit, b.status, b.ends_at, b.final_price::float, b.group_id, b.options_usd::float from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = $1 order by b.created_at desc`, [cl.id])
+  // Сделки клиента: у клиента может быть несколько квартир — по сделке на каждую, пакеты связаны group_id
+  const deals = await q<{ id: string; unit: string; unit_id: string; stage: string; final_price: number; paid_pct: number; group_id: string | null; created_at: string; amount: number }>(`select d.id, coalesce(bl.external_id || '-', '') || un.number unit, un.id unit_id, d.stage, d.final_price::float, d.paid_pct::float, d.group_id, d.created_at,
+      (case when $2 then d.agent_amount else d.our_amount end)::float amount from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id where d.client_id = $1 order by d.created_at`, [cl.id, ext])
+  const pkgNo = (g: string | null, list: { group_id: string | null }[]) => { if (!g) return 0; const gs = Array.from(new Set(list.map((x) => x.group_id).filter(Boolean))); return gs.indexOf(g) + 1 }
   const owners = c.user.role === 'owner' || c.user.role === 'market_head' ? await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','agent','agency_head','market_head') order by name`) : []
   const agentIdx = AGENT_STAGES.findIndex(([, , s]) => s.includes(cl.stage))
   const teamIdx = STAGES.findIndex(([k]) => k === cl.stage)
@@ -120,8 +126,13 @@ export default async function ClientCard({ params }: { params: { id: string } })
             <div className="card">
               <div className="h3">{T('Брони')}</div>
               {books.length === 0 && <div className="small muted">{T('Пока нет')}</div>}
-              {books.map((b) => <Link key={b.id} href="/bookings" className="kv"><span style={{ color: 'var(--ink)' }}>{b.unit} · {usd(L, b.final_price)}</span><span className="small">{T(b.status === 'confirmed' ? 'подтверждена' : b.status === 'requested' ? 'ждёт подтверждения' : b.status === 'converted' ? 'договор' : b.status === 'cancelled' ? 'снята' : 'истекла')}{['requested', 'confirmed'].includes(b.status) ? ' · ' + T('до {d}', { d: date(L, b.ends_at) }) : ''}</span></Link>)}
+              {books.map((b) => <Link key={b.id} href="/bookings" className="kv"><span style={{ color: 'var(--ink)' }}>{b.unit} · {usd(L, b.final_price)}{b.options_usd > 0 ? ' + ' + usd(L, b.options_usd) : ''}{b.group_id ? <span className="tiny bronze"> · {T('пакет {n}', { n: pkgNo(b.group_id, books) })}</span> : null}</span><span className="small">{T(b.status === 'confirmed' ? 'подтверждена' : b.status === 'requested' ? 'ждёт подтверждения' : b.status === 'converted' ? 'договор' : b.status === 'cancelled' ? 'снята' : 'истекла')}{['requested', 'confirmed'].includes(b.status) ? ' · ' + T('до {d}', { d: date(L, b.ends_at) }) : ''}</span></Link>)}
             </div>
+            {deals.length > 0 && <div className="card">
+              <div className="h3">{T('Сделки')} · {deals.filter((d) => d.stage !== 'cancelled').length}</div>
+              {deals.map((d) => <Link key={d.id} href={`/units/${d.unit_id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{d.unit} · {usd(L, d.final_price)}{d.group_id ? <span className="tiny bronze"> · {T('пакет {n}', { n: pkgNo(d.group_id, deals) })}</span> : null}<div className="tiny muted">{date(L, d.created_at)}{d.amount ? ' · ' + (ext ? T('ваш доход') : T('наш доход')) + ' ' + usd(L, d.amount) : ''}</div></span>
+                <span className={'small' + (d.stage === 'cancelled' ? ' muted' : '')}>{T(DEAL_ST[d.stage] || d.stage)}{d.paid_pct && d.stage === 'contract' ? ' · ' + T('оплачено {p}%', { p: Math.round(d.paid_pct) }) : ''}</span></Link>)}
+            </div>}
             <div className="card">
               <div className="h3">{T('Ожидаемая комиссия')}</div>
               <div className="big num">{usd(L, expected)}</div>

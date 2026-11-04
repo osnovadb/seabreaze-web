@@ -1645,5 +1645,15 @@
 "сделок на {a}": "deals worth {a}",
 "средняя цена м² свободных": "average $/m² of available",
 "стоимость свободных по прайсу": "value of available at list price",
-"темп ещё не набран — журнал продаж ведётся с 04.11.2026": "no pace yet — the sales log starts on 04.11.2026"
+"темп ещё не набран — журнал продаж ведётся с 04.11.2026": "no pace yet — the sales log starts on 04.11.2026",
+"Бронь для пакета уже неактивна — обновите страницу": "The package booking is no longer active — refresh the page",
+"Договор подписан — сделок в работе: {n}": "Contract signed — deals in progress: {n}",
+"Пакетом с бронью (один договор)": "As a package with booking (one contract)",
+"нет — отдельная бронь": "no — separate booking",
+"Например, машиноместо или кладовка к квартире: договор по всем броням пакета оформляется разом, комиссия — по каждой квартире.": "For example, a parking space or storage room with an apartment: the contract for all bookings in the package is signed at once, commission is per unit.",
+"пакет {n}": "package {n}",
+"пакет": "package",
+"вознаграждение получено": "fee received",
+"оплачено {p}%": "paid {p}%",
+"наш доход": "our income"
 }
