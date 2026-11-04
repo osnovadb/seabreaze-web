@@ -331,3 +331,17 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .chess th { vertical-align: bottom; }
 .chess td.fl { min-width: 70px; white-space: nowrap; }
 .fz .z-here { fill: rgba(125, 88, 56, .55); stroke: #7D5838; stroke-width: 3px; }
+
+/* Телефон (≤ 700 px): шапка страницы переносится, вкладки и канбан прокручиваются внутри, экран «Этаж» — в одну колонку */
+main, .page { min-width: 0; }
+@media (max-width: 700px) {
+  .top { flex-wrap: wrap; padding: 14px 16px; }
+  .top__r { margin-inline-start: 0; width: 100%; flex-wrap: wrap; }
+  .top__r .in, .top__r form { width: 100% !important; }
+  .tabs { overflow-x: auto; gap: 16px; white-space: nowrap; scrollbar-width: none; }
+  .floorgrid { grid-template-columns: minmax(0, 1fr) !important; }
+  .floorgrid > .card:first-child .stack, .floorgrid > .card--tight { flex-direction: row; flex-wrap: wrap; }
+  .kanban { max-width: calc(100vw - 32px); }
+  .split, .split-l, .cat, .chess-wrap { grid-template-columns: minmax(0, 1fr) !important; }
+  .g2, .g3, .g4 { grid-template-columns: minmax(0, 1fr); }
+}

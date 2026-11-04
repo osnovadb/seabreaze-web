@@ -1811,5 +1811,18 @@
 "со статусами и планами этажей": "with statuses and floor plans",
 "поставить бронь": "set booking",
 "снять бронь": "release booking",
-"Profitbase не принял «{op}» по квартире {u} — сделайте вручную": "Profitbase rejected “{op}” for unit {u} — do it manually"
+"Profitbase не принял «{op}» по квартире {u} — сделайте вручную": "Profitbase rejected “{op}” for unit {u} — do it manually",
+"Обновились и сейчас свободны, квартир: {n}": "Updated and now available, units: {n}",
+"Презентации, планы и видео по проектам — для вас и ваших клиентов": "Presentations, plans and videos for projects — for you and your clients",
+"Квиз на сайте": "Website quiz",
+"Посадочная страница": "Landing page",
+"Смарт-каталог": "Smart catalogue",
+"Импорт": "Import",
+"цена с учётом акции и плана {a} − скидка {d}": "price after offer and plan {a} − discount {d}",
+"{a} дней + одно продление на {b} дней": "{a} days + one extension of {b} days",
+"пересчёт из {c}": "converted from {c}",
+"{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно": "{n} units · {p} · prices from the developer's list in US dollars, transaction costs extra",
+"Сдаётся без ремонта": "Delivered unfinished",
+"на фото — пример дизайна застройщика": "the photo shows a developer design example",
+"К выплате партнёрам по актам": "Due to partners under acts"
 }

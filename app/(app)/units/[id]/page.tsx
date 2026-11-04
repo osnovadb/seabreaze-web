@@ -6,7 +6,7 @@ import { t, usd, m2, date, dateTime, num } from '@/lib/i18n'
 import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText, riser } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
-import { promoForUnit } from '@/lib/promo'
+import { promoForUnit, offersFor, promoOf } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { unitHistory } from '@/lib/unitEvents'
@@ -44,6 +44,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const cur = imgs.some(([k]) => k === searchParams.img) ? searchParams.img! : 'plan'
   const cs = clientScope(c.user)
   const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by last_activity_at desc limit 100`, cs.params)
+  const simOffers = await offersFor(u.project_id) // «Похожие свободные» — тоже с ценой по акции, как сверху
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
   const hist = ext ? [] : await unitHistory(u.id, 12)
   const inSel = await q<{ id: string; client: string }>(`select s.id, cl.name client from portal.selection_items si join portal.selections s on s.id = si.selection_id join portal.clients cl on cl.id = s.client_id where si.unit_id = $1 and (${ext ? 's.user_id = $2' : 'true'})`, ext ? [u.id, c.user.id] : [u.id])
@@ -83,7 +84,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
           <div className="card">
             {promo && <div className="row" style={{ gap: 6, marginBottom: 6 }}><Pill kind="ok">{promo.badge || T('Акция')}</Pill><span className="small muted">{promo.name}{promo.ends_on ? ' · ' + T('до {d}', { d: date(L, promo.ends_on) }) : ''}</span></div>}
             <div className="big num">{promoPrice ? <>{usd(L, promoPrice)} <s className="muted small">{usd(L, u.usd!)}</s></> : u.usd ? usd(L, u.usd) : T('Цена по запросу')}</div>
-            {perM2 && <div className="small muted">{usd(L, perM2)}/{L === 'ru' ? 'м²' : 'm²'}{outdoor ? ' · ' + T('с учётом сада или террасы') : ''} · {T('прайс застройщика, USD')}{u.currency !== 'USD' ? ` (${T('пересчёт из')} ${u.currency})` : ''}</div>}
+            {perM2 && <div className="small muted">{usd(L, perM2)}/{L === 'ru' ? 'м²' : 'm²'}{outdoor ? ' · ' + T('с учётом сада или террасы') : ''} · {T('прайс застройщика, USD')}{u.currency !== 'USD' ? <> (<bdi>{T('пересчёт из {c}', { c: u.currency })}</bdi>)</> : ''}</div>}
             <div className="mt16">
               <div className="kv"><span>{T('Общая площадь')}</span><span>{m2(L, u.area)}</span></div>
               {u.plot_area ? <div className="kv"><span>{T('Свой сад')}</span><span>{m2(L, u.plot_area)}</span></div> : null}
@@ -144,7 +145,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
           {similar.length > 0 && (
             <div className="card">
               <div className="h3">{T('Похожие свободные')}</div>
-              {similar.map((x) => <Link key={x.id} href={`/units/${x.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{unitNo(x)} · {T('{f} эт.', { f: x.floor })} · {m2(L, x.area)}</span><span>{x.usd ? usd(L, x.usd) : ''}</span></Link>)}
+              {similar.map((x) => <Link key={x.id} href={`/units/${x.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{unitNo(x)} · {T('{f} эт.', { f: x.floor })} · {m2(L, x.area)}</span><span>{x.usd ? usd(L, (() => { const pr = promoOf(x, simOffers); return pr ? priceChain(x.usd!, null, pr, promoMode).base : x.usd! })()) : ''}</span></Link>)}
             </div>
           )}
         </div>

@@ -6,6 +6,8 @@ import { listProjects, toUsdSql, roomsSql } from '@/lib/catalog'
 import { isExternal } from '@/lib/perm'
 import { Top, Pill, SALES } from '@/components/ui'
 
+// Картинки по умолчанию, пока в админке не загружена обложка (только свои фото проекта)
+const DEFAULT_COVER: Record<string, string> = { 'premium-residence': '/img/pr-aerial.jpg', 'brabus-island-baku': '/img/brabus.jpg' }
 // Проекты: обложка из админки (Объекты → Основное), свободные по комнатам, цены «от — до», действующие акции
 export default async function Projects() {
   const c = await requireCtx()
@@ -33,13 +35,13 @@ export default async function Projects() {
           return (
             <Link key={p.id} href={`/projects/${p.slug}`} className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div className="ph" style={{ aspectRatio: '16/8', borderRadius: 0, position: 'relative' }}>
-                <img src={x?.cover || x?.gp || '/img/pr-aerial.jpg'} alt="" />
+                {x?.cover || x?.gp || DEFAULT_COVER[p.slug] ? <img src={x?.cover || x?.gp || DEFAULT_COVER[p.slug]} alt="" /> : <div className="muted" style={{ display: 'grid', placeItems: 'center', height: '100%', background: 'var(--sand)', fontFamily: 'var(--serif)', fontSize: 22 }}>{p.name}</div>}
                 {x?.promos ? <span className="ucard__promo">{T('Акций: {n}', { n: x.promos })}</span> : null}
               </div>
               <div style={{ padding: 18 }}>
                 <div className="between"><div className="h2">{p.name}</div><span className="row" style={{ gap: 6 }}>{!ext && p.sales_status !== 'sales' && <Pill kind={st[1]}>{T(st[0])}</Pill>}<span className="pill pill--ok">{T('{n} свободно', { n: p.free })}</span></span></div>
                 <div className="small muted mt8">{p.developer} · {p.city || 'Баку'} · {T('{b} корп.', { b: p.buildings })} · {T('сдача')} {p.delivery || T('уточняется')}</div>
-                <div className="mt8"><b>{p.min_usd ? (x?.max_usd && x.max_usd > p.min_usd ? `${usd(L, p.min_usd)} – ${usd(L, x.max_usd)}` : T('от {p}', { p: usd(L, p.min_usd) })) : '—'}</b></div>
+                <div className="mt8"><b>{p.min_usd ? (x?.max_usd && x.max_usd > p.min_usd ? <bdi dir="ltr">{usd(L, p.min_usd)} – {usd(L, x.max_usd)}</bdi> : T('от {p}', { p: usd(L, p.min_usd) })) : '—'}</b></div>
                 {x?.mix && <div className="chips mt8">{Object.entries(x.mix).sort(([a], [b]) => Number(a) - Number(b)).map(([r, n]) => <span key={r} className="chip" style={{ height: 24 }}>{Number(r) >= 4 ? '4+' : r}{T('к')} <span className="n">{n}</span></span>)}</div>}
               </div>
             </Link>

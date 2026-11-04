@@ -18,7 +18,7 @@ export function FloorPlan({ src, cells, selected, children }: { src: string; cel
       </svg>
       {children}
       {hover && (
-        <div className="hovercard" style={{ left: Math.min(hover.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 1400) - 270), top: hover.y + 14 }}>
+        <div className="hovercard" style={{ left: Math.min(hover.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 1400) - 270), top: Math.min(hover.y + 14, (typeof window !== 'undefined' ? window.innerHeight : 900) - 160) }}>
           <b>{hover.c.no}</b>
           <div className="small">{hover.c.info}</div>
           {hover.c.orient && <div className="tiny muted">{hover.c.orient}</div>}

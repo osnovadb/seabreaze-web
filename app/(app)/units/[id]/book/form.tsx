@@ -60,7 +60,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         {!ch.poolAllowed && <div className="note mt8">{T('По условиям акции «{n}» скидка из пула не применяется.', { n: promo?.name || '' })}</div>}
         {disc > cap && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, cap) })}</div>}
         <div className="grid g2 mt16">
-          <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, sp.final)}</div><div className="tiny muted">{T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) })}</div></div>
+          <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, sp.final)}</div><div className="tiny muted">{(list < priceList ? T('цена с учётом акции и плана {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) }) : T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) }))}</div></div>
           {ext
             ? <div className="card card--tight" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)' }}><div className="small okc">{T('Ваш доход по сделке')}</div><div className="big num okc">{usd(lang, sp.agent)}</div><div className="tiny okc">{T('фикс {f} + остаток вашей части пула {p}', { f: usd(lang, sp.agentFix), p: usd(lang, sp.agentPoolLeft) })}</div></div>
             : showOurs ? <div className="card card--tight" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)' }}><div className="small okc">{T('Наш доход по сделке')}</div><div className="big num okc">{usd(lang, sp.ours)}</div><div className="tiny okc">{T('фикс {f} + пул {p} · продавцу {s}', { f: usd(lang, sp.ourFix), p: usd(lang, sp.ourPool), s: usd(lang, sp.seller) })}</div></div>
@@ -77,7 +77,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}
           {ext && <div className="kv"><span>{T('Ваша часть пула, не отданная клиенту')}</span><span>{pct(lang, Math.max(0, cond.agent_pool_pct - disc))} · {usd(lang, sp.agentPoolLeft)}</span></div>}
           {fee && <div className="kv"><span>{T('Платная бронь')}</span><span className="small">{T('взнос {a} — офис подтвердит бронь после оплаты; при договоре засчитывается в цену', { a: `${fee.cur} ${num(lang, fee.amount)}` })}</span></div>}
-          <div className="kv"><span>{T('Срок брони')}</span><span>{T('{a} дней + одно продление на {b}', { a: days, b: ext_days })}</span></div>
+          <div className="kv"><span>{T('Срок брони')}</span><span>{T('{a} дней + одно продление на {b} дней', { a: days, b: ext_days })}</span></div>
           <div className="kv"><span>{T('Выплата')}</span><span>{T('после оплаты застройщиком')}</span></div>
         </div>
       </div>

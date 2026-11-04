@@ -17,7 +17,7 @@ export default async function Materials() {
   const get = (pid: string, k: string) => stat.find((x) => x.project_id === pid && x.kind === k)
   return (
     <>
-      <Top title={T('Материалы')} sub={T('Материалы для партнёров и клиентов по проектам. Контент и новости сайтов — в CMS (Payload).')} />
+      <Top title={T('Материалы')} sub={isExternal(c.user.role) ? T('Презентации, планы и видео по проектам — для вас и ваших клиентов') : T('Материалы для партнёров и клиентов по проектам. Контент и новости сайтов — в CMS (Payload).')} />
       <div className="page grid g2">
         {ps.map((p) => { const m = get(p.id, 'material'), d = get(p.id, 'document'); return (
           <div key={p.id} className="card">

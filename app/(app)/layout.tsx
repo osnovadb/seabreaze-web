@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const cnt = await one<{ notif: number; req: number; apps: number; kyc: number }>(`select
     (select count(*)::int from portal.notifications where user_id = $1 and not read) notif,
     (select count(*)::int from portal.bookings where status = 'requested') req,
-    (select count(*)::int from portal.agent_applications where status = 'new' and ($2 = 'owner' or market = $3)) apps,
+    (select count(*)::int from portal.agent_applications where status in ('new','review') and ($2 = 'owner' or market = $3)) apps, /* как «Заявки агентов на проверке» на главной */
     (select count(*)::int from portal.clients where kyc_status = 'pending') kyc`, [u.id, u.role, u.market])
   const ext = isExternal(u.role)
   const newsUnread = (await feed(u, { limit: 100 })).filter((p) => !p.read).length

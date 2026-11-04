@@ -3,7 +3,8 @@ import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, date, pct } from '@/lib/i18n'
 import { bookingScope } from '@/lib/scope'
-import { conditionsFor } from '@/lib/catalog'
+import { conditionsFor, listProjects } from '@/lib/catalog'
+import { expectedAgent, type SplitCond } from '@/lib/money'
 import { Top, Pill } from '@/components/ui'
 import { ACT_STATUS } from '@/lib/acts'
 
@@ -14,15 +15,16 @@ export default async function Commission() {
   const deals = await q<{ id: string; unit: string; client: string; stage: string; final_price: number; agent_amount: number; paid_pct: number; paid_out_at: string | null; created_at: string }>(
     `select d.id, portal.unit_no(bl.external_id, un.number) unit, cl.name client, d.stage, d.final_price::float, d.agent_amount::float, d.paid_pct::float, d.paid_out_at, d.created_at
      from portal.deals d join portal.bookings b on b.id = d.booking_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id where ${bs.sql} order by d.created_at desc`, bs.params)
-  const pipe = await q<{ unit: string; client: string; final_price: number; agent: number; ends_at: string }>(
-    `select portal.unit_no(bl.external_id, un.number) unit, cl.name client, b.final_price::float, (b.snapshot->'split'->>'agent')::float agent, b.ends_at
-     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and ${bs.sql}`, bs.params)
+  const pipe = (await q<{ unit: string; client: string; final_price: number; ends_at: string; snapshot: SplitCond; price_list: number; discount_pct: number }>(
+    `select portal.unit_no(bl.external_id, un.number) unit, cl.name client, b.final_price::float, b.snapshot, b.price_list::float, b.discount_pct::float, b.ends_at
+     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and ${bs.sql}`, bs.params)).map((b) => ({ ...b, agent: expectedAgent(b) }))
   const acts = await q<{ id: string; unit: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; paid_at: string | null }>(
     `select ca.id, portal.unit_no(bl.external_id, un.number) unit, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, ca.paid_at
      from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id left join portal.documents doc on doc.id = ca.document_id
      where ${c.user.role === 'agency_head' ? 'ca.agent_id in (select id from portal.users where agency_id = $1)' : 'ca.agent_id = $1'} order by ca.created_at desc`, [c.user.role === 'agency_head' ? c.user.agency_id : c.user.id])
   const owed = acts.filter((a) => a.status === 'clawback').reduce((x, a) => x + a.clawback_left, 0)
-  const projects = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
+  // Ставки — только по проектам, открытым партнёру (черновики и закрытые не показываем)
+  const projects = await listProjects(c.user)
   const rates = await Promise.all(projects.map(async (p) => [p.name, await conditionsFor(p.id, c.user)] as const))
   const paid = deals.filter((d) => d.stage === 'paid_out').reduce((a, d) => a + d.agent_amount, 0)
   const pending = deals.filter((d) => d.stage !== 'paid_out' && d.stage !== 'cancelled').reduce((a, d) => a + d.agent_amount, 0)

@@ -1811,5 +1811,18 @@
 "со статусами и планами этажей": "mit Status und Etagenplänen",
 "поставить бронь": "Reservierung setzen",
 "снять бронь": "Reservierung aufheben",
-"Profitbase не принял «{op}» по квартире {u} — сделайте вручную": "Profitbase hat „{op}“ für Wohnung {u} abgelehnt — bitte manuell erledigen"
+"Profitbase не принял «{op}» по квартире {u} — сделайте вручную": "Profitbase hat „{op}“ für Wohnung {u} abgelehnt — bitte manuell erledigen",
+"Обновились и сейчас свободны, квартир: {n}": "Aktualisiert und jetzt frei, Wohnungen: {n}",
+"Презентации, планы и видео по проектам — для вас и ваших клиентов": "Präsentationen, Pläne und Videos zu den Projekten — für Sie und Ihre Kunden",
+"Квиз на сайте": "Quiz auf der Website",
+"Посадочная страница": "Landingpage",
+"Смарт-каталог": "Smart-Katalog",
+"Импорт": "Import",
+"цена с учётом акции и плана {a} − скидка {d}": "Preis nach Aktion und Plan {a} − Rabatt {d}",
+"{a} дней + одно продление на {b} дней": "{a} Tage + eine Verlängerung um {b} Tage",
+"пересчёт из {c}": "umgerechnet aus {c}",
+"{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно": "{n} Whg. · {p} · Preise laut Preisliste des Bauträgers in US-Dollar, Kaufnebenkosten separat",
+"Сдаётся без ремонта": "Übergabe im Rohbau",
+"на фото — пример дизайна застройщика": "das Foto zeigt ein Designbeispiel des Bauträgers",
+"К выплате партнёрам по актам": "An Partner fällig laut Akten"
 }

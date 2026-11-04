@@ -37,6 +37,7 @@ for (const b of expired) {
 // Платная бронь истекла после оплаты взноса — финансам решить: вернуть или удержать
 const feeLeft = await q(`select b.id from portal.bookings b where b.status = 'expired' and b.fee_status = 'paid' and b.ends_at > now() - interval '1 day'`)
 if (feeLeft.length) for (const o of await q(`select id from portal.users where active and role in ('finance','owner')`)) for (const b of feeLeft) await notify(o.id, 'booking', 'Оплаченная бронь истекла — решите по взносу: вернуть или удержать', '/bookings?f=fee', {}, 'fee-left:' + b.id + ':' + o.id)
+for (const cid of new Set(expired.map((b) => b.client_id))) await q('select portal.sync_client_stage($1)', [cid]) // бронь истекла — стадия клиента назад
 out.expired = expired.length
 
 // 2. Бронь кончается через 3 дня или меньше

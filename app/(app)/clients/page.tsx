@@ -68,7 +68,7 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
             <table className="tbl">
               <thead><tr>{['Клиент', 'Стадия', ext ? 'Страна' : 'Владелец', 'Бюджет', 'Бронь', 'Защита до', 'Активность', ''].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
               <tbody>{rows.map((r) => {
-                const sg = signal(r)
+                const sg = r.pause_until || r.stage === 'lost' ? null : signal(r) // на паузе и в отказе — без сигналов «нет активности»
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/clients/${r.id}`}><b>{r.name}</b></Link><div className="tiny muted">{r.reg_no}</div></td>
