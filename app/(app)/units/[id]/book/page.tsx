@@ -27,7 +27,7 @@ export default async function Book({ params, searchParams }: { params: { id: str
   const { promo, mode } = await promoForUnit(u)
   const options = await optionsFor(u)
   // Активные брони тех же клиентов — к ним можно добавить эту квартиру пакетом (одним договором)
-  const pkgs = clients.length ? await q<{ id: string; client_id: string; unit: string }>(`select b.id, b.client_id, coalesce(bl.external_id || '-', '') || un.number unit from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id
+  const pkgs = clients.length ? await q<{ id: string; client_id: string; unit: string }>(`select b.id, b.client_id, portal.unit_no(bl.external_id, un.number) unit from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id
     where b.client_id = any($1) and b.status in ('requested','confirmed') and b.unit_id <> $2 order by b.created_at`, [clients.map((x) => x.id), u.id]) : []
   return (
     <>

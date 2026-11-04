@@ -12,13 +12,13 @@ export default async function Commission() {
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
   const deals = await q<{ id: string; unit: string; client: string; stage: string; final_price: number; agent_amount: number; paid_pct: number; paid_out_at: string | null; created_at: string }>(
-    `select d.id, coalesce(bl.external_id,'') || '-' || un.number unit, cl.name client, d.stage, d.final_price::float, d.agent_amount::float, d.paid_pct::float, d.paid_out_at, d.created_at
+    `select d.id, portal.unit_no(bl.external_id, un.number) unit, cl.name client, d.stage, d.final_price::float, d.agent_amount::float, d.paid_pct::float, d.paid_out_at, d.created_at
      from portal.deals d join portal.bookings b on b.id = d.booking_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id where ${bs.sql} order by d.created_at desc`, bs.params)
   const pipe = await q<{ unit: string; client: string; final_price: number; agent: number; ends_at: string }>(
-    `select coalesce(bl.external_id,'') || '-' || un.number unit, cl.name client, b.final_price::float, (b.snapshot->'split'->>'agent')::float agent, b.ends_at
+    `select portal.unit_no(bl.external_id, un.number) unit, cl.name client, b.final_price::float, (b.snapshot->'split'->>'agent')::float agent, b.ends_at
      from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and ${bs.sql}`, bs.params)
   const acts = await q<{ id: string; unit: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; paid_at: string | null }>(
-    `select ca.id, coalesce(bl.external_id,'') || '-' || un.number unit, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, ca.paid_at
+    `select ca.id, portal.unit_no(bl.external_id, un.number) unit, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, ca.paid_at
      from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id left join portal.documents doc on doc.id = ca.document_id
      where ${c.user.role === 'agency_head' ? 'ca.agent_id in (select id from portal.users where agency_id = $1)' : 'ca.agent_id = $1'} order by ca.created_at desc`, [c.user.role === 'agency_head' ? c.user.agency_id : c.user.id])
   const owed = acts.filter((a) => a.status === 'clawback').reduce((x, a) => x + a.clawback_left, 0)

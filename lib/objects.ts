@@ -151,7 +151,7 @@ async function hideUnits(ids: string[], by: string) {
     await q(`insert into portal.unit_hidden (unit_id, created_by) values ($1,$2) on conflict do nothing`, [id, by])
     const gone = await q<{ id: string; user_id: string; unit: string }>(`update portal.waitlist w set active = false from portal.users us, units u join buildings b on b.id = u.building_id
       where w.unit_id = $1 and w.active and us.id = w.user_id and us.role in ('agent','agency_head') and u.id = w.unit_id
-      returning w.id, w.user_id, coalesce(b.external_id, '') || '-' || u.number unit`, [id])
+      returning w.id, w.user_id, portal.unit_no(b.external_id, u.number) unit`, [id])
     for (const g of gone) await notifyUser(g.user_id, 'waitlist', 'Квартира {u} снята с продажи для партнёров — вы убраны из листа ожидания', '/waitlist', { u: g.unit })
   }
 }
@@ -169,16 +169,17 @@ export const quickUnit = safe(async (_: unknown, f: FormData) => {
   return { ok: true }
 })
 // Массово из шахматки: статус (офис или владелец) и «скрыть от партнёров» (владелец)
+const uuids = (f: FormData) => f.getAll('units').map(String).filter((x) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x)).slice(0, 500)
 export async function bulkStatus(f: FormData) {
   const c = await unitsEditor()
-  const pid = s(f, 'project'), st = s(f, 'status'), ids = f.getAll('units').map(String).slice(0, 500)
+  const pid = s(f, 'project'), st = s(f, 'status'), ids = uuids(f)
   if (!UNIT_STATUSES.includes(st) || !ids.length) return
-  const r = await asActor(c.user.id, 'portal', (db) => db.query('update units set status = $3 where project_id = $1 and id = any($2) and status <> $3', [pid, ids, st]))
+  const r = await asActor(c.user.id, 'portal', (db) => db.query('update units set status = $3 where project_id::text = $1 and id = any($2) and status <> $3', [pid, ids, st]))
   await log(c, 'object.units_status', 'project', pid, { status: st, n: r.rowCount }); done(pid)
 }
 export async function bulkHide(f: FormData) {
   const c = await owner()
-  const pid = s(f, 'project'), ids = (await q<{ id: string }>('select id from units where project_id = $1 and id = any($2)', [pid, f.getAll('units').map(String).slice(0, 500)])).map((r) => r.id)
+  const pid = s(f, 'project'), ids = (await q<{ id: string }>('select id from units where project_id::text = $1 and id = any($2)', [pid, uuids(f)])).map((r) => r.id)
   if (!ids.length) return
   if (s(f, 'hidden') === '1') await hideUnits(ids, c.user.id)
   else await q('delete from portal.unit_hidden where unit_id = any($1)', [ids])
@@ -351,7 +352,7 @@ export const saveOption = safe(async (_: unknown, f: FormData) => {
   const nums = s(f, 'units').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)
   let uids: string[] = []
   if (nums.length) {
-    const us = await q<{ id: string; no: string; number: string }>(`select u.id, upper(coalesce(b.external_id || '-', '') || u.number) no, upper(u.number) number from units u join buildings b on b.id = u.building_id where u.project_id = $1`, [pid])
+    const us = await q<{ id: string; no: string; number: string }>(`select u.id, upper(portal.unit_no(b.external_id, u.number)) no, upper(u.number) number from units u join buildings b on b.id = u.building_id where u.project_id = $1`, [pid])
     const miss = nums.filter((n) => !us.some((u) => u.no === n || u.number === n))
     if (miss.length) return { error: t(c.lang, 'Нет таких квартир: {n}', { n: miss.slice(0, 5).join(', ') }) }
     uids = Array.from(new Set(us.filter((u) => nums.includes(u.no) || nums.includes(u.number)).map((u) => u.id)))

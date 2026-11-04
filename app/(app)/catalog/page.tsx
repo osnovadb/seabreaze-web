@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
 import { listProjects, unitsOfProjects, viewMode, codeFor, unitNo, planUrl, TYPE_NAME, VIEW_NAME, isLiving, type Code } from '@/lib/catalog'
-import { offersFor, promoOf } from '@/lib/promo'
+import { offersFor, promoOf, promoBadge } from '@/lib/promo'
 import { normFilter, matchUnit } from '@/lib/unitMatch.mjs'
 import { Top, Pill } from '@/components/ui'
 import { saveSearch } from '@/lib/waitActions'
@@ -89,7 +89,7 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
               {shown.map((u) => (
                 <Link key={u.id} href={`/units/${u.id}`} className="ucard">
                   <div className="ucard__img">{planUrl(u.plan_file) ? <img src={planUrl(u.plan_file)!} alt="" loading="lazy" /> : <span className="muted tiny">{T('планировка не загружена')}</span>}
-                    {u.promo && <span className="ucard__promo">{u.promo.badge || T('Акция')} −{Math.round(u.promo.pct * 10) / 10}%</span>}</div>
+                    {u.promo && <span className="ucard__promo">{promoBadge(u.promo, T('Акция'))}</span>}</div>
                   <div className="ucard__b">
                     <div className="between"><b>{unitNo(u)}</b>{STATUS[u.code] ? <Pill kind={STATUS[u.code]![1]}>{T(STATUS[u.code]![0])}</Pill> : <Pill kind="off">{T('не в продаже')}</Pill>}</div>
                     <div className="tiny muted">{!p ? ps.find((x) => x.id === u.project_id)?.name + ' · ' : ''}{u.building} · {T('{f} этаж', { f: u.floor })}</div>
@@ -108,7 +108,7 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
                 <tbody>
                   {shown.map((u) => (
                     <tr key={u.id}>
-                      <td><Link href={`/units/${u.id}`}><b>{unitNo(u)}</b></Link>{u.promo && <div className="tiny bronze">{u.promo.badge || T('Акция')} −{Math.round(u.promo.pct * 10) / 10}%</div>}</td>
+                      <td><Link href={`/units/${u.id}`}><b>{unitNo(u)}</b></Link>{u.promo && <div className="tiny bronze">{promoBadge(u.promo, T('Акция'))}</div>}</td>
                       <td>{u.building}</td><td className="small">{T(TYPE_NAME[u.unit_type] || u.unit_type)}</td><td>{u.floor}</td><td>{isLiving(u.unit_type) ? u.rooms ?? '—' : '—'}</td>
                       <td>{m2(L, u.area)}{out(u) ? <div className="tiny muted">+ {u.plot_area ? T('сад') : T('терраса')} {m2(L, out(u))}</div> : null}</td>
                       <td className="small">{u.view_side ? T(VIEW_NAME[u.view_side] || u.view_side) : '—'}</td>

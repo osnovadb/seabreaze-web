@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, dateTime, pct } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, orientOf, orientText, VIEW_NAME, riser, unitNo, planUrl, TYPE_NAME } from '@/lib/catalog'
-import { offersFor, promoOf } from '@/lib/promo'
+import { offersFor, promoOf, promoBadge } from '@/lib/promo'
 import { clientScope } from '@/lib/scope'
 import { q } from '@/lib/db'
 import { ChessBoard, type CU } from '@/components/ChessBoard'
@@ -45,7 +45,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const cu: CU[] = units.map((u) => {
     const code = codeFor(u, c.user, mode), x = code === 'X', pr = x ? null : promoOf(u, offers)
     return { id: u.id, no: x ? '' : unitNo(u), riser: riser(u), floor: u.floor, code, rooms: x ? null : u.rooms, area: x ? 0 : u.area, out: x ? 0 : (u.plot_area || 0) + (u.ext_area || 0), type: u.unit_type, typeName: TYPE_NAME[u.unit_type] || u.unit_type,
-      usd: x ? null : u.usd, net: x || u.usd == null ? null : u.usd - (pr?.usd || 0), promo: pr ? `${pr.badge || T('Акция')} −${Math.round(pr.pct * 10) / 10}%` : null, plan: x ? null : planUrl(u.plan_file),
+      usd: x ? null : u.usd, net: x || u.usd == null ? null : u.usd - (pr?.usd || 0), promo: pr ? promoBadge(pr, T('Акция')) : null, plan: x ? null : planUrl(u.plan_file),
       view_side: x ? null : orientOf(u, ri).view, orient: x ? '' : orient(u) || '', layout: x ? null : u.layout_code, plot_area: x ? null : u.plot_area, ext_area: x ? null : u.ext_area, is_corner: x ? null : u.is_corner,
       building_id: u.building_id, project_id: u.project_id, hidden: mode === 'team' && u.hidden }
   })

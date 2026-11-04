@@ -18,7 +18,7 @@ export default async function Home() {
   const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null }>(
     `select id, name, stage, last_activity_at, protected_until, pause_until from portal.clients cl where ${cs.sql}`, cs.params)
   const bookings = await q<{ id: string; status: string; ends_at: string; unit: string; client: string; client_id: string; price_list: number; discount_pct: number; snapshot: SplitCond }>(
-    `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, coalesce(bl.external_id,'') || '-' || un.number as unit, cl.name as client, cl.id as client_id from portal.bookings b
+    `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, portal.unit_no(bl.external_id, un.number) as unit, cl.name as client, cl.id as client_id from portal.bookings b
      join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id
      where b.status in ('requested','confirmed') and ${bs.sql} order by b.ends_at`, bs.params)
   const deals = await q<{ id: string; stage: string; agent_amount: number; our_amount: number; final_price: number }>(

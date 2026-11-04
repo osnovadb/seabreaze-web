@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, pct, num } from '@/lib/i18n'
-import { planUrl, toUsdSql, UNIT_TYPES, TYPE_NAME } from '@/lib/catalog'
+import { planUrl, toUsdSql, UNIT_TYPES, TYPE_NAME, unitNo } from '@/lib/catalog'
 import { PLAN_COLS, schedule, planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
@@ -155,7 +155,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
           {units.map((u) => (
             <ActionForm key={u.id} action={saveUnit} lang={L} className="objrow" style={{ gridTemplateColumns: cols }}>
               <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="id" value={u.id} /><input type="hidden" name="building" value={b.id} />
-              {owner ? <input className="in" name="number" defaultValue={u.number} /> : <b className="small">{b.external_id ? b.external_id + '-' : ''}{u.number}</b>}
+              {owner ? <input className="in" name="number" defaultValue={u.number} /> : <b className="small">{unitNo({ block: b.external_id || '', number: u.number })}</b>}
               {owner ? <input className="in" name="floor" type="number" defaultValue={u.floor ?? ''} /> : <span className="small">{u.floor}</span>}
               {owner && <select className="in" name="layout" defaultValue={u.layout_id || ''}><option value="">—</option>{layouts.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select>}
               {owner && <input className="in" name="area" defaultValue={u.area_total_m2 ?? ''} />}
@@ -298,7 +298,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   async function Options() {
     const opts = await q<{ id: string; title: string; note: string | null; price: number; currency: string; building_ids: string[]; unit_types: string[]; units: string[]; active: boolean; sort: number }>(`
       select o.id, o.title, o.note, o.price::float, o.currency, o.building_ids, o.unit_types, o.active, o.sort,
-        (select coalesce(array_agg(coalesce(b.external_id || '-', '') || u.number order by u.number), '{}') from units u join buildings b on b.id = u.building_id where u.id = any(o.unit_ids)) units
+        (select coalesce(array_agg(portal.unit_no(b.external_id, u.number) order by u.number), '{}') from units u join buildings b on b.id = u.building_id where u.id = any(o.unit_ids)) units
       from portal.unit_options o where o.project_id = $1 order by o.sort, o.title`, [p!.id])
     const types = (await q<{ unit_type: string }>('select distinct unit_type from units where project_id = $1', [p!.id])).map((x) => x.unit_type)
     const Form = ({ o }: { o?: (typeof opts)[number] }) => (

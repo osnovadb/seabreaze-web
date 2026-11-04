@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { q, one, tx, audit, notify } from './db'
 import { getCtx, requireCtx, signSession, clearSession, setShow, clearShow, Ctx } from './auth'
 import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegisterClient, canReviewAgents, isExternal, maxDiscount, discountCeiling, canApproveDiscount, type Role } from './perm'
-import { conditionsFor, split, unitById, projectVisible, plansFor } from './catalog'
+import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
 import { priceChain } from './plans'
 import { optionsFor } from './options'
 import { toUsd } from './fx'
@@ -84,7 +84,7 @@ export async function exitShow(_: unknown, f: FormData) {
   }
   if (c.show?.clientId) {
     // Отмеченные на этой встрече квартиры (подборка «Встреча» за последние 4 часа — срок режима показа)
-    const liked = await q<{ unit: string }>(`select coalesce(bl.external_id, '') || '-' || u.number unit from portal.selection_items si join portal.selections se on se.id = si.selection_id
+    const liked = await q<{ unit: string }>(`select portal.unit_no(bl.external_id, u.number) unit from portal.selection_items si join portal.selections se on se.id = si.selection_id
       join units u on u.id = si.unit_id join buildings bl on bl.id = u.building_id where se.client_id = $1 and se.title = 'Встреча' and si.liked and si.created_at > now() - interval '4 hours' order by si.created_at`, [c.show.clientId])
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'meeting','Встреча в режиме показа · отмечено квартир: {n}',$3)`, [c.show.clientId, c.user.id, { n: liked.length + (liked.length ? ' (' + liked.map((x) => x.unit).join(', ') + ')' : '') }])
   }
@@ -364,8 +364,8 @@ export async function createBooking(_: unknown, f: FormData) {
     [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none'])
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
-  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: `${unit.block}-${unit.number}`, d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
-  const u = `${unit.block}-${unit.number}`
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: unitNo(unit), d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
+  const u = unitNo(unit)
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
@@ -450,11 +450,17 @@ export async function addManyToSelection(f: FormData) {
   const clientId = s(f, 'client'), ids = f.getAll('units').map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 100)
   if (!ids.length) return
   await stageGuard(c, clientId)
-  // Партнёру — только видимые ему квартиры (не скрытые, открытый проект)
-  const ok = await q<{ id: string; project_id: string }>(`select u.id, u.project_id from units u where u.id = any($1) and (not $2 or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`, [ids, isExternal(c.user.role)])
+  // Только то, что пользователь видит доступным: партнёру — свободные и свои брони (F/M) в открытых ему проектах;
+  // команде — всё, кроме проданного и снятого с продажи
+  const ext = isExternal(c.user.role), mode = viewMode(c.user, false)
   const vis = new Map<string, boolean>()
   const list: string[] = []
-  for (const u of ok) { if (isExternal(c.user.role)) { if (!vis.has(u.project_id)) vis.set(u.project_id, await projectVisible(u.project_id, c.user)); if (!vis.get(u.project_id)) continue } list.push(u.id) }
+  for (const u of await unitsByIds(ids)) {
+    const code = codeFor(u, c.user, mode)
+    if (ext ? !['F', 'M'].includes(code) : ['S', 'N', 'SB'].includes(code)) continue
+    if (ext) { if (!vis.has(u.project_id)) vis.set(u.project_id, await projectVisible(u.project_id, c.user)); if (!vis.get(u.project_id)) continue }
+    list.push(u.id)
+  }
   if (!list.length) return
   let sel = await one<{ id: string }>(`select id from portal.selections where client_id = $1 and user_id = $2 and title <> 'Встреча' order by created_at desc limit 1`, [clientId, c.user.id])
   if (!sel) {

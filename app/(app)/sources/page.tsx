@@ -14,7 +14,7 @@ export default async function Sources() {
        (select max(u.synced_at) from units u where u.source_id = s.id) synced from sources s order by s.id`)
   const lka = await q<{ n: number; at: string }>(`select count(*)::int n, max(raw->'lka'->>'snapshot') at from units where raw ? 'lka'`)
   const runs = await q<{ source_id: string; started_at: string; status: string; stats: unknown }>('select source_id, started_at, status, stats from sync_runs order by started_at desc limit 20')
-  const conflicts = await q<{ unit: string; status: string; client: string }>(`select coalesce(bl.external_id,'') || '-' || un.number unit, un.status, cl.name client from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and un.status <> 'available'`)
+  const conflicts = await q<{ unit: string; status: string; client: string }>(`select portal.unit_no(bl.external_id, un.number) unit, un.status, cl.name client from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id where b.status in ('requested','confirmed') and un.status <> 'available'`)
   return (
     <>
       <Top title={T('Источники данных')} sub={T('Откуда берутся квартиры, цены и статусы и когда они последний раз подтверждены')} />
