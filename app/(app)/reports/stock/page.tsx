@@ -7,7 +7,7 @@ import { roomsSql, toUsdSql, TYPE_NAME } from '@/lib/catalog'
 import { Top } from '@/components/ui'
 
 type St = { key: string; total: number; free: number; ours: number; hold: number; sold: number; off: number; free_m2: number; free_usd: number; sold_m2: number; sold_usd: number }
-type Mo = { m: string; sold: number; bookings: number; deals: number; up: number; down: number; avg_chg: number | null }
+type Mo = { m: string; sold: number; bookings: number; deals: number; total: number; up: number; down: number; avg_chg: number | null }
 
 // Остатки и темп продаж (группа 4, «дашборд РОП» у Profitbase): что свободно по корпусам и комнатам, цена за м²,
 // сколько продаётся в месяц и на сколько месяцев хватит остатка. Продажи застройщика — из журнала квартиры (с 04.11.2026),
@@ -38,12 +38,15 @@ export default async function Stock({ searchParams }: { searchParams: { p?: stri
       (select count(distinct e.unit_id)::int from portal.unit_events e join units u on u.id = e.unit_id where ${where} and e.kind = 'status' and e.new_value = 'sold' and date_trunc('month', e.at)::date = m.m) sold,
       (select count(*)::int from portal.bookings bk join units u on u.id = bk.unit_id where ${where} and date_trunc('month', bk.created_at)::date = m.m) bookings,
       (select count(*)::int from portal.deals d join units u on u.id = d.unit_id where ${where} and d.stage <> 'cancelled' and date_trunc('month', d.created_at)::date = m.m) deals,
+      /* продано всего без двойного счёта: наша сделка по квартире потом становится «продана» и у застройщика */
+      (select count(distinct x.unit_id)::int from (select e.unit_id from portal.unit_events e join units u on u.id = e.unit_id where ${where} and e.kind = 'status' and e.new_value = 'sold' and date_trunc('month', e.at)::date = m.m
+         union select d.unit_id from portal.deals d join units u on u.id = d.unit_id where ${where} and d.stage <> 'cancelled' and date_trunc('month', d.created_at)::date = m.m) x) total,
       (select count(*)::int from portal.unit_events e join units u on u.id = e.unit_id where ${where} and e.kind = 'price' and e.old_price > 0 and e.new_price > e.old_price and date_trunc('month', e.at)::date = m.m) up,
       (select count(*)::int from portal.unit_events e join units u on u.id = e.unit_id where ${where} and e.kind = 'price' and e.old_price > 0 and e.new_price < e.old_price and date_trunc('month', e.at)::date = m.m) down,
       (select avg(e.new_price / e.old_price - 1)::float * 100 from portal.unit_events e join units u on u.id = e.unit_id where ${where} and e.kind = 'price' and e.old_price > 0 and e.new_price > 0 and date_trunc('month', e.at)::date = m.m) avg_chg
     from m order by m.m desc`, args)
-  // Темп — средние продажи (застройщик + наши сделки) за 3 последних полных месяца; запас = свободно / темп
-  const last3 = months.slice(1, 4), pace = last3.reduce((a, m) => a + m.sold + m.deals, 0) / 3
+  // Темп — средние продажи за 3 последних полных месяца (разные квартиры: продано у застройщика или нашей сделкой); запас = свободно / темп
+  const last3 = months.slice(1, 4), pace = last3.reduce((a, m) => a + m.total, 0) / 3
   const ppm = (usdSum: number, m2: number) => (m2 ? usd(L, usdSum / m2) : '—')
   const label = (k: string) => (by === 'rooms' ? (/^\d$/.test(k) ? (k === '4' ? '4+' : k) + ' ' + T('комн.') : T(TYPE_NAME[k] || k)) : k)
   const qs = (o: Record<string, string>) => '?' + new URLSearchParams(Object.entries({ p: p?.slug || '', by, ...o }).filter(([, v]) => v)).toString()
@@ -72,9 +75,9 @@ export default async function Stock({ searchParams }: { searchParams: { p?: stri
         <div className="tiny muted mt8">{T('«$/м² проданных» — по последней цене прайса, не по цене сделки застройщика. Наши брони и сделки считаются отдельно от статуса в каталоге.')}</div>
         <div className="h3 mt24">{T('По месяцам')}</div>
         <div className="tbl-wrap mt8"><table className="tbl">
-          <thead><tr>{['Месяц', 'Продано у застройщика', 'Наши брони', 'Наши сделки', 'Цены вверх', 'Цены вниз', 'Среднее изменение цены'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
+          <thead><tr>{['Месяц', 'Продано всего', 'Продано у застройщика', 'Наши брони', 'Наши сделки', 'Цены вверх', 'Цены вниз', 'Среднее изменение цены'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{months.map((m) => (
-            <tr key={m.m}><td>{monthName(L, m.m)}</td><td className="num">{m.sold || '—'}</td><td className="num">{m.bookings || '—'}</td><td className="num">{m.deals || '—'}</td>
+            <tr key={m.m}><td>{monthName(L, m.m)}</td><td className="num"><b>{m.total || '—'}</b></td><td className="num">{m.sold || '—'}</td><td className="num">{m.bookings || '—'}</td><td className="num">{m.deals || '—'}</td>
               <td className="num okc">{m.up || '—'}</td><td className="num badc">{m.down || '—'}</td><td className="num small">{m.avg_chg != null ? (m.avg_chg >= 0 ? '+' : '') + m.avg_chg.toFixed(1) + '%' : '—'}</td></tr>))}</tbody>
         </table></div>
       </div>

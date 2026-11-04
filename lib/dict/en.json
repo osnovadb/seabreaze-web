@@ -1707,5 +1707,6 @@
 "нажимайте на квартиры": "click units",
 "от {p}/м²": "from {p}/m²",
 "свободных нет": "none available",
-"В подборку добавлено квартир: {n}": "Units added to selection: {n}"
+"В подборку добавлено квартир: {n}": "Units added to selection: {n}",
+"Продано всего": "Sold total"
 }

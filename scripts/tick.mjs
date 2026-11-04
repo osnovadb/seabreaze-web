@@ -131,7 +131,8 @@ const freeUnits = async (project, partner) => {
     const rows = await q(`select u.id, u.project_id, u.building_id, u.unit_type, u.floor, u.area_total_m2::float area, u.area_external_m2::float ext_area, u.plot_area_m2::float plot_area, u.view_side, u.is_corner,
         coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) rooms,
         u.price_list::float price, u.price_currency currency,
-        (case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end)::float usd
+        (case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1)
+          when u.price_currency = 'EUR' then u.price_list * (select azn_per_unit from currency_rates where currency = 'EUR' order by valid_from desc limit 1) / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end)::float usd /* как toUsdSql в lib/catalog.ts */
       from units u where u.project_id = $1 and ${FREE} and (not $2 or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`, [project, partner])
     const of = await offers(project)
     unitsOf.set(key, rows.map((u) => { const b = bestOffer(u, of); return { ...u, promo: !!b, net: u.usd != null ? u.usd - (b?.usd || 0) : null } }))
