@@ -14,3 +14,7 @@ export function split(c: SplitCond, list: number, discPct: number, withAgent = t
   const seller = ours * c.seller_share_pct / 100
   return { list, final, discount: list - final, fix, agentFix, agentPoolLeft, shareToAgent, agent, ourFix: fix - agentFix, ourPool: ourPool - shareToAgent, ours, seller }
 }
+
+// Ожидаемая комиссия партнёра по активной брони — одна формула для главной и страницы «Комиссия»: условия из снимка брони,
+// у брони, поставленной командой (не партнёром), агентской доли нет
+export const expectedAgent = (b: { snapshot: SplitCond; price_list: number; discount_pct: number; ext?: boolean }) => (b.ext === false ? 0 : split(b.snapshot, b.price_list, b.discount_pct, true).agent)

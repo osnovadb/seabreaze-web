@@ -24,3 +24,7 @@ begin
 end $$;
 drop trigger if exists units_portal_events on units;
 create trigger units_portal_events after insert or update on units for each row execute function portal_unit_events();
+
+-- Синхронизация с Profitbase (М1, М11): портал ведёт источники, журнал прогонов и сопоставление статусов
+grant select, insert, update on sources, sync_runs, status_map, type_map to portal_app;
+grant usage on sequence sync_runs_id_seq, status_map_id_seq, type_map_id_seq to portal_app;

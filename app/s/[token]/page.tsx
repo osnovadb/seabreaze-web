@@ -23,6 +23,8 @@ export default async function PublicSelection({ params, searchParams }: { params
   // Акции и правило сложения — по проектам квартир подборки
   const projIds = Array.from(new Set(Array.from(units.values()).map((u) => u.project_id)))
   const offers = new Map(await Promise.all(projIds.map(async (p) => [p, { offers: await offersFor(p), mode: await promoMode(p) }] as const)))
+  // Проекты подборки: название в шапке и у каждой квартиры; пример дизайна застройщика — только у Premium Residence
+  const projs = new Map((await q<{ id: string; name: string; slug: string; city: string | null }>('select id, name, slug, city from projects where id = any($1)', [projIds])).map((p) => [p.id, p]))
   const promoBy = (u: NonNullable<ReturnType<typeof units.get>>) => { const o = offers.get(u.project_id)!; return { promo: promoOf(u, o.offers), mode: o.mode } }
   // План, выбранный консультантом, и только если он ещё действует для этой квартиры
   const planOf = new Map<string, Awaited<ReturnType<typeof plansFor>>[number]>()
@@ -32,24 +34,25 @@ export default async function PublicSelection({ params, searchParams }: { params
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 20px 64px' }}>
         <div className="between"><img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 24 }} /><PrintButton label={T('Скачать PDF')} /></div>
         <h1 className="h2" style={{ fontSize: 30, marginTop: 28 }}>{T('Подборка для {c}', { c: s.client.split(' · ').pop()! })}</h1>
-        <p className="muted">{T('{n} квартир · Sea Breeze, Баку · цены по прайсу застройщика в долларах США, расходы на сделку отдельно', { n: items.length })}</p>
+        <p className="muted">{T('{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно', { n: items.filter((i) => units.has(i.unit_id)).length, p: Array.from(projs.values()).map((p) => p.name + (p.city ? ', ' + p.city : '')).join(' · ') })}</p>
         <div className="stack mt24" style={{ gap: 20 }}>
           {items.map((i) => {
             const u = units.get(i.unit_id)
             if (!u) return null
             const free = codeFor(u, null, 'show') === 'F' || !!u.booking_id
-            const img = DESIGN[u.rooms || 0]?.[0]
+            const pr = projs.get(u.project_id)
+            const img = pr?.slug === 'premium-residence' ? DESIGN[u.rooms || 0]?.[0] : undefined
             return (
               <div key={i.unit_id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 {img && <div style={{ position: 'relative' }}><img src={`/img/${img}.jpg`} alt="" style={{ width: '100%', aspectRatio: '16/8', objectFit: 'cover' }} /><span className="pill pill--off" style={{ position: 'absolute', top: 12, insetInlineStart: 12, background: '#fff' }}>{T('Визуализация')}</span></div>}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 16, padding: 20 }}>
                   <div>
                     <div className="h2">{T('Квартира {n}', { n: unitNo(u) })}</div>
-                    <div className="muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
+                    <div className="muted">{pr?.name} · {u.building} · {T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
                     {free && promoBy(u).promo && <div className="mt16"><span className="pill pill--ok">{promoBy(u).promo!.badge || T('Акция')}</span> <span className="small muted">{promoBy(u).promo!.name}</span></div>}
                     <div className="big mt16">{free && u.usd ? (promoBy(u).promo ? <>{usd(L, priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T('Уже забронирована')}</div>
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
-                    <div className="small muted mt8">{T('Сдаётся без ремонта; на фото — пример дизайна застройщика.')}</div>
+                    {(u.finish === 'shell' || img) && <div className="small muted mt8">{[u.finish === 'shell' ? T('Сдаётся без ремонта') : '', img ? T('на фото — пример дизайна застройщика') : ''].filter(Boolean).join('; ')}.</div>}
                   </div>
                   {planUrl(u.plan_file) && <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" style={{ maxHeight: 220 }} /></div>}
                 </div>

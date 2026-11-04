@@ -119,10 +119,12 @@ export async function payActNow(f: FormData) {
   const a = await one<{ deal_id: string }>(`select deal_id from portal.commission_acts where id = $1 and status = 'due'`, [s(f, 'id')])
   if (!a) return
   // выплата акта = стадия сделки «выплачено агенту»; вычет возвратов — в payAct
-  await q(`update portal.deals set stage = 'paid_out', paid_pct = 100, paid_out_at = current_date where id = $1`, [a.deal_id])
+  // процент оплаты клиента не трогаем — выплата агенту про наши деньги, не про платежи клиента
+  const d = await one<{ client_id: string }>(`update portal.deals set stage = 'paid_out', paid_out_at = current_date where id = $1 returning client_id`, [a.deal_id])
+  if (d) await q('select portal.sync_client_stage($1)', [d.client_id])
   await syncAct(a.deal_id)
   const ag = await one<{ agent_id: string }>('select agent_id from portal.commission_acts where id = $1', [s(f, 'id')])
   if (ag) await notify(ag.agent_id, 'payout', 'Комиссия выплачена', '/commission')
   await log(c, 'act.pay', 'commission_act', s(f, 'id'))
-  revalidatePath('/finance')
+  revalidatePath('/', 'layout') // селект стадии сделки в «Финансах» — сразу «выплачено»
 }

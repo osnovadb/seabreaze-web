@@ -2,10 +2,10 @@ import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, dateTime, date, fmtVars } from '@/lib/i18n'
-import { isExternal, canConfirmBooking, canSeeFinance } from '@/lib/perm'
+import { isExternal, canConfirmBooking, canSeeFinance, canSeeClients } from '@/lib/perm'
 import { clientScope, bookingScope } from '@/lib/scope'
 import { listProjects } from '@/lib/catalog'
-import { split, type SplitCond } from '@/lib/money'
+import { expectedAgent, type SplitCond } from '@/lib/money'
 import { Top, AGENT_STAGES, STAGES } from '@/components/ui'
 import { readAll, toggleTask, startShow } from '@/lib/actions'
 import { feed } from '@/lib/posts'
@@ -17,12 +17,12 @@ export default async function Home() {
   const cs = clientScope(u), bs = bookingScope(u)
   const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null }>(
     `select id, name, stage, last_activity_at, protected_until, pause_until from portal.clients cl where ${cs.sql}`, cs.params)
-  const bookings = await q<{ id: string; status: string; ends_at: string; unit: string; client: string; client_id: string; price_list: number; discount_pct: number; snapshot: SplitCond }>(
-    `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, portal.unit_no(bl.external_id, un.number) as unit, cl.name as client, cl.id as client_id from portal.bookings b
-     join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id
+  const bookings = await q<{ id: string; status: string; ends_at: string; unit: string; client: string; client_id: string; price_list: number; discount_pct: number; snapshot: SplitCond; ext: boolean }>(
+    `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, portal.unit_no(bl.external_id, un.number) as unit, cl.name as client, cl.id as client_id, ag.role in ('agent','agency_head') ext from portal.bookings b
+     join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users ag on ag.id = b.agent_id
      where b.status in ('requested','confirmed') and ${bs.sql} order by b.ends_at`, bs.params)
   const deals = await q<{ id: string; stage: string; agent_amount: number; our_amount: number; final_price: number }>(
-    `select d.id, d.stage, d.agent_amount::float, d.our_amount::float, d.final_price::float from portal.deals d join portal.bookings b on b.id = d.booking_id where d.stage <> 'cancelled' and ${bs.sql}`, bs.params)
+    `select d.id, d.stage, d.agent_amount::float, d.our_amount::float, d.final_price::float from portal.deals d join portal.bookings b on b.id = d.booking_id where d.stage not in ('cancelled','paid_out') and ${bs.sql}`, bs.params)
   const notif = await q<{ id: string; text: string; vars: Record<string, string | number> | null; link: string | null; read: boolean; created_at: string }>('select id, text, vars, link, read, created_at from portal.notifications where user_id = $1 order by created_at desc limit 8', [u.id])
   const tasks = await q<{ id: string; title: string; vars: Record<string, string | number> | null; due: string | null; done: boolean; client_id: string | null; client: string | null }>(
     `select t.id, t.title, t.vars, t.due, t.done, t.client_id, cl.name as client from portal.tasks t left join portal.clients cl on cl.id = t.client_id where t.user_id = $1 and not t.done order by t.due nulls last limit 8`, [u.id])
@@ -65,15 +65,18 @@ export default async function Home() {
     ? AGENT_STAGES.map(([k, l, sts]) => [l, active.filter((x) => sts.includes(x.stage)).length] as [string, number])
     : STAGES.map(([k, l]) => [l, active.filter((x) => x.stage === k).length] as [string, number]).filter(([, n], i) => n || i < 9)
   const maxF = Math.max(1, ...funnel.map(([, n]) => n))
-  // Ожидаемая комиссия агента: сделки в работе + активные брони по снимку условий
-  const agentSum = deals.reduce((a, d) => a + d.agent_amount, 0) + bookings.reduce((a, b) => a + split(b.snapshot, b.price_list, b.discount_pct).agent, 0), ourSum = deals.reduce((a, d) => a + d.our_amount, 0)
+  // Ожидаемая комиссия агента: сделки в работе (до выплаты) + активные брони по снимку условий; агентская доля — только у броней партнёров.
+  // Та же формула — на странице «Комиссия» (lib/money expectedAgent)
+  const agentSum = deals.reduce((a, d) => a + d.agent_amount, 0) + bookings.reduce((a, b) => a + expectedAgent(b), 0), ourSum = deals.reduce((a, d) => a + d.our_amount, 0)
+  // Финансы: к выплате — реальные акты «к выплате» за вычетом удержаний, не ожидание по броням
+  const due = u.role === 'finance' ? await one<{ v: number }>(`select coalesce(sum(amount - deducted), 0)::float v from portal.commission_acts where status = 'due'`) : null
 
   const kpis: [string, string | number][] = ext
     ? [[T('Клиентов в работе'), active.length], [T('Активных броней'), bookings.length], [T('Подборок открыто за неделю'), sel!.n], [T('Ожидаемая комиссия'), usd(L, agentSum)]]
     : u.role === 'office'
       ? [[T('Ждут подтверждения'), bookings.filter((b) => b.status === 'requested').length], [T('Активных броней'), bookings.length], [T('Сделок в работе'), deals.length], [T('Клиентов'), clients.length]]
       : u.role === 'finance'
-        ? [[T('Сделок в работе'), deals.length], [T('Оборот сделок'), usd(L, deals.reduce((a, d) => a + d.final_price, 0))], [T('Наш доход по сделкам'), usd(L, ourSum)], [T('К выплате агентам'), usd(L, agentSum)]]
+        ? [[T('Сделок в работе'), deals.length], [T('Оборот сделок'), usd(L, deals.reduce((a, d) => a + d.final_price, 0))], [T('Наш доход по сделкам'), usd(L, ourSum)], [T('К выплате партнёрам по актам'), usd(L, due?.v || 0)]]
         : u.role === 'content'
           ? [[T('Проектов'), projects.length], [T('Квартир в каталоге'), projects.reduce((a, p) => a + p.units, 0)], [T('Свободно'), projects.reduce((a, p) => a + p.free, 0)], [T('Языков'), 4]]
           : [[T('Клиентов в работе'), active.length], [T('Активных броней'), bookings.length], [T('Сделок в работе'), deals.length], [canSeeFinance(u.role) ? T('Наш доход по сделкам') : T('Заявок агентов'), canSeeFinance(u.role) ? usd(L, ourSum) : apps!.n]]
@@ -105,7 +108,7 @@ export default async function Home() {
               ))}
             </div>
           </div>
-          <div className="card">
+          {canSeeClients(u.role) && <div className="card">
             <div className="between"><div className="h3">{ext ? T('Моя воронка') : T('Воронка')}</div><Link className="small bronze" href="/clients">{T('Все клиенты →')}</Link></div>
             <div className="stack mt16" style={{ gap: 8 }}>
               {funnel.map(([l, n]) => (
@@ -116,7 +119,7 @@ export default async function Home() {
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
         <div className="grid g3 mt16">
           <div className="card">
@@ -138,7 +141,7 @@ export default async function Home() {
             <div className="card">
               <div className="h3">{T('Изменения в каталоге')}</div>
               <div className="tiny muted">{T('с прошлого входа')} · {dateTime(L, since)}</div>
-              {changes.freed > 0 && <Link className="kv" href="/catalog"><span style={{ color: 'var(--ink)' }}>{T('Обновились и сейчас свободны: {n} квартир', { n: changes.freed })}</span><span className="small">→</span></Link>}
+              {changes.freed > 0 && <Link className="kv" href="/catalog"><span style={{ color: 'var(--ink)' }}>{T('Обновились и сейчас свободны, квартир: {n}', { n: changes.freed })}</span><span className="small">→</span></Link>}
               {changes.prices > 0 && <div className="kv"><span style={{ color: 'var(--ink)' }}>{T('Изменились цены: {n} квартир', { n: changes.prices })}</span><span className={changes.in_sel ? 'small warnc' : 'small muted'}>{changes.in_sel ? T('{n} — в ваших подборках', { n: changes.in_sel }) : ''}</span></div>}
               {changes.opened > 0 && <Link className="kv" href="/projects"><span style={{ color: 'var(--ink)' }}>{T('Проекты в продаже обновлены: {n}', { n: changes.opened })}</span><span className="small">→</span></Link>}
             </div>

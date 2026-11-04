@@ -50,7 +50,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [b.name, `/projects/${p.slug}/chess?b=${b.id}`], [T('Этаж {f}', { f })]]}
         title={T('{f} этаж · {n} свободно из {t}', { f, n: units.filter((u) => codeFor(u, c.user, mode) === 'F').length, t: units.length })}
         right={<ViewTabs lang={L} base={`/projects/${p.slug}`} b={b.id} active="floor" facade={hasFacade} />} />
-      <div className="page" style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }}>
+      <div className="page floorgrid" style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }}>
         <div className="card card--tight stack" style={{ gap: 4 }}>
           <div className="label">{T('Этаж')}</div>
           {floors.map((x) => {

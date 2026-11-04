@@ -11,6 +11,7 @@ import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, u
 import { priceChain } from './plans'
 import { optionsFor } from './options'
 import { toUsd } from './fx'
+import { pbEnqueue } from './pbQueue'
 import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mailOn } from './access'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
@@ -259,7 +260,7 @@ export async function saveKycData(f: FormData) {
   if (cur?.kyc_status === 'pending' || (cur?.kyc_status === 'passed' && !canReviewKyc(c.user.role))) return
   const pep = s(f, 'pep') === 'yes' ? true : s(f, 'pep') === 'no' ? false : null
   await q('update portal.clients set kyc_citizenship = $2, kyc_tax_residence = $3, kyc_pep = $4 where id = $1', [cl.id, s(f, 'citizenship').slice(0, 60) || null, s(f, 'tax_residence').slice(0, 60) || null, pep])
-  revalidatePath(`/clients/${cl.id}`)
+  revalidatePath(`/clients/${cl.id}`); revalidatePath('/', 'layout') // бейдж KYC и счётчики — сразу, без F5
 }
 export async function submitKyc(f: FormData) {
   const c = await writeCtx()
@@ -291,7 +292,7 @@ export async function reviewKyc(f: FormData) {
   if (cl.owner_id !== c.user.id) await notify(cl.owner_id, 'kyc', decision === 'passed' ? 'KYC {c} пройден' : decision === 'rejected' ? 'KYC {c} отклонён — посмотрите причину' : 'KYC {c} нужно пройти заново', `/clients/${id}`, { c: cl.name })
   await audit(c.real.id, 'client.kyc_' + decision, 'client', id, { note: s(f, 'note') || null }, c.impersonating ? c.user.id : null)
   revalidatePath(`/clients/${id}`)
-  revalidatePath('/kyc')
+  revalidatePath('/kyc'); revalidatePath('/', 'layout')
 }
 export async function fixation(f: FormData) {
   const c = await writeCtx()
@@ -404,11 +405,13 @@ export async function bookingAction(f: FormData) {
     await q(`update portal.bookings set fee_status = $2, fee_by = $3 where id = $1 and fee_status = 'paid'`, [id, act === 'fee_refund' ? 'refunded' : 'kept', c.user.id])
   } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending' && b.fee_status !== 'due') {
     await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now() where id = $1`, [id, c.user.id])
+    await pbEnqueue(b.unit_id, 'reserve', id, c.user.id) // М3: бронь у застройщика в Profitbase
     await notify(b.agent_id, 'booking', 'Бронь подтверждена у застройщика', '/bookings')
   } else if (act === 'extend' && (mine || canConfirmBooking(c.user.role)) && !b.extended && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set ends_at = ends_at + ((snapshot->>'booking_ext_days') || ' days')::interval, extended = true where id = $1`, [id])
   } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
+    if (b.status === 'confirmed') await pbEnqueue(b.unit_id, 'release', id, c.user.id) // снять бронь и в Profitbase
     if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
   } else if (act === 'contract' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && b.status === 'confirmed') {
     // Договор — только после пройденного KYC (v2)
@@ -428,14 +431,17 @@ export async function bookingAction(f: FormData) {
         const d = await t.query<{ id: string }>(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount, group_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
           [x.id, b.client_id, x.unit_id, x.project_id, isExternal((seller?.role || 'seller') as any) ? x.agent_id : null, seller?.curator_id || x.agent_id, x.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0), g])
         made.push(d.rows[0].id)
+        await pbEnqueue(x.unit_id, 'sold', x.id, c.user.id) // М4: «продано через GetsEstate» в Profitbase
       }
       if (made.length) await t.query(`update portal.clients set stage = case when stage in ('payments','fee','support','handed') then stage else 'contract' end where id = $1`, [b.client_id])
     })
     if (made.length) await notify(b.agent_id, 'deal', made.length > 1 ? 'Договор подписан — сделок в работе: {n}' : 'Договор подписан — сделка в работе', '/commission', made.length > 1 ? { n: made.length } : undefined)
     for (const d of made) await syncAct(d)
   }
+  await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
   revalidatePath('/bookings')
+  revalidatePath(`/clients/${b.client_id}`); revalidatePath('/clients'); revalidatePath('/')
 }
 
 /* ── Подборки ── */
@@ -802,7 +808,8 @@ export async function dealPaid(f: FormData) {
   if (!['owner', 'finance'].includes(c.user.role)) return
   const v = Math.max(0, Math.min(100, Number(s(f, 'paid'))))
   if (Number.isNaN(v)) return
-  await q('update portal.deals set paid_pct = $2 where id = $1', [s(f, 'id'), v])
+  const d = await one<{ client_id: string }>('update portal.deals set paid_pct = $2 where id = $1 returning client_id', [s(f, 'id'), v])
+  if (d) await q('select portal.sync_client_stage($1)', [d.client_id]) // первый платёж — стадия «Платежи»
   await audit(c.real.id, 'deal.paid', 'deal', s(f, 'id'), { paid_pct: v }, c.impersonating ? c.user.id : null)
   revalidatePath('/finance')
 }
@@ -874,12 +881,14 @@ export async function dealStage(f: FormData) {
   const c = await writeCtx()
   if (!['owner', 'finance'].includes(c.user.role)) return
   const st = s(f, 'stage')
-  await q(`update portal.deals set stage = $2, paid_pct = case when $2 in ('fee_received','paid_out') then 100 else paid_pct end, paid_out_at = case when $2 = 'paid_out' then current_date else paid_out_at end where id = $1`, [s(f, 'id'), st])
-  const d = await one<{ agent_id: string | null }>('select agent_id from portal.deals where id = $1', [s(f, 'id')])
+  // Процент оплаты клиента (paid_pct) — отдельно от нашего вознаграждения: стадия сделки его не меняет
+  await q(`update portal.deals set stage = $2, paid_out_at = case when $2 = 'paid_out' then current_date else paid_out_at end where id = $1`, [s(f, 'id'), st])
+  const d = await one<{ agent_id: string | null; client_id: string }>('select agent_id, client_id from portal.deals where id = $1', [s(f, 'id')])
+  if (d) await q('select portal.sync_client_stage($1)', [d.client_id])
   if (d?.agent_id && st === 'paid_out') await notify(d.agent_id, 'payout', 'Комиссия выплачена', '/commission')
   await syncAct(s(f, 'id')) // М4: акт вознаграждения следует за стадией сделки
   await audit(c.real.id, 'deal.' + st, 'deal', s(f, 'id'))
-  revalidatePath('/finance')
+  revalidatePath('/', 'layout') // стадия сделки в селекте, акты и стадия клиента — сразу
 }
 
 /* ── Импорт клиентов из xlsx (v2 · М13): первая строка — заголовки; согласие клиента подтверждает тот, кто загружает ── */

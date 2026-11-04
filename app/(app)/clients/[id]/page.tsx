@@ -11,11 +11,13 @@ import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { MakeDoc, DocStatus } from './docs'
 import { split, type SplitCond } from '@/lib/money'
+import { listProjects } from '@/lib/catalog'
 import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
 
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
 import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 
+const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
 const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'отменена' }
 
 export default async function ClientCard({ params }: { params: { id: string } }) {
@@ -28,7 +30,8 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const acts = await q<{ id: string; kind: string; text: string; vars: Record<string, string | number> | null; internal: boolean; created_at: string; who: string | null }>(`select a.id, a.kind, a.text, a.vars, a.internal, a.created_at, u.name as who from portal.activities a left join portal.users u on u.id = a.user_id where a.client_id = $1 ${ext ? 'and not a.internal' : ''} order by a.created_at desc`, [cl.id])
   const tasks = await q<{ id: string; title: string; vars: Record<string, string | number> | null; due: string | null; done: boolean }>('select id, title, vars, due, done from portal.tasks where client_id = $1 order by done, due nulls last', [cl.id])
   const fixes = await q<{ project_id: string; name: string; status: string; protected_until: string | null }>(`select f.project_id, p.name, f.status, f.protected_until from portal.fixations f join projects p on p.id = f.project_id where f.client_id = $1`, [cl.id])
-  const projects = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
+  // Регистрация у застройщика — только по проектам, открытым пользователю (партнёру не видны черновики)
+  const projects = await listProjects(c.user)
   const sels = await q<{ id: string; title: string; opened: number; last_opened_at: string | null; n: number; lang: string }>(`select s.id, s.title, s.opened, s.last_opened_at, s.lang, (select count(*)::int from portal.selection_items i where i.selection_id = s.id) n from portal.selections s where s.client_id = $1 order by s.created_at desc`, [cl.id])
   const books = await q<{ id: string; unit: string; status: string; ends_at: string; final_price: number; group_id: string | null; options_usd: number }>(`select b.id, portal.unit_no(bl.external_id, un.number) unit, b.status, b.ends_at, b.final_price::float, b.group_id, b.options_usd::float from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = $1 order by b.created_at desc`, [cl.id])
   // Сделки клиента: у клиента может быть несколько квартир — по сделке на каждую, пакеты связаны group_id
@@ -79,7 +82,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
               <div className="kv"><span>{T('Телефон')}</span><span>{cl.phone || '—'}</span></div>
               <div className="kv"><span>E-mail</span><span className="small">{cl.email || '—'}</span></div>
               <div className="kv"><span>{T('Страна, язык')}</span><span>{[cl.country, (cl.language || '').toUpperCase()].filter(Boolean).join(' · ')}</span></div>
-              <div className="kv"><span>{T('Источник')}</span><span>{cl.source || '—'}</span></div>
+              <div className="kv"><span>{T('Источник')}</span><span>{cl.source ? T(SRC_NAME[cl.source] || (cl.source.startsWith('site') ? 'Сайт' : cl.source)) : '—'}</span></div>
               <div className="kv"><span>{T('Согласие')}</span><span>{date(L, cl.consent_at)}</span></div>
               <EditContacts lang={L} cl={{ id: cl.id, name: cl.name, phone: cl.phone, email: cl.email, country: cl.country, language: cl.language }} />
             </div>

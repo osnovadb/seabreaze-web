@@ -40,6 +40,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (img) ok = !ext || (await projectVisible(img.project_id, c.user))
   }
   if (!ok) return new Response('forbidden', { status: 404 })
+  // План этажа из Profitbase (/floor): храним ссылку на картинку застройщика, отдаём перенаправлением
+  if (f.mime === 'image/url' && /^https:\/\/pb\d+\.profitbase\.ru\//.test(f.disk_name)) return Response.redirect(f.disk_name, 302)
   const p = path.join(process.env.FILES_DIR || './dev-files', path.basename(f.disk_name))
   if (!fs.existsSync(p)) return new Response('missing', { status: 404 })
   const inline = /^(image\/|application\/pdf|video\/)/.test(f.mime)

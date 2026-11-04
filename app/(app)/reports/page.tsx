@@ -7,7 +7,7 @@ import { clientScope } from '@/lib/scope'
 import { Top, STAGES, stageName } from '@/components/ui'
 import { split, type SplitCond } from '@/lib/money'
 
-const SRC: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', referral: 'Рекомендация' }
+const SRC: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
 type Row = { key: string; clients: number; active: number; booked: number; deals: number; lost: number }
 
 // Отчёты команды (ТЗ, «CRM»): воронка и конверсия по владельцам, источникам и рынкам, причины отказов, прогноз вознаграждения.
@@ -24,8 +24,8 @@ export default async function Reports() {
       count(*) filter (where cl.stage = 'lost')::int lost
     from portal.clients cl join portal.users us on us.id = cl.owner_id left join portal.agencies ag on ag.id = cl.agency_id
     where ${cs.sql} group by 1 order by clients desc`, cs.params)
-  const [byOwner, bySource, byMarket] = await Promise.all([by(`us.name || coalesce(' · ' || ag.name, '')`), by('cl.source'), by(`coalesce(cl.market, '—')`)])
-  const stages = await q<{ stage: string; n: number }>(`select stage, count(*)::int n from portal.clients cl where ${cs.sql} group by 1`, cs.params)
+  const [byOwner, bySource, byMarket] = await Promise.all([by(`us.name || coalesce(' · ' || ag.name, '')`), by(`case when cl.source in ('site','website') or cl.source like 'site%' then 'site' else coalesce(cl.source, '—') end`), by(`coalesce(cl.market, '—')`)])
+  const stages = await q<{ stage: string; n: number }>(`select stage, count(*)::int n from portal.clients cl where ${cs.sql} and cl.pause_until is null group by 1`, cs.params) // как воронка на главной: без клиентов на паузе
   const lost = await q<{ reason: string; n: number }>(`select coalesce(nullif(lost_reason, ''), '—') reason, count(*)::int n from portal.clients cl where ${cs.sql} and stage = 'lost' group by 1 order by 2 desc`, cs.params)
   const fin = canSeeFinance(c.user.role)
   const deals = fin ? await q<{ our: number; agent: number; seller: number }>(`select d.our_amount::float our, d.agent_amount::float agent, d.seller_amount::float seller from portal.deals d join portal.clients cl on cl.id = d.client_id where ${cs.sql} and d.stage not in ('cancelled','paid_out')`, cs.params) : []

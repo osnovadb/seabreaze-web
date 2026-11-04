@@ -92,7 +92,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
 
       <div className={'chess' + (big ? ' chess--big' : '')} onMouseLeave={() => setHover(null)}>
         <table>
-          <thead><tr><th />{cols.map((c) => { const fr = freeAt((u) => u.riser === c).length; const any = units.find((u) => u.riser === c); return <th key={c} title={any?.layout || ''}>{c}<div className="tiny muted" style={{ fontWeight: 400 }}>{fr || '·'}</div></th> })}</tr></thead>
+          <thead><tr><th />{cols.map((c) => { const fr = freeAt((u) => u.riser === c).length; const any = units.find((u) => u.riser === c); return <th key={c} title={any?.layout || ''}>{c.toUpperCase()}<div className="tiny muted" style={{ fontWeight: 400 }}>{fr || '·'}</div></th> })}</tr></thead>
           <tbody>
             {floors.map((fl) => {
               const fr = freeAt((u) => u.floor === fl)
@@ -105,7 +105,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
                     const dim = !ok(u)
                     const cls = `cell c-${u.code}${u.id === selected ? ' sel' : ''}${dim ? ' dim' : ''}${picked.includes(u.id) ? ' picked' : ''}`
                     const inner = <span className={cls} onMouseEnter={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); if (u.code !== 'X') setHover({ u, x: r.right, y: r.top }) }}>
-                      <b>{u.code === 'X' ? '' : u.riser}{u.promo && u.code === 'F' ? <i className="cell__promo">%</i> : null}</b>
+                      <b>{u.code === 'X' ? '' : u.riser.toUpperCase()}{u.promo && u.code === 'F' ? <i className="cell__promo">%</i> : null}</b>
                       {big && u.code !== 'X' && <span className="cell__meta">{u.rooms ? `${u.rooms}${T('к')} · ` : ''}{Math.round(u.area)} м²</span>}
                       <span className="cell__v">{val(u)}</span>
                     </span>
@@ -117,7 +117,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
           </tbody>
         </table>
         {hover && !pick && (
-          <div className="hovercard" style={{ left: Math.min(hover.x + 8, (typeof window !== 'undefined' ? window.innerWidth : 1400) - 270), top: Math.max(8, hover.y - 20) }}>
+          <div className="hovercard" style={{ left: Math.min(hover.x + 8, (typeof window !== 'undefined' ? window.innerWidth : 1400) - 270), top: Math.max(8, Math.min(hover.y - 20, (typeof window !== 'undefined' ? window.innerHeight : 900) - 330)) }}>
             {hover.u.plan ? <img src={hover.u.plan} alt="" /> : <div className="tiny muted">{T('планировка не загружена')}</div>}
             <div className="between mt8"><b>{hover.u.no}</b><span className="tiny">{T(STATUS.find(([c]) => c === hover.u.code)?.[1] || '')}</span></div>
             <div className="small">{hover.u.rooms ? T('{r} комн.', { r: hover.u.rooms }) + ' · ' : T(hover.u.typeName) + ' · '}{num(lang, hover.u.area, 1)} м²{hover.u.out ? ` + ${num(lang, hover.u.out, 1)}` : ''} · {T('{f} этаж', { f: hover.u.floor })}</div>
