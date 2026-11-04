@@ -92,3 +92,15 @@ test('команда: сделка с агентом и продавцом в и
   assert.ok(sophie && martin, 'строки агента и продавца')
   assert.equal(n(k1[2]) - n(k0[2]), 1, `KPI «сделок»: было ${k0[2]}, стало ${k1[2]}`)
 })
+
+// 4182bc2: «Продано всего» = distinct квартир (продажа у застройщика ∪ наша сделка) — одна квартира не считается дважды
+test('по месяцам: наша сделка и продажа той же квартиры у застройщика в одном месяце — «Продано всего» +1', { skip: SKIP }, async () => {
+  const c = await login(U.owner)
+  const m0 = tables((await page(c, '/reports/stock?p=test-marina')).html)[1][0]
+  const u = (await db.query(`select project_id from units where id=$1`, [U602])).rows[0]
+  deals.push((await db.query(`insert into portal.deals (client_id, unit_id, project_id, final_price, agent_id, stage) values ($1,$2,$3,100000,$4,'contract') returning id`, [MICHAEL, U602, u.project_id, SOPHIE])).rows[0].id)
+  events.push((await db.query(`insert into portal.unit_events (unit_id, kind, old_value, new_value, source) values ($1,'status','available','sold','manual') returning id`, [U602])).rows[0].id)
+  const m1 = tables((await page(c, '/reports/stock?p=test-marina')).html)[1][0]
+  assert.equal(n(m1[1]) - n(m0[1]), 1, `«Продано всего»: ${m0[1]} → ${m1[1]}`)
+  assert.equal(n(m1[2]) - n(m0[2]), 1, 'у застройщика'); assert.equal(n(m1[4]) - n(m0[4]), 1, 'наши сделки')
+})
