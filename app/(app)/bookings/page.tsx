@@ -15,7 +15,7 @@ export default async function Bookings({ searchParams }: { searchParams: { f?: s
   if (!(canBook(c.user.role) || c.user.role === 'finance')) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
-  const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.group_id, b.fee_status, b.fee_usd::float, b.fee_amount::float, b.fee_currency, b.price_list::float, b.discount_pct::float, coalesce(bl.external_id,'') || '-' || un.number unit, un.id unit_id, un.status unit_status,
+  const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.group_id, b.fee_status, b.fee_usd::float, b.fee_amount::float, b.fee_currency, b.price_list::float, b.discount_pct::float, portal.unit_no(bl.external_id, un.number) unit, un.id unit_id, un.status unit_status,
       cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, cl.kyc_status
     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id
     where ${bs.sql} order by case when b.status in ('requested','confirmed') then 0 else 1 end, b.ends_at`, bs.params)

@@ -31,7 +31,7 @@ const RATE = (cur: string) => `(select azn_per_unit from currency_rates where cu
 export const toUsdSql = `case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / ${RATE('USD')} when u.price_currency = 'EUR' then u.price_list * ${RATE('EUR')} / ${RATE('USD')} end`
 
 const UNIT_SELECT = `
-  select u.id, u.project_id, u.building_id, b.name as building, coalesce(b.external_id, left(b.name, 1)) as block, u.number, u.floor, u.unit_type, u.bedrooms,
+  select u.id, u.project_id, u.building_id, b.name as building, coalesce(b.external_id, '') as block, u.number, u.floor, u.unit_type, u.bedrooms,
     coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) as rooms,
     u.area_total_m2::float as area, u.area_external_m2::float as ext_area, u.plot_area_m2::float as plot_area, u.status, u.external_status,
     u.price_list::float as price, (${toUsdSql})::float as usd, u.price_currency as currency, l.plan_file, l.code as layout_code, u.synced_at, u.source_id,
@@ -111,7 +111,8 @@ export function riser(u: { number: string; floor: number }) {
   if (m && m[1].length >= 3) return m[1].slice(-2) + m[2]
   return n
 }
-export const unitNo = (u: { block: string; number: string }) => (u.number.startsWith(u.block + '-') ? u.number : `${u.block}-${u.number}`).toUpperCase()
+// Номер для показа — как portal.unit_no в базе: с префиксом корпуса, если его ещё нет в номере (BRABUS «A-0305» как есть)
+export const unitNo = (u: { block: string; number: string }) => (/^[A-ZА-Я]{1,3}-/i.test(u.number) || !u.block ? u.number : `${u.block}-${u.number}`).toUpperCase()
 export const planUrl = (fileId: string | null) => (fileId ? `/plan/${fileId}` : null)
 
 // Коммерческие условия: последняя опубликованная версия на дату, плюс индивидуальная ставка агента

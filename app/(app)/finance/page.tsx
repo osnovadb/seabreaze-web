@@ -14,12 +14,12 @@ export default async function Finance() {
   if (!canSeeFinance(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const deals = await q<{ id: string; unit: string; project: string; client: string; agent: string | null; seller: string | null; stage: string; final_price: number; agent_amount: number; our_amount: number; seller_amount: number; paid_pct: number; created_at: string }>(
-    `select d.id, coalesce(bl.external_id,'') || '-' || un.number unit, p.name project, cl.name client, ag.name agent, se.name seller, d.stage, d.final_price::float, d.agent_amount::float, d.our_amount::float, d.seller_amount::float, d.paid_pct::float, d.created_at
+    `select d.id, portal.unit_no(bl.external_id, un.number) unit, p.name project, cl.name client, ag.name agent, se.name seller, d.stage, d.final_price::float, d.agent_amount::float, d.our_amount::float, d.seller_amount::float, d.paid_pct::float, d.created_at
      from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id join portal.clients cl on cl.id = d.client_id
      left join portal.users ag on ag.id = d.agent_id left join portal.users se on se.id = d.seller_id ${c.user.role === 'market_head' ? 'where cl.market = $1' : ''} order by d.created_at desc`, c.user.role === 'market_head' ? [c.user.market] : [])
   const sum = (k: 'final_price' | 'agent_amount' | 'our_amount' | 'seller_amount') => deals.filter((d) => d.stage !== 'cancelled').reduce((a, d) => a + d[k], 0)
   const acts = await q<{ id: string; unit: string; client: string; agent: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; docx: string | null; created_at: string }>(
-    `select ca.id, coalesce(bl.external_id,'') || '-' || un.number unit, cl.name client, ag.name agent, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, doc.docx_file_id docx, ca.created_at
+    `select ca.id, portal.unit_no(bl.external_id, un.number) unit, cl.name client, ag.name agent, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, doc.docx_file_id docx, ca.created_at
      from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id join portal.users ag on ag.id = ca.agent_id left join portal.documents doc on doc.id = ca.document_id
      ${c.user.role === 'market_head' ? 'where cl.market = $1' : ''} order by ca.status = 'due' desc, ca.created_at desc`, c.user.role === 'market_head' ? [c.user.market] : [])
   const fin = ['owner', 'finance'].includes(c.user.role)

@@ -21,7 +21,7 @@ const out = {}
 // 1. Истёкшие брони: срок вышел — квартира снова свободна, агенту и куратору уведомление
 const expired = await q(`update portal.bookings b set status = 'expired' from units u join buildings bl on bl.id = u.building_id
   where u.id = b.unit_id and b.status in ('requested','confirmed') and b.ends_at < now()
-  returning b.id, b.client_id, b.agent_id, coalesce(bl.external_id, '') || '-' || u.number as unit`)
+  returning b.id, b.client_id, b.agent_id, portal.unit_no(bl.external_id, u.number) as unit`)
 for (const b of expired) {
   await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Бронь {u} истекла',$2)`, [b.client_id, JSON.stringify({ u: b.unit })])
   await notify(b.agent_id, 'booking', 'Бронь {u} истекла', '/bookings', { u: b.unit }, 'expired:' + b.id)
@@ -34,7 +34,7 @@ if (feeLeft.length) for (const o of await q(`select id from portal.users where a
 out.expired = expired.length
 
 // 2. Бронь кончается через 3 дня или меньше
-const soon = await q(`select b.id, b.agent_id, b.ends_at, coalesce(bl.external_id, '') || '-' || u.number as unit, ceil(extract(epoch from b.ends_at - now()) / 86400)::int as d
+const soon = await q(`select b.id, b.agent_id, b.ends_at, portal.unit_no(bl.external_id, u.number) as unit, ceil(extract(epoch from b.ends_at - now()) / 86400)::int as d
   from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id
   where b.status in ('requested','confirmed') and b.ends_at < now() + interval '3 days'`)
 for (const b of soon) await notify(b.agent_id, 'booking', 'Бронь {u} истекает через {d} дн.', '/bookings', { u: b.unit, d: b.d }, 'soon:' + b.id + ':' + (b.ends_at.toISOString?.() || b.ends_at))
@@ -71,7 +71,7 @@ for (const c of back) await task(c.id, c.owner_id, 'Вернуться к кли
 out.unpaused = back.length
 
 // 7. Цена квартиры из подборки изменилась — владельцу подборки (клиент увидит новую цену по ссылке)
-const changed = await q(`select ph.id, ph.unit_id, se.id sel, se.user_id, se.client_id, cl.name, coalesce(bl.external_id, '') || '-' || u.number unit
+const changed = await q(`select ph.id, ph.unit_id, se.id sel, se.user_id, se.client_id, cl.name, portal.unit_no(bl.external_id, u.number) unit
   from price_history ph join units u on u.id = ph.unit_id join buildings bl on bl.id = u.building_id
   join portal.selection_items si on si.unit_id = ph.unit_id join portal.selections se on se.id = si.selection_id join portal.clients cl on cl.id = se.client_id
   where ph.changed_at > now() - interval '1 day' and ph.changed_at > si.created_at
@@ -91,7 +91,7 @@ out.promo_ended = promoEnd.length
 const FREE = `u.status = 'available' and u.price_list is not null
   and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('requested','confirmed'))
   and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')`
-const waitUnits = await q(`select u.id, coalesce(bl.external_id, '') || '-' || u.number unit, coalesce(ps.waitlist_pause_hours, 24) pause,
+const waitUnits = await q(`select u.id, portal.unit_no(bl.external_id, u.number) unit, coalesce(ps.waitlist_pause_hours, 24) pause,
     (select max(w.notified_at) from portal.waitlist w where w.unit_id = u.id and w.notified_at > now() - interval '30 days') last
   from units u join buildings bl on bl.id = u.building_id left join portal.project_settings ps on ps.project_id = u.project_id
   where ${FREE} and exists (select 1 from portal.waitlist w where w.unit_id = u.id and w.active)`)

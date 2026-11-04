@@ -20,7 +20,7 @@ export default async function PriceList({ params }: { params: { id: string } }) 
     select pl.id, pl.project_id, p.name pname, pl.title, pl.status, pl.rule, pl.note, a.name by, pl.created_at, b.name pub, pl.published_at, r.name rev, pl.reverted_at
     from portal.price_lists pl join projects p on p.id = pl.project_id join portal.users a on a.id = pl.created_by left join portal.users b on b.id = pl.published_by left join portal.users r on r.id = pl.reverted_by where pl.id = $1`, [params.id])
   if (!l) notFound()
-  const items = await q<Item>(`select i.unit_id, case when u.number ilike coalesce(bl.external_id, '') || '-%' then u.number else coalesce(bl.external_id || '-', '') || u.number end no, bl.name building, u.floor, u.area_total_m2::float area, i.old_price::float, i.new_price::float, i.currency, i.applied,
+  const items = await q<Item>(`select i.unit_id, portal.unit_no(bl.external_id, u.number) no, bl.name building, u.floor, u.area_total_m2::float area, i.old_price::float, i.new_price::float, i.currency, i.applied,
       u.price_list::float now, u.price_currency now_cur from portal.price_list_items i join units u on u.id = i.unit_id join buildings bl on bl.id = u.building_id where i.list_id = $1 order by bl.sort, bl.name, u.floor, u.number`, [l.id])
   const money = (v: number, cur: string) => `${cur} ${num(L, Math.round(v))}`
   const byCur = Array.from(new Set(items.map((i) => i.currency))).map((cur) => {

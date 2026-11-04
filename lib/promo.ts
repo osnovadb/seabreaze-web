@@ -21,3 +21,6 @@ export async function promoMode(projectId: string): Promise<PromoMode> {
 export async function promoForUnit(u: Pick<Unit, 'id' | 'building_id' | 'usd' | 'price' | 'currency' | 'project_id'>) {
   return { promo: promoOf(u, await offersFor(u.project_id)), mode: await promoMode(u.project_id) }
 }
+
+// Бейдж акции: «−5%» дописываем, только если в самом бейдже процента ещё нет («ТЕСТ осенняя акция −5%» → без повтора)
+export const promoBadge = (p: { badge: string | null; pct: number }, fallback: string) => (p.badge && /%/.test(p.badge) ? p.badge : `${p.badge || fallback} −${Math.round(p.pct * 10) / 10}%`)

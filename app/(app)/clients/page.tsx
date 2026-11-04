@@ -22,7 +22,7 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
       (select max(opened) from portal.selections s where s.client_id = cl.id) as opened,
       exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled') as has_deal,
       (coalesce(cl.goal, '') <> '' and coalesce(cl.budget, '') <> '' and coalesce(cl.timeline, '') <> '') as qualified,
-      (select coalesce(bl.external_id,'') || '-' || un.number from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking,
+      (select portal.unit_no(bl.external_id, un.number) from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking,
       (select ends_at from portal.bookings b where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking_ends,
       (select status from portal.fixations f where f.client_id = cl.id limit 1) as fix
     from portal.clients cl join portal.users us on us.id = cl.owner_id where ${cs.sql} ${searchParams.q ? `and (cl.name ilike $${cs.params.length + 1} or cl.email ilike $${cs.params.length + 1} or cl.phone ilike $${cs.params.length + 1})` : ''} order by cl.last_activity_at desc`,
