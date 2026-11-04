@@ -119,10 +119,14 @@ test('исчезнувшая квартира → «не в продаже» с 
   assert.equal((await unit('601')).status, 'unavailable', 'исчезла второй раз — осталась в продаже (gone_at от первого раза)')
 })
 
-test('неизвестный пользовательский статус застройщика → «не в продаже»', { skip }, async () => {
-  fx(`P('302')['customStatusId']=999; P('302')['status']='AVAILABLE'`)
+// Решение разработчика (641d22c): неизвестный customStatusId → базовый статус Profitbase; только если нет и его — «не в продаже»
+test('неизвестный пользовательский статус застройщика → по базовому статусу, без базового — «не в продаже»', { skip }, async () => {
+  fx(`P('302')['customStatusId']=999; P('302')['status']='BOOKED'`)
   tick()
-  assert.equal((await unit('302')).status, 'unavailable', `статус ${(await unit('302')).status}`)
+  assert.equal((await unit('302')).status, 'reserved')
+  fx(`P('302')['customStatusId']=999; P('302')['status']='QA_UNKNOWN'`)
+  tick()
+  assert.equal((await unit('302')).status, 'unavailable')
 })
 
 test('запись в Profitbase: подтверждение → ge_booking, снятие → AVAILABLE, договор → ge_sold', { skip }, async () => {
@@ -157,4 +161,37 @@ test('ошибка записи: на третьей неудаче — одна
 test('/sources: владелец и офис открывают; «Запустить сейчас» — owner и office; остальные — нет', { skip }, async () => {
   for (const who of [U.owner, U.office]) assert.equal((await page(await login(who), '/sources')).status, 200, who)
   for (const who of [U.agent, U.seller, U.head, U.finance]) assert.notEqual((await page(await login(who), '/sources')).status, 200, who)
+})
+
+// 641d22c: замок снимается вручную; «продано» от застройщика сильнее замка статуса; пересопоставление по номеру без дубля
+test('«Вернуть синхронизацию»: офис снимает замок цены — следующий прогон приносит цену застройщика; агент и продавец — не могут', { skip }, async () => {
+  const u = await unit('202')
+  await db.query(`update units set price_list = 151234 where id=$1`, [u.id])
+  assert.deepEqual((await unit('202')).locked_fields, ['price_list'])
+  for (const who of [U.agent, U.seller]) {
+    await retry(() => call(who, 'lib/sourceActions.ts', 'unlockUnits', [['unit', u.id], ['field', 'price_list']], `/units/${u.id}`))
+    assert.deepEqual((await unit('202')).locked_fields, ['price_list'], who)
+  }
+  await call(U.office, 'lib/sourceActions.ts', 'unlockUnits', [['unit', u.id], ['field', 'price_list']], `/units/${u.id}`)
+  assert.deepEqual((await unit('202')).locked_fields, [])
+  assert.equal((await unit('202')).p, 151234, 'снятие замка поменяло цену само')
+  tick()
+  assert.equal((await unit('202')).p, prop('202').price.value, 'после снятия замка цена застройщика не пришла')
+})
+
+test('пересопоставление: у квартиры в Profitbase новый id — та же квартира получает его, дубль не заводится', { skip }, async () => {
+  const u = await unit('401'), old = u.external_id
+  fx(`P('401')['id']=900099`)
+  try {
+    tick()
+    const rows = (await db.query(`select id, external_id, status from units where project_id=$1 and number='401'`, [MARINA])).rows
+    assert.equal(rows.length, 1, `квартир 401: ${rows.length}`)
+    assert.equal(rows[0].id, u.id); assert.equal(rows[0].external_id, '900099')
+  } finally {
+    fx(`P('401')['id']=${Number(old)}`)
+    tick()
+    const dup = (await db.query(`select id from units where project_id=$1 and number='401' and id <> $2`, [MARINA, u.id])).rows
+    for (const d of dup) { await db.query('delete from portal.unit_events where unit_id=$1', [d.id]); await db.query('delete from units where id=$1', [d.id]) }
+  }
+  assert.equal((await unit('401')).external_id, old)
 })

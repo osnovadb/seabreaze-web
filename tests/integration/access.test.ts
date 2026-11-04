@@ -180,3 +180,17 @@ test('создать пользователя с несуществующей р
   await createUser(o, 'role', 'superadmin')
   assert.equal((await db.query('select count(*)::int n from portal.users where email=$1', [mail('role')])).rows[0].n, 0)
 })
+
+test('руководитель агентства: ссылка для входа своему агенту — да, чужому — нет', { skip: SKIP }, async () => {
+  const lk = await login('lukas.weber@demo.getsestate')
+  const ids = Object.fromEntries((await db.query(`select email, id from portal.users where email = any($1)`, [[U.agent, U.agentIl]])).rows.map((r) => [r.email, r.id]))
+  const f = forms((await page(lk, '/team')).html).find((x) => x.fields.some(([k, v]) => k === 'id' && v === ids[U.agent]) && x.html.includes('$ACTION_REF'))
+  assert.ok(f, 'кнопка «Ссылка для входа» у Sophie на /team')
+  const r = await submit(lk, '/team', f!, {})
+  const raw = tokenOf(r.text); assert.ok(raw, 'ссылка своему агенту не выдана')
+  await db.query(`update portal.auth_tokens set used_at = now() where token_hash=$1`, [sha(raw!)])
+  await db.query(`delete from portal.outbox_messages where body like $1`, [`%${raw}%`])
+  const n0 = (await db.query('select count(*)::int n from portal.auth_tokens')).rows[0].n
+  await submit(lk, '/team', { ...f!, fields: f!.fields.map(([k, v]) => [k, k === 'id' ? ids[U.agentIl] : v] as [string, string]) }, {})
+  assert.equal((await db.query('select count(*)::int n from portal.auth_tokens')).rows[0].n, n0, 'ссылка чужому агенту')
+})
