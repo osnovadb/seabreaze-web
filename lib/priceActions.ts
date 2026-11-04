@@ -53,7 +53,7 @@ export async function savePriceList(_: unknown, f: FormData) {
   return { ok: true, made: items.length }
 }
 
-// Публикация: цена меняется, только если с момента расчёта её никто не трогал; остальные позиции помечаются «пропущено»
+// Публикация: цена меняется, только если с момента расчёта её никто не трогал и статус квартиры всё ещё из правила; остальные — «пропущено»
 export async function publishPriceList(_: unknown, f: FormData) {
   const c = await editor()
   const l = await one<{ id: string; project_id: string; title: string; status: string }>('select id, project_id, title, status from portal.price_lists where id = $1', [s(f, 'id')])
@@ -64,7 +64,8 @@ export async function publishPriceList(_: unknown, f: FormData) {
     const st = (await db.query<{ status: string }>('select status from portal.price_lists where id = $1 for update', [l.id])).rows[0]
     if (st?.status !== 'draft') return null
     const ok = (await db.query<{ unit_id: string }>(`update units u set price_list = i.new_price from portal.price_list_items i
-      where i.list_id = $1 and u.id = i.unit_id and coalesce(u.price_list, 0) = i.old_price and u.price_currency = i.currency returning u.id unit_id`, [l.id])).rows.map((x) => x.unit_id)
+      where i.list_id = $1 and u.id = i.unit_id and u.price_list is not distinct from i.old_price and u.price_currency = i.currency
+        and u.status in (select jsonb_array_elements_text(coalesce(pl.rule->'statuses', '["available"]')) from portal.price_lists pl where pl.id = $1) returning u.id unit_id`, [l.id])).rows.map((x) => x.unit_id)
     await db.query(`update portal.price_list_items set applied = (unit_id = any($2::uuid[])) where list_id = $1`, [l.id, ok])
     await db.query(`update portal.price_lists set status = 'published', published_by = $2, published_at = now() where id = $1`, [l.id, c.user.id])
     const skipped = (await db.query<{ n: number }>('select count(*)::int n from portal.price_list_items where list_id = $1 and not applied', [l.id])).rows[0].n

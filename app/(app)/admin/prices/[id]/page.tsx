@@ -9,7 +9,7 @@ import { Top, Pill } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { RuleForm, PL_STATUS } from '../form'
 
-type Item = { unit_id: string; no: string; building: string; floor: number; area: number | null; old_price: number; new_price: number; currency: string; applied: boolean | null; now: number | null; now_cur: string }
+type Item = { unit_id: string; no: string; building: string; floor: number; area: number | null; old_price: number | null; new_price: number; currency: string; applied: boolean | null; now: number | null; now_cur: string }
 
 // Прайс-лист: черновик — правило и предпросмотр «было → стало»; опубликованный — что применено, что пропущено, откат
 export default async function PriceList({ params }: { params: { id: string } }) {
@@ -20,15 +20,15 @@ export default async function PriceList({ params }: { params: { id: string } }) 
     select pl.id, pl.project_id, p.name pname, pl.title, pl.status, pl.rule, pl.note, a.name by, pl.created_at, b.name pub, pl.published_at, r.name rev, pl.reverted_at
     from portal.price_lists pl join projects p on p.id = pl.project_id join portal.users a on a.id = pl.created_by left join portal.users b on b.id = pl.published_by left join portal.users r on r.id = pl.reverted_by where pl.id = $1`, [params.id])
   if (!l) notFound()
-  const items = await q<Item>(`select i.unit_id, coalesce(bl.external_id || '-', '') || u.number no, bl.name building, u.floor, u.area_total_m2::float area, i.old_price::float, i.new_price::float, i.currency, i.applied,
+  const items = await q<Item>(`select i.unit_id, case when u.number ilike coalesce(bl.external_id, '') || '-%' then u.number else coalesce(bl.external_id || '-', '') || u.number end no, bl.name building, u.floor, u.area_total_m2::float area, i.old_price::float, i.new_price::float, i.currency, i.applied,
       u.price_list::float now, u.price_currency now_cur from portal.price_list_items i join units u on u.id = i.unit_id join buildings bl on bl.id = u.building_id where i.list_id = $1 order by bl.sort, bl.name, u.floor, u.number`, [l.id])
   const money = (v: number, cur: string) => `${cur} ${num(L, Math.round(v))}`
   const byCur = Array.from(new Set(items.map((i) => i.currency))).map((cur) => {
     const xs = items.filter((i) => i.currency === cur && (l.status === 'draft' || i.applied))
-    const o = xs.reduce((a, i) => a + i.old_price, 0), n = xs.reduce((a, i) => a + i.new_price, 0)
+    const o = xs.reduce((a, i) => a + (i.old_price || 0), 0), n = xs.reduce((a, i) => a + i.new_price, 0)
     return { cur, n: xs.length, o, d: n - o, pct: o ? (n / o - 1) * 100 : 0 }
   })
-  const stale = l.status === 'draft' ? items.filter((i) => (i.now ?? 0) !== i.old_price || i.now_cur !== i.currency).length : 0
+  const stale = l.status === 'draft' ? items.filter((i) => i.now !== i.old_price || i.now_cur !== i.currency).length : 0
   const st = PL_STATUS[l.status]
   return (
     <>
@@ -50,7 +50,7 @@ export default async function PriceList({ params }: { params: { id: string } }) 
               <tr key={i.unit_id}><td><Link href={`/units/${i.unit_id}`}><b>{i.no}</b></Link></td><td className="small">{i.building}</td><td>{i.floor}</td><td className="small">{i.area ?? '—'}</td>
                 <td className="num small">{i.old_price ? money(i.old_price, i.currency) : '—'}</td><td className="num"><b>{money(i.new_price, i.currency)}</b></td>
                 <td className={'num small ' + (d >= 0 ? 'okc' : 'badc')}>{i.old_price ? (d >= 0 ? '+' : '') + d.toFixed(1) + '%' : ''}</td>
-                <td className="tiny">{i.applied === false ? <span className="warnc">{T('пропущено: цена менялась')}</span> : l.status === 'draft' && ((i.now ?? 0) !== i.old_price || i.now_cur !== i.currency) ? <span className="warnc">{T('цена уже другая')}</span> : ''}</td></tr>) })}</tbody>
+                <td className="tiny">{i.applied === false ? <span className="warnc">{T('пропущено: цена или статус изменились')}</span> : l.status === 'draft' && (i.now !== i.old_price || i.now_cur !== i.currency) ? <span className="warnc">{T('цена уже другая')}</span> : ''}</td></tr>) })}</tbody>
           </table>{items.length > 600 && <div className="tiny muted mt8">{T('Показаны первые 600 из {n}', { n: items.length })}</div>}</div>}
         </div>
         <div className="stack">
