@@ -11,11 +11,12 @@ import { q, one, tx, audit, notify as notifyUser } from './db'
 import { requireCtx, type Ctx } from './auth'
 import { t } from './i18n'
 import { autoPost, dropAutoPost } from './posts'
+import { asActor } from './unitEvents'
+import { UNIT_TYPES } from './catalog'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
 const slugify = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 60)
-const UNIT_TYPES = ['studio', '1br', '2br', '3br', '4br', 'duplex', 'penthouse', 'townhouse', 'villa', 'commercial', 'parking']
 const UNIT_STATUSES = ['available', 'reserved', 'sold', 'unavailable']
 
 // Объекты и планы оплаты правит владелец; цены и статусы квартир — ещё и офис в Баку (ТЗ, матрица прав)
@@ -147,18 +148,22 @@ export const saveUnit = safe(async (_: unknown, f: FormData) => {
   const status = UNIT_STATUSES.includes(s(f, 'status')) ? s(f, 'status') : 'available'
   const price = num(f, 'price'), cur = ['USD', 'AZN', 'EUR'].includes(s(f, 'currency')) ? s(f, 'currency') : 'USD'
   if (price != null && (Number.isNaN(price) || price < 0)) return { error: t(c.lang, 'Проверьте цену') }
+  // Правка — от имени пользователя: журнал квартиры запишет автора (lib/unitEvents.ts)
+  const err = await asActor(c.user.id, 'portal', async (db) => {
   if (c.user.role === 'office') {
-    await q(`update units set price_list = $2, price_currency = $3, status = $4 where id = $1 and project_id = $5`, [id, price, cur, status, pid])
+    await db.query(`update units set price_list = $2, price_currency = $3, status = $4 where id = $1 and project_id = $5`, [id, price, cur, status, pid])
   } else {
-    const lay = s(f, 'layout') ? await one<{ unit_type: string; bedrooms: number | null; total_area_m2: number | null; internal_area_m2: number | null; external_area_m2: number | null }>('select unit_type, bedrooms, total_area_m2, internal_area_m2, external_area_m2 from layouts where id = $1', [s(f, 'layout')]) : null
+    const lay = s(f, 'layout') ? (await db.query<{ unit_type: string; bedrooms: number | null; total_area_m2: number | null; internal_area_m2: number | null; external_area_m2: number | null }>('select unit_type, bedrooms, total_area_m2, internal_area_m2, external_area_m2 from layouts where id = $1', [s(f, 'layout')])).rows[0] : null
     const vals = [s(f, 'number'), num(f, 'floor'), s(f, 'building') || null, s(f, 'layout') || null, lay?.unit_type || (UNIT_TYPES.includes(s(f, 'unit_type')) ? s(f, 'unit_type') : '2br'),
       lay?.bedrooms ?? num(f, 'bedrooms'), num(f, 'area') ?? lay?.total_area_m2 ?? null, lay?.internal_area_m2 ?? null, num(f, 'ext_area') ?? lay?.external_area_m2 ?? null, num(f, 'plot_area'), price, cur, status, s(f, 'published') !== '0']
-    if (!vals[0]) return { error: t(c.lang, 'Нужен номер квартиры') }
-    if (id) await q(`update units set number = $2, floor = $3, building_id = $4, layout_id = $5, unit_type = $6, bedrooms = $7, area_total_m2 = $8, area_internal_m2 = $9, area_external_m2 = $10, plot_area_m2 = $11,
+    if (!vals[0]) return t(c.lang, 'Нужен номер квартиры')
+    if (id) await db.query(`update units set number = $2, floor = $3, building_id = $4, layout_id = $5, unit_type = $6, bedrooms = $7, area_total_m2 = $8, area_internal_m2 = $9, area_external_m2 = $10, plot_area_m2 = $11,
         price_list = $12, price_currency = $13, status = $14, published = $15 where id = $1 and project_id = $16`, [id, ...vals, pid])
-    else await q(`insert into units (number, floor, building_id, layout_id, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, published, project_id, source_id)
+    else await db.query(`insert into units (number, floor, building_id, layout_id, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, published, project_id, source_id)
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'manual')`, [...vals, pid])
   }
+  })
+  if (err) return { error: err }
   // Скрыть от партнёров — отдельная отметка портала, на сайты не влияет
   if (id && f.has('hidden_set')) {
     if (s(f, 'hidden') === '1') {
@@ -201,17 +206,6 @@ export const generateUnits = safe(async (_: unknown, f: FormData) => {
   await log(c, 'object.units_generate', 'project', pid, { building: bid, made }); done(pid)
   return { ok: true, made }
 })
-// Изменение цен свободных квартир блока на процент (повышение прайса застройщиком) или удаление пустых квартир
-export const bulkUnits = safe(async (_: unknown, f: FormData) => {
-  const c = await unitsEditor()
-  const pid = s(f, 'project'), bid = s(f, 'building')
-  const pctv = num(f, 'pct')
-  if (pctv == null || Number.isNaN(pctv) || Math.abs(pctv) > 50) return { error: t(c.lang, 'Процент — от −50 до 50') }
-  const r = await q(`update units set price_list = round(price_list * (1 + $3 / 100.0)) where project_id = $1 and ($2 = '' or building_id::text = $2) and status = 'available' and price_list is not null returning id`, [pid, bid, pctv])
-  await log(c, 'object.units_price_pct', 'project', pid, { building: bid || null, pct: pctv, n: r.length }); done(pid)
-  return { ok: true, made: r.length }
-})
-
 /* ── Планы оплаты (каталог: их же видят сайты) ── */
 export const savePlan = safe(async (_: unknown, f: FormData) => {
   const c = await owner()

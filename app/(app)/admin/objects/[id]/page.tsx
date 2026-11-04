@@ -3,16 +3,16 @@ import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, pct, num } from '@/lib/i18n'
-import { planUrl, toUsdSql } from '@/lib/catalog'
+import { planUrl, toUsdSql, UNIT_TYPES } from '@/lib/catalog'
 import { PLAN_COLS, schedule, planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { saveGenplan, saveFacade, saveFloorPlan, saveRisers, saveSides } from '@/lib/markup'
 import { MARKS, SIDES, SIDE_NAME, type Sides } from '@/lib/surround'
 import { riser as riserOf } from '@/lib/catalog'
-import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, bulkUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode } from '@/lib/objects'
+import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode } from '@/lib/objects'
 
-const TYPES = ['studio', '1br', '2br', '3br', '4br', 'duplex', 'penthouse', 'townhouse', 'villa', 'commercial', 'parking']
+const TYPES = UNIT_TYPES
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 
 // Карточка проекта в админке: всё, что влияет на деньги, наличие и доступ (ТЗ, «Портал и CMS»)
@@ -26,7 +26,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   const ps = await one<{ sales_status: string; agent_markets: string[]; site_urls: Record<string, string>; cover_file_id: string | null }>('select sales_status, agent_markets, site_urls, cover_file_id from portal.project_settings where project_id = $1', [p.id])
   const tab = owner ? searchParams.tab || 'main' : 'units'
   const cover = ps?.cover_file_id
-  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры']]
+  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['prices', 'Прайс-листы'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры'], ['prices', 'Прайс-листы']]
   const blocks = await q<{ id: string; name: string; external_id: string | null; kind: string; floors_total: number | null; delivery: string | null; sort: number; n: number }>(
     'select b.id, b.name, b.external_id, b.kind, b.floors_total, b.delivery, b.sort, (select count(*)::int from units u where u.building_id = b.id) n from buildings b where b.project_id = $1 order by b.sort, b.name', [p.id])
   const layouts = await q<{ id: string; code: string; unit_type: string; name: string | null; bedrooms: number | null; internal_area_m2: number | null; external_area_m2: number | null; total_area_m2: number | null; plan_file: string | null; n: number }>(
@@ -39,7 +39,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind={sales[1]}>{T(sales[0])}</Pill><span className="small muted">{T('Партнёрам')}: {ps?.agent_markets.join(', ') || '—'}</span></span>}
         right={<Link className="btn" href={`/projects/${p.slug}`}>{T('Как видят в портале')} ↗</Link>} />
       <div className="page">
-        <div className="tabs">{tabs.map(([k, l]) => <Link key={k} href={k === 'terms' ? `/admin/conditions?p=${p.slug}` : tabLink(k)} className={tab === k ? 'on' : ''}>{T(l)}</Link>)}</div>
+        <div className="tabs">{tabs.map(([k, l]) => <Link key={k} href={k === 'terms' ? `/admin/conditions?p=${p.slug}` : k === 'prices' ? `/admin/prices?p=${p.id}` : tabLink(k)} className={tab === k ? 'on' : ''}>{T(l)}</Link>)}</div>
 
         {tab === 'main' && <Main />}
         {tab === 'blocks' && <Blocks />}
@@ -169,13 +169,11 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
           <div className="tiny muted">{T('«Сайт» — показывать ли квартиру на сайтах рынков. «Скрыть» — убрать от партнёров (квота, придержать), на сайты не влияет. Ручная правка цены у квартир из Profitbase и xlsx ставит замок от синхронизации.')}</div>
         </div>
         <div className="grid g2" style={{ alignItems: 'start' }}>
-          <ActionForm action={bulkUnits} lang={L} className="card stack" style={{ gap: 8 }} okText={T('Цены изменены')}>
-            <div className="h3" style={{ margin: 0 }}>{T('Изменить цены свободных квартир')}</div>
-            <input type="hidden" name="project" value={p!.id} />
-            <label className="field"><span>{T('Где')}</span><select className="in" name="building" defaultValue={b.id}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label className="field"><span>{T('На сколько, % (минус — снижение)')}</span><input className="in" name="pct" inputMode="decimal" placeholder="3" required /></label>
-            <div><button className="btn">{T('Применить')}</button></div>
-          </ActionForm>
+          <div className="card stack" style={{ gap: 8 }}>
+            <div className="h3" style={{ margin: 0 }}>{T('Изменить цены')}</div>
+            <div className="small muted">{T('Массово — прайс-листом: отбор по корпусам, этажам, комнатам, стоякам; процент, сумма, цена за м² или шаг по этажам; предпросмотр и откат.')}</div>
+            <div><Link className="btn" href={`/admin/prices?p=${p!.id}`}>{T('Прайс-листы')} →</Link></div>
+          </div>
           {owner && (
             <ActionForm action={generateUnits} lang={L} reset className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Добавить квартиры')}</div>

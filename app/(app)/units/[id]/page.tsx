@@ -2,18 +2,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, usd, m2, date, dateTime } from '@/lib/i18n'
+import { t, usd, m2, date, dateTime, num } from '@/lib/i18n'
 import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
 import { promoForUnit } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
+import { unitHistory } from '@/lib/unitEvents'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
 import { addToSelection, startShow } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
 
+const ST_NAME: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
   F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Квота SeaBreeze', 'off'],
   O: ['Наша бронь', 'ours'], M: ['Ваша бронь', 'ours'], D: ['Наша сделка', 'ink'], X: ['Недоступно', 'off'],
@@ -37,7 +39,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const cs = clientScope(c.user)
   const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by last_activity_at desc limit 100`, cs.params)
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
-  const hist = seesSource(c.user.role) ? await q<{ price: number; currency: string; changed_at: string; changed_by: string }>('select price::float, currency, changed_at, changed_by from price_history where unit_id = $1 order by changed_at desc limit 5', [u.id]) : []
+  const hist = ext ? [] : await unitHistory(u.id, 12)
   const inSel = await q<{ id: string; client: string }>(`select s.id, cl.name client from portal.selection_items si join portal.selections s on s.id = si.selection_id join portal.clients cl on cl.id = s.client_id where si.unit_id = $1 and (${ext ? 's.user_id = $2' : 'true'})`, ext ? [u.id, c.user.id] : [u.id])
   const bk = u.booking_id ? (await q<{ client: string; agent: string; status: string; ends_at: string; final_price: number }>(`select cl.name client, us.name agent, b.status, b.ends_at, b.final_price::float from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [u.booking_id]))[0] : null
   const plans = await plansFor(u.project_id, u.building_id)
@@ -117,7 +119,13 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
                 <div className="kv"><span>{T('Ручные правки')}</span><span className="small">{u.locked.length ? '🔒 ' + u.locked.map((x) => T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x)).join(', ') + ' · ' + T('синхронизация не меняет') : T('нет · синхронизация может менять цену и статус')}</span></div>
               </>}
               {bk && <div className="kv"><span>{T('Бронь')}</span><span className="small">{bk.client} · {bk.agent} · {T('до {d}', { d: date(L, bk.ends_at) })} · {usd(L, bk.final_price)}</span></div>}
-              {hist.length > 0 && <><div className="label mt16">{T('История цены')}</div>{hist.map((h, i) => <div key={i} className="kv"><span>{date(L, h.changed_at)}</span><span className="small">{h.price ? h.currency + ' ' + Math.round(h.price).toLocaleString('ru') : '—'} · {h.changed_by}</span></div>)}</>}
+              {hist.length > 0 && <><div className="label mt16">{T('История: статус и цена')}</div>{hist.map((h, i) => {
+                const money = (v: number | null) => (v == null ? '—' : (h.currency || '') + ' ' + num(L, Math.round(v)))
+                const what = h.kind === 'status' ? `${T(ST_NAME[h.old_value || ''] || h.old_value || '—')} → ${T(ST_NAME[h.new_value || ''] || h.new_value || '—')}`
+                  : h.kind === 'price' ? `${money(h.old_price)} → ${money(h.new_price)}${h.old_price && h.new_price ? ` (${h.new_price >= h.old_price ? '+' : ''}${((h.new_price / h.old_price - 1) * 100).toFixed(1)}%)` : ''}` : T('заведена') + (h.new_price ? ' · ' + money(h.new_price) : '')
+                const who = h.list ? T('прайс-лист «{t}»', { t: h.list }) : h.source.startsWith('sync:') ? T('синхронизация') + ' ' + h.source.slice(5) : h.source === 'portal' ? T('портал') : T('вручную в базе')
+                return <div key={i} className="kv"><span className="small">{dateTime(L, h.at)}</span><span className="small" style={{ textAlign: 'end' }}>{what}<div className="tiny muted">{[who, h.who].filter(Boolean).join(' · ')}</div></span></div>
+              })}</>}
               <div className="kv"><span>{T('В подборках')}</span><span className="small">{inSel.length ? inSel.map((x) => x.client).join(', ') : '—'}</span></div>
             </div>
           )}
