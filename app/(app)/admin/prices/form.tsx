@@ -10,7 +10,7 @@ const STATUSES: [string, string][] = [['available', 'свободна'], ['reser
 
 // Форма правила прайс-листа: кого меняем и как. Пустой отбор — все квартиры проекта с выбранными статусами.
 export async function RuleForm({ lang, projectId, id, title, note, rule }: { lang: Lang; projectId: string; id?: string; title?: string; note?: string | null; rule?: PriceRule }) {
-  const T = (s: string) => t(lang, s)
+  const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const r = rule || normRule({})
   const bs = await q<{ id: string; name: string }>('select id, name from buildings where project_id = $1 order by sort, name', [projectId])
   const ls = await q<{ id: string; code: string }>('select id, code from layouts where project_id = $1 order by code', [projectId])
@@ -22,6 +22,7 @@ export async function RuleForm({ lang, projectId, id, title, note, rule }: { lan
       <input type="hidden" name="project" value={projectId} />{id && <input type="hidden" name="id" value={id} />}
       <label className="field"><span>{T('Название')}</span><input className="in" name="title" defaultValue={title} placeholder={T('Повышение с 1 декабря')} /></label>
       <div className="label">{T('Кого меняем')}</div>
+      {r.units.length > 0 && <div className="note small">{T('Отобрано в шахматке: {n} кв. — остальные условия отбора сужают этот список', { n: r.units.length })}{r.units.map((u) => <input key={u} type="hidden" name="units" value={u} />)}</div>}
       {bs.length > 1 && <div className="field"><span>{T('Корпуса')}</span><div className="chips">{bs.map((b) => <label key={b.id} className="chip chk"><input type="checkbox" name="buildings" value={b.id} defaultChecked={r.buildings.includes(b.id)} /> {b.name}</label>)}</div></div>}
       {types.length > 1 && <div className="field"><span>{T('Тип')}</span><div className="chips">{types.map((x) => <label key={x} className="chip chk"><input type="checkbox" name="types" value={x} defaultChecked={r.types.includes(x)} /> {T(TYPE_NAME[x] || x)}</label>)}</div></div>}
       <div className="field"><span>{T('Комнат')}</span><div className="chips">{[1, 2, 3, 4].map((x) => <label key={x} className="chip chk"><input type="checkbox" name="rooms" value={x} defaultChecked={r.rooms.includes(x)} /> {x === 4 ? '4+' : x}</label>)}</div></div>

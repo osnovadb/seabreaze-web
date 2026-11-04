@@ -5,10 +5,11 @@ import { q } from '@/lib/db'
 import { t, dateTime } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { RuleForm, PL_STATUS } from './form'
+import { normRule } from '@/lib/priceRule'
 
 
 // Прайс-листы проекта: список и новый черновик
-export default async function Prices({ searchParams }: { searchParams: { p?: string } }) {
+export default async function Prices({ searchParams }: { searchParams: { p?: string; units?: string } }) {
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -30,7 +31,7 @@ export default async function Prices({ searchParams }: { searchParams: { p?: str
               <tbody>{lists.map((l) => <tr key={l.id}><td><Link href={`/admin/prices/${l.id}`}><b>{l.title}</b></Link></td><td><Pill kind={PL_STATUS[l.status][1]}>{T(PL_STATUS[l.status][0])}</Pill></td>
                 <td className="num">{l.status === 'draft' ? l.n : `${l.applied} / ${l.n}`}</td><td className="small">{l.by}</td><td className="small muted">{dateTime(L, l.created_at)}</td><td className="small muted">{l.published_at ? dateTime(L, l.published_at) : '—'}</td></tr>)}</tbody></table>}
           </div>
-          {p && <RuleForm lang={L} projectId={p.id} />}
+          {p && <RuleForm lang={L} projectId={p.id} rule={searchParams.units ? normRule({ units: searchParams.units.split(',').filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 500) }) : undefined} />}
         </div>
       </div>
     </>

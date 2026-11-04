@@ -27,7 +27,7 @@ export async function savePriceList(_: unknown, f: FormData) {
   if (!(await one('select 1 from projects where id = $1', [pid]))) return { error: 'project' }
   if (id && !(await one(`select 1 from portal.price_lists where id = $1 and project_id = $2 and status = 'draft'`, [id, pid]))) return { error: t(c.lang, 'Прайс-лист уже опубликован — создайте новый') }
   const rule = normRule({
-    buildings: all(f, 'buildings'), types: all(f, 'types'), rooms: all(f, 'rooms'), layouts: all(f, 'layouts'), units: [],
+    buildings: all(f, 'buildings'), types: all(f, 'types'), rooms: all(f, 'rooms'), layouts: all(f, 'layouts'), units: all(f, 'units').filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 500),
     risers: s(f, 'risers').split(/[\s,;]+/).filter(Boolean), floor_from: s(f, 'floor_from'), floor_to: s(f, 'floor_to'), statuses: all(f, 'statuses'),
     op: s(f, 'op'), value: s(f, 'value').replace(',', '.'), base_floor: s(f, 'base_floor'), round: s(f, 'round'), currency: s(f, 'currency'),
   })

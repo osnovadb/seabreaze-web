@@ -2,15 +2,20 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, dateTime, pct } from '@/lib/i18n'
-import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, orientOf, orientText, VIEW_NAME } from '@/lib/catalog'
+import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, orientOf, orientText, VIEW_NAME, riser, unitNo, planUrl, TYPE_NAME } from '@/lib/catalog'
+import { offersFor, promoOf } from '@/lib/promo'
+import { clientScope } from '@/lib/scope'
+import { q } from '@/lib/db'
+import { ChessBoard, type CU } from '@/components/ChessBoard'
+import { addManyToSelection } from '@/lib/actions'
+import { bulkStatus, bulkHide } from '@/lib/objects'
 import { ViewTabs } from '@/components/ViewTabs'
 import { seesSource, isExternal, canBook } from '@/lib/perm'
 import { one } from '@/lib/db'
 import { UnitPanel } from '@/components/UnitPanel'
-import { Top, Legend } from '@/components/ui'
-import { Chess } from '@/components/Chess'
+import { Top } from '@/components/ui'
 
-export default async function ChessPage({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; m?: string; r?: string; u?: string; v?: string } }) {
+export default async function ChessPage({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; u?: string; l?: string } }) {
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)
@@ -20,16 +25,9 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const b = bs.find((x) => x.id === searchParams.b) || [...bs].sort((a, z) => z.free - a.free)[0]
   const units = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
-  const cellMode = (searchParams.m as 'price' | 'rooms' | 'm2') || 'price'
-  const rooms = Number(searchParams.r) || undefined
-  const counts = units.reduce((a, u) => { const k = codeFor(u, c.user, mode); a[k] = (a[k] || 0) + 1; return a }, {} as Record<string, number>)
   const free = units.filter((u) => codeFor(u, c.user, mode) === 'F')
   const sync = seesSource(c.user.role) ? await one<{ at: string; src: string }>(`select max(u.synced_at) at, min(u.source_id) src from units u where u.building_id = $1`, [b.id]) : null
-  // Ориентация стояков: фильтр «вид из окон» и строка в карточке квартиры
   const ri = await riserInfo(b.id)
-  const views = Array.from(new Set(units.map((u) => orientOf(u, ri).view).filter(Boolean))) as string[]
-  const view = views.includes(searchParams.v || '') ? searchParams.v : undefined
-  const match = view ? new Set(units.filter((u) => orientOf(u, ri).view === view).map((u) => u.id)) : undefined
   const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri)) || undefined
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
   const sel = units.find((u) => u.id === searchParams.u && codeFor(u, c.user, mode) !== 'X')
@@ -41,22 +39,28 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
       (select count(*)::int from portal.clients where owner_id = $1 and stage not in ('lost','handed') and pause_until is null) cl`, [c.user.id, p.id])
     return cond ? { ...n!, max: cond.max_bookings_agent, fix: cond.agent_fix_pct, pool: cond.agent_pool_pct, sales: p.sales_status } : null
   })() : null
-  const qs = (o: Record<string, string | number | undefined>) => '?' + new URLSearchParams(Object.entries({ b: b.id, m: cellMode, r: rooms, v: view, u: sel?.id, ...o }).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString()
+  const qs = (o: Record<string, string | undefined>) => '?' + new URLSearchParams(Object.entries({ b: b.id, u: sel?.id, ...o }).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString()
+  // Данные для шахматки в браузере: статус по роли, цена с акцией, вид, планировка — фильтры и подсветка без перезагрузки
+  const offers = await offersFor(p.id)
+  const cu: CU[] = units.map((u) => {
+    const code = codeFor(u, c.user, mode), x = code === 'X', pr = x ? null : promoOf(u, offers)
+    return { id: u.id, no: x ? '' : unitNo(u), riser: riser(u), floor: u.floor, code, rooms: x ? null : u.rooms, area: x ? 0 : u.area, out: x ? 0 : (u.plot_area || 0) + (u.ext_area || 0), type: u.unit_type, typeName: TYPE_NAME[u.unit_type] || u.unit_type,
+      usd: x ? null : u.usd, net: x || u.usd == null ? null : u.usd - (pr?.usd || 0), promo: pr ? `${pr.badge || T('Акция')} −${Math.round(pr.pct * 10) / 10}%` : null, plan: x ? null : planUrl(u.plan_file),
+      view_side: x ? null : orientOf(u, ri).view, orient: x ? '' : orient(u) || '', layout: x ? null : u.layout_code, plot_area: x ? null : u.plot_area, ext_area: x ? null : u.ext_area, is_corner: x ? null : u.is_corner,
+      building_id: u.building_id, project_id: u.project_id, hidden: mode === 'team' && u.hidden }
+  })
+  const views = (Array.from(new Set(cu.map((u) => u.view_side).filter(Boolean))) as string[]).map((v): [string, string] => [v, VIEW_NAME[v] || v])
+  const layouts = Array.from(new Set(cu.map((u) => u.layout).filter(Boolean))).sort() as string[]
+  const cs = clientScope(c.user)
+  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by last_activity_at desc limit 200`, cs.params) : []
+  const editor = ['owner', 'office'].includes(c.user.role)
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [T('Шахматка')]]} title={`${p.name} · ${b.name}`}
         sub={sync ? T('Данные на {d} · источник {s}', { d: dateTime(L, sync.at), s: sync.src }) : T('Цены застройщика в USD')}
         right={<><ViewTabs lang={L} base={`/projects/${p.slug}`} b={b.id} active="chess" facade={hasFacade} /><Link className="btn" href={`/catalog?p=${p.slug}`}>{T('Список')}</Link></>} />
       <div className="page">
-        <div className="chips">{bs.map((x) => <Link key={x.id} href={`?b=${x.id}&m=${cellMode}`} className={'chip' + (x.id === b.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>
-        <div className="between mt16">
-          <div className="chips">
-            <Link href={qs({ r: '' })} className={'chip' + (!rooms ? ' on' : '')}>{T('Комнаты: все')}</Link>
-            {[1, 2, 3, 4].filter((r) => units.some((u) => u.rooms === r)).map((r) => <Link key={r} href={qs({ r })} className={'chip' + (rooms === r ? ' on' : '')}>{r}</Link>)}
-            {views.length > 0 && <><span className="small muted" style={{ marginInlineStart: 8 }}>{T('Вид')}:</span><Link href={qs({ v: '' })} className={'chip' + (!view ? ' on' : '')}>{T('любой')}</Link>{views.map((v) => <Link key={v} href={qs({ v })} className={'chip' + (view === v ? ' on' : '')}>{T(VIEW_NAME[v])}</Link>)}</>}
-          </div>
-          <div className="chips">{(['price', 'rooms', 'm2'] as const).map((m) => <Link key={m} href={qs({ m })} className={'chip' + (cellMode === m ? ' on' : '')}>{T(m === 'price' ? 'Цена, тыс. $' : m === 'rooms' ? 'Комнаты' : '$/м²')}</Link>)}</div>
-        </div>
+        <div className="chips">{bs.map((x) => <Link key={x.id} href={`?b=${x.id}`} className={'chip' + (x.id === b.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>
         {lim && <div className="card card--tight mt16 row" style={{ gap: 18 }}>
           <span className="small">{T('Ваши брони')}: <b>{lim.b} / {lim.max}</b></span>
           <span className="small">{T('Клиентов в работе')}: <b>{lim.cl}</b></span>
@@ -64,17 +68,16 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
           {lim.sales === 'stop' && <span className="small warnc">{T('Проект на стоп-продажах — новые брони не принимаются')}</span>}
           {lim.b >= lim.max && <span className="small warnc">{T('Лимит броней исчерпан — снимите одну, чтобы поставить новую')}</span>}
         </div>}
-        <div className="mt16"><Legend lang={L} team={mode === 'team'} /></div>
         <div className={sel ? 'chess-wrap mt16' : 'mt16'}>
-          <Chess units={units} viewer={c.user} mode={mode} lang={L} cellMode={cellMode} rooms={rooms} match={match} selected={sel?.id} hrefFor={(u) => qs({ u: u.id })} />
-          {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} />
+          <ChessBoard units={cu} lang={L} team={mode === 'team'} selected={sel?.id} hrefFor={Object.fromEntries(cu.map((u) => [u.id, qs({ u: u.id })]))} views={views} layouts={layouts}
+            clients={clients} projectId={p.id} canPick={clients.length > 0 || editor} initial={searchParams.l ? { l: searchParams.l } : undefined}
+            bulk={{ toSelection: addManyToSelection, ...(editor ? { status: bulkStatus } : {}), ...(c.user.role === 'owner' ? { hide: bulkHide } : {}) }} />
+          {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
             : null}
         </div>
         <div className="row mt16 small muted">
-          <span>{T('Свободно {f} из {n}', { f: free.length, n: units.length })}</span>
-          {!sel && <span>· {T('Нажмите на квартиру — карточка откроется справа')}</span>}
+          {!sel && <span>{T('Наведите на квартиру — краткая карточка; нажмите — подробная справа')}</span>}
           {free.length > 0 && <span>· {T('цены свободных')} {usd(L, Math.min(...free.map((u) => u.usd || 0)))} – {usd(L, Math.max(...free.map((u) => u.usd || 0)))}</span>}
-          {mode === 'team' && <span>· {T('наша бронь')} {(counts.O || 0) + (counts.M || 0)} · {T('бронь застройщика')} {counts.B || 0} · {T('продано')} {counts.S || 0}</span>}
           {isExternal(c.user.role) && <span>· {T('Недоступные квартиры показаны серым без причины')}</span>}
         </div>
       </div>
