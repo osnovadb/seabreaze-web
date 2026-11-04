@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 import pg from 'pg'
 import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
+import { bestOffer } from '../lib/promoMatch.mjs'
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -114,24 +115,40 @@ for (const u of waitUnits) {
 out.waitlist = waitN
 
 // 7г. Сохранённые поиски (М12): новые подходящие свободные квартиры с прошлой проверки; первая проверка только запоминает
-const searches = await q(`select s.id, s.user_id, s.name, s.filters, s.seen_ids, s.checked_at, us.role from portal.saved_searches s join portal.users us on us.id = s.user_id where s.active and us.active`)
+const searches = await q(`select s.id, s.user_id, s.name, s.filters, s.seen_ids, s.checked_at, us.role, us.agency_id, us.market from portal.saved_searches s join portal.users us on us.id = s.user_id where s.active and us.active`)
 let searchN = 0
-// Свободные квартиры с теми же расчётными полями, что в каталоге (комнаты — lib/catalog.ts roomsSql, цена — в долларах), и признак акции
-const unitsOf = new Map()
+// Свободные квартиры с теми же расчётными полями, что в каталоге (комнаты — lib/catalog.ts roomsSql, цена — в долларах);
+// акция — той же функцией bestOffer, что и в каталоге (lib/promoMatch.mjs), цена для фильтра — с акцией
+const unitsOf = new Map(), offersOf = new Map()
+const offers = async (project) => {
+  if (!offersOf.has(project)) offersOf.set(project, await q(`select id, building_id, kind, value::float, currency, unit_ids from portal.special_offers
+    where project_id = $1 and active and (starts_on is null or starts_on <= current_date) and (ends_on is null or ends_on >= current_date) order by ends_on nulls last, created_at, id`, [project]))
+  return offersOf.get(project)
+}
 const freeUnits = async (project, partner) => {
   const key = project + ':' + partner
-  if (!unitsOf.has(key)) unitsOf.set(key, await q(`select u.id, u.project_id, u.building_id, u.unit_type, u.floor, u.area_total_m2::float area, u.area_external_m2::float ext_area, u.plot_area_m2::float plot_area, u.view_side, u.is_corner,
-      coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) rooms,
-      (case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end)::float usd,
-      exists (select 1 from portal.special_offers o where o.project_id = u.project_id and o.active and (o.starts_on is null or o.starts_on <= current_date) and (o.ends_on is null or o.ends_on >= current_date)
-        and (o.building_id is null or o.building_id = u.building_id) and (o.unit_ids is null or cardinality(o.unit_ids) = 0 or u.id = any(o.unit_ids))) promo
-    from units u where u.project_id = $1 and ${FREE} and (not $2 or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`, [project, partner]))
+  if (!unitsOf.has(key)) {
+    const rows = await q(`select u.id, u.project_id, u.building_id, u.unit_type, u.floor, u.area_total_m2::float area, u.area_external_m2::float ext_area, u.plot_area_m2::float plot_area, u.view_side, u.is_corner,
+        coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) rooms,
+        u.price_list::float price, u.price_currency currency,
+        (case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end)::float usd
+      from units u where u.project_id = $1 and ${FREE} and (not $2 or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`, [project, partner])
+    const of = await offers(project)
+    unitsOf.set(key, rows.map((u) => { const b = bestOffer(u, of); return { ...u, promo: !!b, net: u.usd != null ? u.usd - (b?.usd || 0) : null } }))
+  }
   return unitsOf.get(key)
 }
+// Видимость проекта партнёру — как visibleSql в lib/catalog.ts: в продаже или стоп, рынок открыт или исключение «открыть»; «закрыть» сильнее
+const visibleTo = async (s, project) => (await q(`select 1 from portal.project_settings ps where ps.project_id = $1 and ps.sales_status in ('sales','stop')
+    and not exists (select 1 from portal.project_exceptions x where x.project_id = ps.project_id and not x.allow and (x.user_id = $2 or x.agency_id = $3))
+    and ($4 = any(ps.agent_markets) or exists (select 1 from portal.project_exceptions x where x.project_id = ps.project_id and x.allow and (x.user_id = $2 or x.agency_id = $3)))`, [project, s.user_id, s.agency_id, s.market])).length > 0
 for (const s of searches) {
   const nf = normFilter(s.filters)
   if (!nf.project) continue
-  const ids = (await freeUnits(nf.project, ['agent', 'agency_head'].includes(s.role))).filter((u) => matchUnit(u, nf)).map((r) => r.id)
+  const partner = ['agent', 'agency_head'].includes(s.role)
+  // Проект закрыли для партнёра после сохранения поиска — молчим и не запоминаем квартиры
+  if (partner && !(await visibleTo(s, nf.project))) continue
+  const ids = (await freeUnits(nf.project, partner)).filter((u) => matchUnit(u, nf)).map((r) => r.id)
   const fresh = s.checked_at ? ids.filter((id) => !s.seen_ids.includes(id)) : []
   if (fresh.length) {
     await notify(s.user_id, 'search', 'По поиску «{s}» новых квартир: {n}', '/waitlist', { s: s.name, n: fresh.length }, 'search:' + s.id + ':' + fresh.sort().join(',').slice(0, 200))

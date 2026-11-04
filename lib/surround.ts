@@ -14,13 +14,15 @@ export type Sides = Partial<Record<'top' | 'right' | 'bottom' | 'left', Side>>
 export const SIDES = ['top', 'right', 'bottom', 'left'] as const
 export const SIDE_NAME: Record<string, string> = { top: 'Сверху', right: 'Справа', bottom: 'Снизу', left: 'Слева' }
 
-export const markIcon = (k: string) => (MARKS[k] || MARKS.custom)[0]
-export const markText = (L: Lang, m: { kind: string; label?: string }) => m.label || t(L, (MARKS[m.kind] || MARKS.custom)[1])
+// Только собственные ключи словаря: «constructor», «toString» и прочие имена из прототипа объекта — не вид метки
+export const isMark = (k: unknown): k is string => typeof k === 'string' && Object.hasOwn(MARKS, k)
+export const markIcon = (k: string) => (isMark(k) ? MARKS[k] : MARKS.custom)[0]
+export const markText = (L: Lang, m: { kind: string; label?: string }) => m.label || t(L, (isMark(m.kind) ? MARKS[m.kind] : MARKS.custom)[1])
 
 // Разбор того, что пришло из формы или базы: только известные виды, координаты в пределах картинки
 export function cleanMarks(v: unknown): Mark[] {
   const a = Array.isArray(v) ? v : []
-  return a.filter((m) => m && MARKS[m.kind] && [m.x, m.y].every((x) => typeof x === 'number' && x >= 0 && x <= 1))
+  return a.filter((m) => m && isMark(m.kind) && [m.x, m.y].every((x) => typeof x === 'number' && x >= 0 && x <= 1))
     .slice(0, 60).map((m) => ({ kind: m.kind, x: +m.x.toFixed(4), y: +m.y.toFixed(4), ...(typeof m.label === 'string' && m.label.trim() ? { label: m.label.trim().slice(0, 40) } : {}) }))
 }
 // Что рядом с квартирой на плане этажа: метки ближе 0,28 картинки к центру её контура, ближние первыми

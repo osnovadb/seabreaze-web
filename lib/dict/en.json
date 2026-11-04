@@ -1678,5 +1678,6 @@
 "ждёт взнос": "awaiting fee",
 "Платная бронь": "Paid booking",
 "взнос {a} — офис подтвердит бронь после оплаты; при договоре засчитывается в цену": "fee {a} — the office confirms after payment; credited to the price on contract",
-"взнос за платную бронь": "paid booking fee"
+"взнос за платную бронь": "paid booking fee",
+"Файл больше 25 МБ": "File larger than 25 MB"
 }

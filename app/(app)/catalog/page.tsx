@@ -25,13 +25,14 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
   const k = (v?: string) => (v && Number(v) ? Number(v) * 1000 : undefined) // цена в фильтре — в тысячах долларов
   const nf = normFilter({ project: p?.id, building: sp.b, types: sp.t, rooms: sp.r, pmin: k(sp.pmin), pmax: k(sp.pmax ?? sp.max), amin: sp.amin, amax: sp.amax, fmin: sp.fmin, fmax: sp.fmax, view: sp.v, outdoor: sp.o, corner: sp.c, promo: sp.promo })
   const offers = new Map(await Promise.all(ps.map(async (x) => [x.id, await offersFor(x.id)] as const)))
-  const base = (await unitsOfProjects((p ? [p] : ps).map((x) => x.id))).map((u) => ({ ...u, code: codeFor(u, c.user, mode), promo: promoOf(u, offers.get(u.project_id) || []) }))
+  const base = (await unitsOfProjects((p ? [p] : ps).map((x) => x.id))).map((u) => { const promo = promoOf(u, offers.get(u.project_id) || []); return { ...u, code: codeFor(u, c.user, mode), promo, net: u.usd != null ? u.usd - (promo?.usd || 0) : null } })
   const pool = base.filter((u) => all || u.code === 'F' || u.code === 'M')
   const units = pool.filter((u) => matchUnit(u, nf))
   const out = (u: (typeof units)[number]) => (u.plot_area || 0) + (u.ext_area || 0)
-  const per = (u: (typeof units)[number]) => (u.usd ? u.usd / u.area : 0)
+  // Цена для сортировки, фильтра и $/м² — с акцией, как показана в карточке
+  const per = (u: (typeof units)[number]) => (u.net ? u.net / u.area : 0)
   const sort = sp.s || 'price'
-  units.sort((a, b) => (sort === 'price' ? (a.usd || 0) - (b.usd || 0) : sort === 'm2' ? per(a) - per(b) : sort === 'area' ? b.area - a.area : sort === 'floor' ? b.floor - a.floor : (b.promo?.usd || 0) - (a.promo?.usd || 0)))
+  units.sort((a, b) => (sort === 'price' ? (a.net || 0) - (b.net || 0) : sort === 'm2' ? per(a) - per(b) : sort === 'area' ? b.area - a.area : sort === 'floor' ? b.floor - a.floor : (b.promo?.usd || 0) - (a.promo?.usd || 0)))
   const view = sp.view === 'table' ? 'table' : 'cards'
   const pages = Math.max(1, Math.ceil(units.length / PER)), page = Math.min(pages, Math.max(1, Number(sp.pg) || 1))
   const shown = units.slice((page - 1) * PER, page * PER)
@@ -40,8 +41,8 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
   const blocks = p ? Array.from(new Map(pool.map((u) => [u.building_id, u.building])).entries()) : []
   const types = Array.from(new Set(pool.map((u) => u.unit_type))).sort((a, b) => Object.keys(TYPE_NAME).indexOf(a) - Object.keys(TYPE_NAME).indexOf(b))
   const views = Array.from(new Set(pool.map((u) => u.view_side).filter(Boolean))) as string[]
-  const prices = pool.map((u) => u.usd || 0).filter(Boolean)
-  const kpi = units.length ? { min: Math.min(...units.map((u) => u.usd || Infinity)), m2: units.reduce((a, u) => a + per(u), 0) / units.length } : null
+  const prices = pool.map((u) => u.net || 0).filter(Boolean)
+  const kpi = units.length ? { min: Math.min(...units.map((u) => u.net || Infinity)), m2: units.reduce((a, u) => a + per(u), 0) / units.length } : null
   const chk = (name: string, val: string) => (sp[name] || '').split(',').includes(val)
   const roomsOn = (sp.r || '').split(',').filter(Boolean)
   return (

@@ -31,11 +31,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const ap = await one<{ market: string }>('select a.market from portal.application_files af join portal.agent_applications a on a.id = af.application_id where af.file_id = $1', [params.id])
     if (ap) ok = c.user.role === 'owner' || (['market_head', 'seller'].includes(c.user.role) && c.user.market === ap.market)
   }
-  // Картинки разметки (генплан, фасады, поэтажные планы) — тем, кому виден проект
+  // Картинки разметки (генплан, фасады, поэтажные планы) и обложка проекта — тем, кому виден проект
   if (!ok) {
     const img = await one<{ project_id: string }>(`select project_id from portal.genplans where file_id = $1
       union all select b.project_id from portal.facades f join buildings b on b.id = f.building_id where f.file_id = $1
-      union all select b.project_id from portal.floor_plans f join buildings b on b.id = f.building_id where f.file_id = $1 limit 1`, [params.id])
+      union all select b.project_id from portal.floor_plans f join buildings b on b.id = f.building_id where f.file_id = $1
+      union all select project_id from portal.project_settings where cover_file_id = $1 limit 1`, [params.id])
     if (img) ok = !ext || (await projectVisible(img.project_id, c.user))
   }
   if (!ok) return new Response('forbidden', { status: 404 })
