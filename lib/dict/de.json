@@ -1827,5 +1827,13 @@
 "К выплате партнёрам по актам": "An Partner fällig laut Akten",
 "Ошибка на странице {p} (код {d}) — подробности в журнале сервера": "Fehler auf Seite {p} (Code {d}) — Details im Serverprotokoll",
 "Фоновая обработка: ошибки — {e}": "Hintergrundverarbeitung: Fehler — {e}",
-"Фоновая обработка портала упала — проверьте журнал службы tick": "Die Hintergrundverarbeitung des Portals ist ausgefallen — Protokoll des tick-Dienstes prüfen"
+"Фоновая обработка портала упала — проверьте журнал службы tick": "Die Hintergrundverarbeitung des Portals ist ausgefallen — Protokoll des tick-Dienstes prüfen",
+"Вернуть синхронизацию": "Synchronisierung wiederherstellen",
+"Вернуть синхронизацию: {f}": "Synchronisierung wiederherstellen: {f}",
+"Вернуть синхронизацию: всё": "Synchronisierung wiederherstellen: alles",
+"Ручные правки: статус — {s}, цена — {p}": "Manuelle Änderungen: Status — {s}, Preis — {p}",
+"Ручная правка в портале фиксирует поле: синхронизация его не меняет. «Продано» у застройщика снимает замок статуса само.": "Eine manuelle Änderung im Portal sperrt das Feld: die Synchronisierung ändert es nicht. „Verkauft“ beim Bauträger hebt die Statussperre automatisch auf.",
+"все поля": "alle Felder",
+"Ссылка для входа": "Anmeldelink",
+"Ссылка для входа:": "Anmeldelink:"
 }

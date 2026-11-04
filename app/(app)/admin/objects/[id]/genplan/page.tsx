@@ -8,9 +8,11 @@ import { saveGenplan, saveMarks } from '@/lib/markup'
 import { MarksEditor } from '@/components/MarksEditor'
 import { cleanMarks } from '@/lib/surround'
 import Link from 'next/link'
+import { needUuid } from '@/lib/ids'
 
 // Разметка генплана: контур на каждый дом (блок)
 export default async function GenplanEditor({ params, searchParams }: { params: { id: string }; searchParams: { m?: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

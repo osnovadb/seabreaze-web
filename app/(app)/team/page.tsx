@@ -3,7 +3,7 @@ import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, date } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
-import { NewAgent } from './form'
+import { NewAgent, AgentLink } from './form'
 import { toggleAgencyAgent } from '@/lib/actions'
 
 export default async function Team() {
@@ -20,7 +20,7 @@ export default async function Team() {
       <div className="page">
         <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Сотрудник', 'Клиенты', 'Брони', 'Сделки', 'Последний вход', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
-          <tbody>{rows.map((r) => <tr key={r.id}><td><b>{r.name}</b><div className="tiny muted">{r.email}</div></td><td>{r.clients}</td><td>{r.bookings}</td><td>{r.deals}</td><td className="small muted">{date(L, r.last_login_at)}</td><td>{r.role === 'agent' && <form action={toggleAgencyAgent} className="row" style={{ gap: 6 }}><input type="hidden" name="id" value={r.id} />{!r.active && <Pill kind="off">{T('отключён')}</Pill>}<button className="btn btn--sm">{r.active ? T('Отключить') : T('Включить')}</button></form>}</td></tr>)}</tbody>
+          <tbody>{rows.map((r) => <tr key={r.id}><td><b>{r.name}</b><div className="tiny muted">{r.email}</div></td><td>{r.clients}</td><td>{r.bookings}</td><td>{r.deals}</td><td className="small muted">{date(L, r.last_login_at)}</td><td>{r.role === 'agent' && <form action={toggleAgencyAgent} className="row" style={{ gap: 6 }}><input type="hidden" name="id" value={r.id} />{!r.active && <Pill kind="off">{T('отключён')}</Pill>}<button className="btn btn--sm">{r.active ? T('Отключить') : T('Включить')}</button></form>}{r.role === 'agent' && r.active && <div className="mt8"><AgentLink lang={L} id={r.id} /></div>}</td></tr>)}</tbody>
         </table></div>
         <div className="mt16"><NewAgent lang={L} /></div>
       </div>

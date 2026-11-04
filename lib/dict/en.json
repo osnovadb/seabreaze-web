@@ -1827,5 +1827,13 @@
 "К выплате партнёрам по актам": "Due to partners under acts",
 "Ошибка на странице {p} (код {d}) — подробности в журнале сервера": "Error on page {p} (code {d}) — details in the server log",
 "Фоновая обработка: ошибки — {e}": "Background processing: errors — {e}",
-"Фоновая обработка портала упала — проверьте журнал службы tick": "The portal background job has failed — check the tick service log"
+"Фоновая обработка портала упала — проверьте журнал службы tick": "The portal background job has failed — check the tick service log",
+"Вернуть синхронизацию": "Restore sync",
+"Вернуть синхронизацию: {f}": "Restore sync: {f}",
+"Вернуть синхронизацию: всё": "Restore sync: all",
+"Ручные правки: статус — {s}, цена — {p}": "Manual edits: status — {s}, price — {p}",
+"Ручная правка в портале фиксирует поле: синхронизация его не меняет. «Продано» у застройщика снимает замок статуса само.": "A manual edit in the portal locks the field: sync won't change it. \"Sold\" at the developer removes the status lock automatically.",
+"все поля": "all fields",
+"Ссылка для входа": "Sign-in link",
+"Ссылка для входа:": "Sign-in link:"
 }

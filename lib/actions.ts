@@ -666,7 +666,12 @@ export async function updateUser(_: unknown, f: FormData) {
 }
 export async function resetPassword(_: unknown, f: FormData) {
   const c = await writeCtx()
-  const u = await editableUser(c, s(f, 'id'))
+  // Руководитель агентства перевыпускает ссылку своему агенту (потерял приглашение), остальное — по правам редактирования
+  let u = await editableUser(c, s(f, 'id'))
+  if (!u && c.user.role === 'agency_head') {
+    const a = await one<UserRow>('select id, role, market, curator_id, agency_id, email, name from portal.users where id = $1', [s(f, 'id')])
+    if (a && a.role === 'agent' && a.agency_id && a.agency_id === c.user.agency_id) u = a
+  }
   if (!u) return { error: 'Нет прав' }
   // Ссылка на новый пароль (48 часов); старый пароль действует, пока пользователь не задаст новый
   const full = (await one<{ id: string; email: string; name: string; locale: Lang; password_set: boolean }>('select id, email, name, locale, password_set from portal.users where id = $1', [u.id]))!

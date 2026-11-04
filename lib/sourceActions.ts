@@ -57,3 +57,16 @@ export async function retryPbOutbox(f: FormData) {
   await q(`update portal.pb_outbox set state = 'pending', attempts = 0 where id = $1 and state in ('error','skipped')`, [s(f, 'id')])
   revalidatePath('/sources')
 }
+
+// Замки ручных правок: вернуть полю (или всем) синхронизацию — по квартире или по всему источнику.
+// Меняется только locked_fields, цена и статус остаются: триггер замок заново не ставит, значение застройщика придёт следующим прогоном
+export async function unlockUnits(f: FormData) {
+  const c = await requireCtx()
+  if (!['owner', 'office'].includes(c.user.role) || c.impersonating) throw new Error('forbidden')
+  const field = s(f, 'field'), unit = s(f, 'unit'), src = s(f, 'source')
+  const expr = field === 'status' || field === 'price_list' ? `locked_fields - '${field}'` : `'[]'::jsonb`
+  const where = unit ? 'id = $1' : 'source_id = $1'
+  const r = await q<{ id: string }>(`update units set locked_fields = ${expr} where ${where} and jsonb_array_length(locked_fields) > 0 returning id`, [unit || src])
+  await audit(c.real.id, 'unit.unlock', unit ? 'unit' : 'source', unit || src, { field: field || 'all', units: r.length })
+  revalidatePath(unit ? `/units/${unit}` : '/sources')
+}

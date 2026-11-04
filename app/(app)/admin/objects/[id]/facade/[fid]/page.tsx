@@ -5,9 +5,11 @@ import { t } from '@/lib/i18n'
 import { Top } from '@/components/ui'
 import { FacadeEditor } from '@/components/FacadeEditor'
 import { saveFacade } from '@/lib/markup'
+import { needUuid } from '@/lib/ids'
 
 // Калибровка фасада: четыре угла сетки окон, стояки и этажи
 export default async function FacadeCal({ params }: { params: { id: string; fid: string } }) {
+  needUuid(params.fid)
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

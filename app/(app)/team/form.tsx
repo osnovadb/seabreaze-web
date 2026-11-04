@@ -1,7 +1,7 @@
 'use client'
 import { InviteLink } from '@/components/InviteLink'
 import { useFormState } from 'react-dom'
-import { createAgencyAgent } from '@/lib/actions'
+import { createAgencyAgent, resetPassword } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function NewAgent({ lang }: { lang: Lang }) {
@@ -19,6 +19,19 @@ export function NewAgent({ lang }: { lang: Lang }) {
       </div>
       <button className="btn btn--p">{T('Создать')}</button>
       <div className="tiny muted">{T('Сотрудник видит только своих клиентов; вы видите клиентов и брони всех сотрудников. Комиссия платится агентству.')}</div>
+    </form>
+  )
+}
+
+// Ссылка для входа сотруднику: приглашение (если пароль не задан) или сброс пароля
+export function AgentLink({ lang, id }: { lang: Lang; id: string }) {
+  const [st, act] = useFormState(resetPassword, null)
+  const T = (s: string) => t(lang, s)
+  return (
+    <form action={act}>
+      <input type="hidden" name="id" value={id} />
+      {st && 'link' in st && st.link ? <InviteLink lang={lang} link={st.link} mailed={st.mailed} title={T('Ссылка для входа:')} /> : <button className="btn btn--sm">{T('Ссылка для входа')}</button>}
+      {st?.error && <div className="err">{T(st.error)}</div>}
     </form>
   )
 }

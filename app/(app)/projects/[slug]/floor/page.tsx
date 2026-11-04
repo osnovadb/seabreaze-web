@@ -28,7 +28,7 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
   const rows = [units.slice(0, half), units.slice(half).reverse()]
   const sel = units.find((u) => u.id === searchParams.u) || units.find((u) => codeFor(u, c.user, mode) === 'F')
   // Настоящий план этажа, если загружен (Объекты → Разметка), и ориентация стояков
-  const plan = await one<{ file_id: string; north_deg: number; cells: { riser: string; points: number[][] }[]; marks: unknown }>('select file_id, north_deg, cells, marks from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by floor_to - floor_from limit 1', [b.id, f])
+  const plan = await one<{ file_id: string; north_deg: number; cells: { riser: string; points: number[][] }[]; marks: unknown }>('select file_id, north_deg, cells, marks from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by (source is not null), floor_to - floor_from limit 1', [b.id, f])
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
   const ri = await riserInfo(b.id)
   const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri))
