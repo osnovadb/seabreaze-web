@@ -10,7 +10,8 @@ import { ActionForm } from '@/components/ActionForm'
 import { saveGenplan, saveFacade, saveFloorPlan, saveRisers, saveSides } from '@/lib/markup'
 import { MARKS, SIDES, SIDE_NAME, type Sides } from '@/lib/surround'
 import { riser as riserOf } from '@/lib/catalog'
-import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode, saveOption } from '@/lib/objects'
+import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode, saveOption, importChess, copyFloor } from '@/lib/objects'
+import { ChessImport } from '@/components/ChessImport'
 
 const TYPES = UNIT_TYPES
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
@@ -175,6 +176,19 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
             <div className="small muted">{T('Массово — прайс-листом: отбор по корпусам, этажам, комнатам, стоякам; процент, сумма, цена за м² или шаг по этажам; предпросмотр и откат.')}</div>
             <div><Link className="btn" href={`/admin/prices?p=${p!.id}`}>{T('Прайс-листы')} →</Link></div>
           </div>
+          {owner && <ChessImport lang={L} projectId={p!.id} action={importChess} />}
+          {owner && (
+            <ActionForm action={copyFloor} lang={L} className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
+              <div className="h3" style={{ margin: 0 }}>{T('Копировать этаж')}</div>
+              <input type="hidden" name="project" value={p!.id} />
+              <label className="field"><span>{T('Блок')}</span><select className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              <div className="row"><label className="field" style={{ flex: 1 }}><span>{T('Этаж-образец')}</span><input className="in" name="source" type="number" defaultValue={fl ?? ''} required /></label>
+                <label className="field" style={{ flex: 1 }}><span>{T('На этажи с')}</span><input className="in" name="floor_from" type="number" required /></label><label className="field" style={{ flex: 1 }}><span>{T('по')}</span><input className="in" name="floor_to" type="number" required /></label></div>
+              <label className="check"><input type="checkbox" name="prices" value="1" /> <span>{T('Скопировать цены (иначе — «не в продаже» без цены)')}</span></label>
+              <div><button className="btn">{T('Копировать')}</button></div>
+              <div className="tiny muted">{T('Квартиры этажа-образца с теми же стояками, планировками, площадями и видом. Номер = этаж + позиция (806 → 906). Существующие номера пропускаются.')}</div>
+            </ActionForm>
+          )}
           {owner && (
             <ActionForm action={generateUnits} lang={L} reset className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Добавить квартиры')}</div>
