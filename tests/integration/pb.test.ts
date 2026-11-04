@@ -18,24 +18,27 @@ const t0 = new Date()
 
 const ssh = (cmd: string, input?: string) => execFileSync('ssh', ['ams', cmd], { encoding: 'utf8', input })
 // Правка фикстуры: py — выражение над d (dict); P(n) — квартира по номеру
-const fx = (py: string) => ssh(`python3 -c "
-import json,sys
+const fx = (py: string) => ssh('python3 -', `import json
 f='${FIX}';d=json.load(open(f))
 P=lambda n:[x for x in d['properties'] if x['number']==n][0]
-${py.replace(/"/g, '\\"')}
-json.dump(d,open(f,'w'),indent=1)"`)
+${py.split('; ').join('\n')}
+json.dump(d,open(f,'w'),indent=1)
+`)
 const prop = (n: string) => JSON.parse(ssh(`python3 -c "import json;d=json.load(open('${FIX}'));print(json.dumps([x for x in d['properties'] if x['number']=='${n}'][0]))"`))
+// Синхронный tick блокирует цикл событий, и сокет keep-alive к next dev успевает закрыться — первый запрос после него повторяем
+const retry = async <T>(fn: () => Promise<T>) => { try { return await fn() } catch { return fn() } }
 const tick = () => JSON.parse(execFileSync('node', ['scripts/tick.mjs'], { encoding: 'utf8', env: process.env }).trim().split(' ').slice(1).join(' '))
 const unit = async (n: string) => (await db.query(`select id, status, price_list::float p, locked_fields, raw, external_id from units where project_id=$1 and number=$2`, [MARINA, n])).rows[0]
 const aid = (file: string, name: string) => crypto.createHash('sha1').update(`${path.resolve(file)}:${name}`).digest('hex')
 async function call(who: string, file: string, name: string, fields: [string, string][], at = '/bookings') {
   const fd = new FormData(); fd.append('$ACTION_ID_' + aid(file, name), '')
   for (const [k, v] of fields) fd.append(k, v)
-  return (await fetch(URL0 + at, { method: 'POST', body: fd, headers: { cookie: await login(who) }, redirect: 'manual' })).status
+  const cookie = await retry(() => login(who))
+  return (await retry(() => fetch(URL0 + at, { method: 'POST', body: fd, headers: { cookie, connection: 'close' }, redirect: 'manual' }))).status
 }
 async function book(unitId: string) {
-  const ag = await login(U.agent)
-  const f = formWith((await page(ag, `/units/${unitId}/book`)).html, 'discount', 'client', 'unit')
+  const ag = await retry(() => login(U.agent))
+  const f = formWith((await retry(() => page(ag, `/units/${unitId}/book`))).html, 'discount', 'client', 'unit')
   assert.ok(f, 'форма брони Marina')
   const t = new Date()
   await submit(ag, `/units/${unitId}/book`, { ...f!, fields: f!.fields.filter(([k]) => k !== 'package') }, { discount: '0', client: JONAS })
@@ -132,7 +135,7 @@ test('запись в Profitbase: подтверждение → ge_booking, с�
   await act(U.agent, b1, 'cancel'); tick()
   assert.equal(prop('501').status, 'AVAILABLE', 'снятие не записано')
   const b2 = await book(u6.id); assert.ok(b2, 'бронь 502')
-  await act(U.office, b2, 'confirm'); await act(U.owner, b2, 'contract'); tick()
+  await act(U.office, b2, 'confirm'); await act(U.owner, b2, 'contract'); tick(); tick() // синхронизация идёт раньше записи — «продано» вернётся следующим проходом
   assert.equal(prop('502').customStatusId, 502, 'ge_sold не записан')
   assert.equal((await unit('502')).status, 'sold', 'после синхронизации квартира не продана')
   const errs = (await db.query(`select count(*)::int n from portal.pb_outbox where created_at >= $1 and state <> 'sent'`, [t0])).rows[0].n
@@ -141,19 +144,14 @@ test('запись в Profitbase: подтверждение → ge_booking, с�
 
 test('ошибка записи: на третьей неудаче — одна задача офису', { skip }, async () => {
   const u = await unit('401')
-  const ext = u.external_id
-  await db.query(`update units set external_id='999999' where id=$1`, [u.id]) // нет в Profitbase → 404
-  try {
-    await db.query(`insert into portal.pb_outbox (source_id, unit_id, op, status_alias) values ('pb:mock',$1,'reserve','ge_booking')`, [u.id])
-    for (let i = 0; i < 4; i++) tick()
-    const j = (await db.query(`select state, attempts from portal.pb_outbox where unit_id=$1 and created_at >= $2`, [u.id, t0])).rows[0]
-    assert.equal(j.state, 'error'); assert.ok(j.attempts >= 3)
-    const n = (await db.query(`select count(*)::int n from portal.tasks where created_at >= $1 and title like 'Profitbase%'`, [t0])).rows[0].n
-    const office = (await db.query(`select count(*)::int n from portal.users where role='office' and active`)).rows[0].n
-    assert.equal(n, office, `задач: ${n}`)
-  } finally {
-    await db.query(`update units set external_id=$2 where id=$1`, [u.id, ext])
-  }
+  // статуса qa_bad в Profitbase нет → заглушка отвечает 400
+  await db.query(`insert into portal.pb_outbox (source_id, unit_id, op, status_alias) values ('pb:mock',$1,'reserve','qa_bad')`, [u.id])
+  for (let i = 0; i < 4; i++) tick()
+  const j = (await db.query(`select state, attempts from portal.pb_outbox where unit_id=$1 and status_alias='qa_bad'`, [u.id])).rows[0]
+  assert.equal(j.state, 'error'); assert.ok(j.attempts >= 3, `попыток ${j.attempts}`)
+  const n = (await db.query(`select count(*)::int n from portal.tasks where created_at >= $1 and title like 'Profitbase%'`, [t0])).rows[0].n
+  const office = (await db.query(`select count(*)::int n from portal.users where role='office' and active`)).rows[0].n
+  assert.equal(n, office, `задач: ${n}`)
 })
 
 test('/sources: владелец и офис открывают; «Запустить сейчас» — owner и office; остальные — нет', { skip }, async () => {
