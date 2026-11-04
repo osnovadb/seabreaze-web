@@ -1,4 +1,5 @@
 'use client'
+import { InviteLink } from '@/components/InviteLink'
 import { useFormState } from 'react-dom'
 import { createUser } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
@@ -11,7 +12,7 @@ export function NewUser({ lang, agencies }: { lang: Lang; agencies: { id: string
     <form action={act} className="card stack" style={{ gap: 10 }}>
       <div className="h3" style={{ margin: 0 }}>{T('Новый пользователь')}</div>
       {st?.error && <div className="err">{T(st.error)}</div>}
-      {st?.ok && <div className="okbox">{T('Создан. Временный пароль — передайте лично и попросите сменить:')} <b>{st.password}</b></div>}
+      {st && 'link' in st && <InviteLink lang={lang} link={st.link} mailed={st.mailed} title={T('Создан. Пароль пользователь задаст сам по ссылке-приглашению (7 дней):')} />}
       <label className="field"><span>{T('Имя')}</span><input className="in" name="name" required /></label>
       <label className="field"><span>E-mail</span><input className="in" name="email" type="email" required /></label>
       <label className="field"><span>{T('Роль')}</span><select className="in" name="role">{Object.entries(ROLE_NAMES).map(([k, v]) => <option key={k} value={k}>{T(v)}</option>)}</select></label>
