@@ -65,18 +65,19 @@ export function newPrice(u: RuleUnit, r: PriceRule): number | null {
     case 'add': v = p + r.value; break
     case 'set': v = r.value; break
     case 'm2': if (!u.area) return null; v = r.value * u.area; break
-    case 'floor_step': v = p * (1 + (r.value / 100) * Math.max(0, u.floor - (r.base_floor ?? u.floor))); break
+    // базовый этаж и ниже не меняются (иначе округление сдвинуло бы цену без шага)
+    case 'floor_step': if (u.floor <= (r.base_floor ?? u.floor)) return null; v = p * (1 + (r.value / 100) * (u.floor - (r.base_floor ?? u.floor))); break
   }
   v = rnd(v, r.round)
   return v > 0 && v !== u.price ? v : null
 }
 
 export function computeItems(units: RuleUnit[], r: PriceRule) {
-  const out: { unit_id: string; old_price: number; new_price: number; currency: string }[] = []
+  const out: { unit_id: string; old_price: number | null; new_price: number; currency: string }[] = []
   for (const u of units) {
     if (!matches(u, r)) continue
     const v = newPrice(u, r)
-    if (v != null) out.push({ unit_id: u.id, old_price: u.price ?? 0, new_price: v, currency: u.currency })
+    if (v != null) out.push({ unit_id: u.id, old_price: u.price, new_price: v, currency: u.currency }) // без цены — null, откат вернёт пустую
   }
   return out
 }

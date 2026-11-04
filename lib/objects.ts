@@ -14,7 +14,7 @@ import { autoPost, dropAutoPost } from './posts'
 import { asActor } from './unitEvents'
 import { UNIT_TYPES, riser } from './catalog'
 import { readXlsx } from './xlsx'
-import { parseChess } from './chessImport'
+import { parseChess, bareNo } from './chessImport'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
@@ -145,6 +145,45 @@ export async function saveLayout(_: unknown, f: FormData) {
 }
 
 /* ── Квартиры ── */
+// Скрыть от партнёров (квота, придержать): отметка портала, на сайты не влияет. М12: их места в листе ожидания закрываются с уведомлением.
+async function hideUnits(ids: string[], by: string) {
+  for (const id of ids) {
+    await q(`insert into portal.unit_hidden (unit_id, created_by) values ($1,$2) on conflict do nothing`, [id, by])
+    const gone = await q<{ id: string; user_id: string; unit: string }>(`update portal.waitlist w set active = false from portal.users us, units u join buildings b on b.id = u.building_id
+      where w.unit_id = $1 and w.active and us.id = w.user_id and us.role in ('agent','agency_head') and u.id = w.unit_id
+      returning w.id, w.user_id, coalesce(b.external_id, '') || '-' || u.number unit`, [id])
+    for (const g of gone) await notifyUser(g.user_id, 'waitlist', 'Квартира {u} снята с продажи для партнёров — вы убраны из листа ожидания', '/waitlist', { u: g.unit })
+  }
+}
+// Быстрая правка из панели шахматки: только цена, валюта и статус (офис или владелец), от имени пользователя
+export const quickUnit = safe(async (_: unknown, f: FormData) => {
+  const c = await unitsEditor()
+  const id = s(f, 'id')
+  const price = num(f, 'price'), cur = ['USD', 'AZN', 'EUR'].includes(s(f, 'currency')) ? s(f, 'currency') : null
+  const status = UNIT_STATUSES.includes(s(f, 'status')) ? s(f, 'status') : null
+  if (price != null && (Number.isNaN(price) || price <= 0)) return { error: t(c.lang, 'Проверьте цену') }
+  const u = await one<{ project_id: string }>('select project_id from units where id = $1', [id])
+  if (!u || !cur || !status) return { error: t(c.lang, 'Проверьте данные') }
+  await asActor(c.user.id, 'portal', (db) => db.query('update units set price_list = $2, price_currency = $3, status = $4 where id = $1', [id, price, cur, status]))
+  await log(c, 'object.unit_quick', 'unit', id, { price, cur, status }); done(u.project_id)
+  return { ok: true }
+})
+// Массово из шахматки: статус (офис или владелец) и «скрыть от партнёров» (владелец)
+export async function bulkStatus(f: FormData) {
+  const c = await unitsEditor()
+  const pid = s(f, 'project'), st = s(f, 'status'), ids = f.getAll('units').map(String).slice(0, 500)
+  if (!UNIT_STATUSES.includes(st) || !ids.length) return
+  const r = await asActor(c.user.id, 'portal', (db) => db.query('update units set status = $3 where project_id = $1 and id = any($2) and status <> $3', [pid, ids, st]))
+  await log(c, 'object.units_status', 'project', pid, { status: st, n: r.rowCount }); done(pid)
+}
+export async function bulkHide(f: FormData) {
+  const c = await owner()
+  const pid = s(f, 'project'), ids = (await q<{ id: string }>('select id from units where project_id = $1 and id = any($2)', [pid, f.getAll('units').map(String).slice(0, 500)])).map((r) => r.id)
+  if (!ids.length) return
+  if (s(f, 'hidden') === '1') await hideUnits(ids, c.user.id)
+  else await q('delete from portal.unit_hidden where unit_id = any($1)', [ids])
+  await log(c, 'object.units_hidden', 'project', pid, { hidden: s(f, 'hidden') === '1', n: ids.length }); done(pid); revalidatePath('/projects', 'layout')
+}
 // Правка одной квартиры. Цена и статус — офис или владелец; ручная правка у квартир из Profitbase и xlsx получает замок от синхронизации (триггер каталога).
 export const saveUnit = safe(async (_: unknown, f: FormData) => {
   const c = await unitsEditor()
@@ -170,14 +209,7 @@ export const saveUnit = safe(async (_: unknown, f: FormData) => {
   if (err) return { error: err }
   // Скрыть от партнёров — отдельная отметка портала, на сайты не влияет
   if (id && f.has('hidden_set')) {
-    if (s(f, 'hidden') === '1') {
-      await q(`insert into portal.unit_hidden (unit_id, created_by) values ($1,$2) on conflict do nothing`, [id, c.user.id])
-      // М12: партнёры в листе ожидания на скрытую квартиру — запись закрывается с уведомлением, а не висит молча
-      const gone = await q<{ id: string; user_id: string; unit: string }>(`update portal.waitlist w set active = false from portal.users us, units u join buildings b on b.id = u.building_id
-        where w.unit_id = $1 and w.active and us.id = w.user_id and us.role in ('agent','agency_head') and u.id = w.unit_id
-        returning w.id, w.user_id, coalesce(b.external_id, '') || '-' || u.number unit`, [id])
-      for (const g of gone) await notifyUser(g.user_id, 'waitlist', 'Квартира {u} снята с продажи для партнёров — вы убраны из листа ожидания', '/waitlist', { u: g.unit })
-    }
+    if (s(f, 'hidden') === '1') await hideUnits([id], c.user.id)
     else await q('delete from portal.unit_hidden where unit_id = $1', [id])
   }
   await log(c, id ? 'object.unit_update' : 'object.unit_create', 'unit', id || s(f, 'number'), { price, status }); done(pid)
@@ -354,7 +386,7 @@ export const importChess = safe(async (_: unknown, f: FormData) => {
   for (const r of p.rows) {
     const b = bid(r.block), set = { ...r.set }
     if (set.layout) { const l = layouts.find((x) => x.code.toLowerCase() === String(set.layout).toLowerCase())!; delete set.layout; set.layout_id = l.id; set.unit_type ??= l.unit_type; set.bedrooms ??= l.bedrooms; set.area_total_m2 ??= l.total_area_m2 }
-    const u = cur.find((x) => x.building_id === b && x.number === r.number)
+    const u = cur.find((x) => x.building_id === b && x.number === r.number) || cur.find((x) => x.building_id === b && bareNo(x.number) === r.bare)
     if (u) {
       const diff = Object.fromEntries(Object.entries(set).filter(([k, v]) => u[k] !== v && !(u[k] == null && v == null)))
       if (Object.keys(diff).length) plan.push({ kind: 'update', id: u.id, building: b, number: r.number, set: diff }); else same++
@@ -385,6 +417,13 @@ export const importChess = safe(async (_: unknown, f: FormData) => {
   return { ok: true, report, applied: true }
 })
 
+// Номер квартиры на другом этаже в формате образца: «806» → «906», «A-0301» → «A-0401», «12A05» как есть по позиции.
+// Этаж в номере — цифры перед двумя последними (позиция); ширина сохраняется (03 → 04). Без этажа в номере — этаж + позиция.
+function floorNumber(n: string, from: number, to: number) {
+  const m = n.match(/^([A-Za-zА-Яа-я]{1,3}-)?(\d+)(.*)$/)
+  if (m && m[2].length >= 3 && Number(m[2].slice(0, -2)) === from) return (m[1] || '') + String(to).padStart(m[2].length - 2, '0') + m[2].slice(-2) + m[3]
+  return (m?.[1] || '') + `${to}${riser({ number: n, floor: from })}`
+}
 // Копировать этаж: квартиры этажа-образца на этажи «с–по» с теми же позициями (стояками); номер = этаж + позиция, как при создании
 export const copyFloor = safe(async (_: unknown, f: FormData) => {
   const c = await owner()
@@ -402,7 +441,7 @@ export const copyFloor = safe(async (_: unknown, f: FormData) => {
   await asActor(c.user.id, 'portal', async (db) => {
     await db.query(`select set_config('app.skip_refresh', 'on', true)`)
     for (let fl = from; fl <= to; fl++) for (const u of base) {
-      const number = `${fl}${riser(u)}`
+      const number = floorNumber(u.number, u.floor, fl)
       if (exist.has(number.toUpperCase())) continue
       const price = withPrice ? u.price_list : null
       await db.query(`insert into units (project_id, building_id, layout_id, number, floor, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2, plot_area_m2, price_list, price_currency, status, view_side, is_corner, source_id)

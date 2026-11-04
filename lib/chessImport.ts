@@ -16,7 +16,10 @@ const STATUS_ALIAS: Record<string, string> = { available: 'available', free: 'av
 const VIEW_ALIAS: Record<string, string> = { sea: 'sea', 'море': 'sea', 'на море': 'sea', marina: 'marina', 'марина': 'marina', park: 'park', 'парк': 'park', yard: 'yard', 'двор': 'yard', 'во двор': 'yard',
   city: 'city', 'улица': 'city', 'город': 'city', mixed: 'mixed', 'две стороны': 'mixed' }
 
-export type Row = { line: number; block: string; number: string; set: Record<string, unknown> }
+export type Row = { line: number; block: string; number: string; bare: string; set: Record<string, unknown> }
+// Номер без префикса корпуса: «A-0301» → «0301». Квартира ищется и по номеру как есть, и без префикса —
+// у Premium в базе «808», у BRABUS — «A-0301»
+export const bareNo = (n: string) => n.toUpperCase().replace(/^[A-ZА-Я]{1,3}-/, '')
 const yes = (v: string) => ['да', 'yes', 'ja', '1', 'true', 'x', '+'].includes(v.toLowerCase())
 
 // rows — первая строка заголовок; номер строки в ошибках — как в Excel
@@ -30,13 +33,14 @@ export function parseChess(rows: string[][], ctx: { blocks: string[]; layouts: s
   rows.slice(1).forEach((r, i) => {
     const line = i + 2, cell = (k: string) => (idx[k] != null ? String(r[idx[k]] ?? '').trim() : '')
     if (!r.some((x) => String(x ?? '').trim())) return
-    const block = cell('block'), number = cell('number').toUpperCase().replace(/^[A-ZА-Я]{1,3}-/, '') // «A-101» из шахматки = «101» в корпусе A
+    const block = cell('block'), number = cell('number').toUpperCase(), bare = bareNo(number)
     const err = (m: string) => errors.push(`${line}: ${m}`)
     if (!block || !number) return err('нет корпуса или номера')
     if (!ctx.blocks.some((b) => b.toLowerCase() === block.toLowerCase())) return err(`нет корпуса «${block}»`)
     const set: Record<string, unknown> = {}
-    const n = (k: string, col: string, min = 0) => { const v = cell(k); if (!v) return true; const x = num(v); if (Number.isNaN(x) || x < min) { err(`${col}: «${v}»`); return false } set[col] = x; return true }
-    if (!n('floor', 'floor', -5) || !n('bedrooms', 'bedrooms') || !n('area', 'area_total_m2') || !n('terrace', 'area_external_m2') || !n('garden', 'plot_area_m2') || !n('price', 'price_list')) return
+    // positive — строго больше нуля (цена и площадь): «свободна за $0» в каталоге недопустима
+    const n = (k: string, col: string, min = 0, positive = false) => { const v = cell(k); if (!v) return true; const x = num(v); if (Number.isNaN(x) || x < min || (positive && x <= 0)) { err(`${col}: «${v}»`); return false } set[col] = x; return true }
+    if (!n('floor', 'floor', -5) || !n('bedrooms', 'bedrooms') || !n('area', 'area_total_m2', 0, true) || !n('terrace', 'area_external_m2') || !n('garden', 'plot_area_m2') || !n('price', 'price_list', 0, true)) return
     if (set.floor != null) set.floor = Math.round(set.floor as number)
     const type = cell('type').toLowerCase()
     if (type) { const v = UNIT_TYPES.includes(type) ? type : TYPE_ALIAS[type]; if (!v) return err(`тип «${cell('type')}»`); set.unit_type = v }
@@ -49,8 +53,8 @@ export function parseChess(rows: string[][], ctx: { blocks: string[]; layouts: s
     if (cell('corner')) set.is_corner = yes(cell('corner'))
     const lay = cell('layout')
     if (lay) { if (!ctx.layouts.some((l) => l.toLowerCase() === lay.toLowerCase())) return err(`нет планировки «${lay}»`); set.layout = lay }
-    if (out.some((x) => x.block.toLowerCase() === block.toLowerCase() && x.number === number)) return err(`квартира ${block}-${number} в файле дважды`)
-    out.push({ line, block, number, set })
+    if (out.some((x) => x.block.toLowerCase() === block.toLowerCase() && x.bare === bare)) return err(`квартира ${number} в файле дважды`)
+    out.push({ line, block, number, bare, set })
   })
   return { error: '', rows: out, errors }
 }

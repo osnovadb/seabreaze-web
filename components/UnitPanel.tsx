@@ -4,6 +4,8 @@ import { planUrl, unitNo } from '@/lib/catalog'
 import { t, usd, m2, date, type Lang } from '@/lib/i18n'
 import { Pill } from '@/components/ui'
 import { startShow } from '@/lib/actions'
+import { quickUnit } from '@/lib/objects'
+import { ActionForm } from '@/components/ActionForm'
 
 const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
   F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Квота SeaBreeze', 'off'],
@@ -11,9 +13,9 @@ const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 
 }
 
 // Квартира справа от шахматки: смотреть, не уходя со страницы. mode=show — без рабочих действий и внутренней информации.
-export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient }: {
+export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient, quickEdit }: {
   u: Unit; code: Code; lang: Lang; mode: 'team' | 'agent' | 'show'; closeHref: string; canBook?: boolean
-  booking?: { client: string; agent: string; ends_at: string } | null; orient?: string
+  booking?: { client: string; agent: string; ends_at: string } | null; orient?: string; quickEdit?: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const outdoor = (u.plot_area || 0) + (u.ext_area || 0)
@@ -41,6 +43,18 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
         {orient && <div className="kv"><span>{T('Вид из окон')}</span><span>{orient}</span></div>}
         {mode === 'team' && booking && <div className="kv"><span>{T('Бронь')}</span><span className="small">{booking.client} · {booking.agent} · {T('до {d}', { d: date(lang, booking.ends_at) })}</span></div>}
       </div>
+      {quickEdit && mode === 'team' && (
+        <ActionForm action={quickUnit} lang={lang} className="card card--sand card--tight stack mt16" style={{ gap: 6 }}>
+          <div className="label">{T('Быстрая правка')}</div>
+          <input type="hidden" name="id" value={u.id} />
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            <input className="in" name="price" inputMode="decimal" defaultValue={u.price ?? ''} placeholder={T('Цена')} />
+            <select className="in" name="currency" defaultValue={u.currency} style={{ width: 80 }}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select>
+          </div>
+          <select className="in" name="status" defaultValue={u.status}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
+          <div><button className="btn btn--sm">{T('Сохранить')}</button></div>
+        </ActionForm>
+      )}
       <div className="stack mt16" style={{ gap: 8 }}>
         {show ? (
           <Link className="btn btn--p btn--block" href={`/show/unit/${u.id}`}>{T('Подробнее')}</Link>

@@ -444,6 +444,29 @@ export async function addToSelection(f: FormData) {
   await q(`update portal.clients set stage = case when stage in ('lead','contact','qualify','fixation') then 'selection' else stage end, last_activity_at = now() where id = $1`, [clientId])
   redirect(`/selections/${sel!.id}`)
 }
+// Несколько квартир из шахматки в подборку клиента разом (без перехода в подборку — шахматка остаётся открытой)
+export async function addManyToSelection(f: FormData) {
+  const c = await writeCtx()
+  const clientId = s(f, 'client'), ids = f.getAll('units').map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 100)
+  if (!ids.length) return
+  await stageGuard(c, clientId)
+  // Партнёру — только видимые ему квартиры (не скрытые, открытый проект)
+  const ok = await q<{ id: string; project_id: string }>(`select u.id, u.project_id from units u where u.id = any($1) and (not $2 or not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))`, [ids, isExternal(c.user.role)])
+  const vis = new Map<string, boolean>()
+  const list: string[] = []
+  for (const u of ok) { if (isExternal(c.user.role)) { if (!vis.has(u.project_id)) vis.set(u.project_id, await projectVisible(u.project_id, c.user)); if (!vis.get(u.project_id)) continue } list.push(u.id) }
+  if (!list.length) return
+  let sel = await one<{ id: string }>(`select id from portal.selections where client_id = $1 and user_id = $2 and title <> 'Встреча' order by created_at desc limit 1`, [clientId, c.user.id])
+  if (!sel) {
+    const cl = await one<{ language: string | null }>('select language from portal.clients where id = $1', [clientId])
+    sel = await one<{ id: string }>(`insert into portal.selections (token, client_id, user_id, title, lang) values ($1,$2,$3,'Подборка',$4) returning id`, [crypto.randomBytes(9).toString('base64url'), clientId, c.user.id, ['ru', 'en', 'de', 'he'].includes(cl?.language || '') ? cl!.language : 'en'])
+  }
+  for (const id of list) await q(`insert into portal.selection_items (selection_id, unit_id, sort) values ($1,$2,(select coalesce(max(sort),0)+1 from portal.selection_items where selection_id = $1)) on conflict do nothing`, [sel!.id, id])
+  await q(`update portal.clients set stage = case when stage in ('lead','contact','qualify','fixation') then 'selection' else stage end, last_activity_at = now() where id = $1`, [clientId])
+  await notify(c.user.id, 'selection', 'В подборку добавлено квартир: {n}', `/selections/${sel!.id}`, { n: list.length })
+  await audit(c.real.id, 'selection.add_many', 'client', clientId, { n: list.length }, c.impersonating ? c.user.id : null)
+  revalidatePath(`/selections/${sel!.id}`)
+}
 export async function selectionUpdate(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'id')
