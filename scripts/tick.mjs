@@ -27,6 +27,9 @@ for (const b of expired) {
   const cur = (await q('select curator_id from portal.users where id = $1', [b.agent_id]))[0]?.curator_id
   if (cur) await notify(cur, 'booking', 'Бронь {u} истекла', '/bookings', { u: b.unit }, 'expired-c:' + b.id)
 }
+// Платная бронь истекла после оплаты взноса — финансам решить: вернуть или удержать
+const feeLeft = await q(`select b.id from portal.bookings b where b.status = 'expired' and b.fee_status = 'paid' and b.ends_at > now() - interval '1 day'`)
+if (feeLeft.length) for (const o of await q(`select id from portal.users where active and role in ('finance','owner')`)) for (const b of feeLeft) await notify(o.id, 'booking', 'Оплаченная бронь истекла — решите по взносу: вернуть или удержать', '/bookings?f=fee', {}, 'fee-left:' + b.id + ':' + o.id)
 out.expired = expired.length
 
 // 2. Бронь кончается через 3 дня или меньше

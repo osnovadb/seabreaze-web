@@ -13,7 +13,7 @@ import { saveAgentRate } from '@/lib/actions'
 // Первая версия условий нового проекта: значения по умолчанию как у Premium (5% + пул 20%, партнёру 2% + 10%), правятся перед публикацией
 const defaults = (projectId: string): Conditions => ({ id: '', project_id: projectId, version: 1, status: 'draft', valid_from: new Date().toISOString().slice(0, 10), fix_pct: 5, pool_pct: 20,
   agent_fix_pct: 2, agent_pool_pct: 10, agent_our_pool_share: 0, seller_share_pct: 15, seller_self_disc: 10, seller_max_disc: 20, booking_days: 14, booking_ext_days: 14, protect_months: 3,
-  max_bookings_client: 3, max_bookings_agent: 3, max_bookings_total: 10, pay_timing: 'after_first_payment', payment_plans: [], note: null, created_at: '' })
+  max_bookings_client: 3, max_bookings_agent: 3, max_bookings_total: 10, pay_timing: 'after_first_payment', payment_plans: [], note: null, created_at: '', booking_fee: 0, booking_fee_currency: 'USD' })
 
 export default async function Conditions({ searchParams }: { searchParams: { p?: string } }) {
   const c = await requireCtx()

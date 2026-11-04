@@ -117,10 +117,10 @@ export type Conditions = {
   id: string; project_id: string; version: number; status: string; valid_from: string; fix_pct: number; pool_pct: number
   agent_fix_pct: number; agent_pool_pct: number; agent_our_pool_share: number; seller_share_pct: number; seller_self_disc: number; seller_max_disc: number
   booking_days: number; booking_ext_days: number; protect_months: number; max_bookings_client: number; max_bookings_agent: number; max_bookings_total: number
-  pay_timing: string; payment_plans: { name: string; note: string }[]; note: string | null; created_at: string
+  pay_timing: string; payment_plans: { name: string; note: string }[]; note: string | null; created_at: string; booking_fee: number; booking_fee_currency: string
 }
-const COND = `id, project_id, version, status, valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float,
-  seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at`
+const COND = `id, project_id, version, status, valid_from::text valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float,
+  seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at, booking_fee::float, booking_fee_currency`
 export async function conditionsFor(projectId: string, agent?: User | null): Promise<Conditions | undefined> {
   const c = await one<Conditions>(`select ${COND} from portal.conditions where project_id = $1 and status = 'published' and valid_from <= current_date order by valid_from desc, version desc limit 1`, [projectId])
   if (!c || !agent) return c

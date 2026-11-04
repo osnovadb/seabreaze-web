@@ -32,6 +32,9 @@ export function CondForm({ lang, projectId, cur, canEdit, example }: { lang: Lan
         <div className="grid g3 mt8">{N('seller_self_disc', 'Продавец сам')}{N('seller_max_disc', 'С согласованием до')}{N('seller_share_pct', 'Доля продавца (% от нашего дохода)')}</div>
         <div className="label mt16">{T('Бронь и защита')}</div>
         <div className="grid g3 mt8">{N('booking_days', 'Бронь', 'дней')}{N('booking_ext_days', 'Продление', 'дней')}{N('protect_months', 'Защита клиента агента', 'мес.')}{N('max_bookings_client', 'Броней на клиента', 'шт.')}{N('max_bookings_agent', 'Броней на агента', 'шт.')}{N('max_bookings_total', 'Всего у застройщика', 'шт.')}</div>
+        <div className="grid g3 mt8">{N('booking_fee', 'Платная бронь: взнос', '0 — нет')}
+          <label className="field"><span>{T('Валюта взноса')}</span><select className="in" name="booking_fee_currency" defaultValue={cur.booking_fee_currency || 'USD'} disabled={!canEdit}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <div className="tiny muted" style={{ alignSelf: 'center' }}>{T('С взносом офис подтверждает бронь только после отметки «взнос получен»; при договоре взнос засчитывается в цену, при снятии финансы решают — вернуть или удержать.')}</div></div>
         <div className="grid g2 mt16">
           <label className="field"><span>{T('Вступает в силу')}</span><input className="in" type="date" name="valid_from" defaultValue={String(cur.valid_from).slice(0, 10)} disabled={!canEdit} /></label>
           <div className="small muted">{T('Планы оплаты и рассрочки — в «Объекты → проект → Планы оплаты».')}</div>

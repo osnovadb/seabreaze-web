@@ -13,9 +13,9 @@ function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{label}</button>
 }
-export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs, options = [], pkgs = [] }: {
+export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, cond, days, ext_days, clients, plans, fx, promo, mode, preset, showOurs, options = [], pkgs = [], fee = null }: {
   lang: Lang; unitId: string; list: number; ext: boolean; cap: number; ceiling: number; cond: SplitCond; days: number; ext_days: number
-  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean; options?: Opt[]; pkgs?: { id: string; client_id: string; unit: string }[]
+  clients: { id: string; name: string; reg_no: string }[]; plans: Plan[]; fx: FxView; promo: PromoView | null; mode: PromoMode; preset?: string; showOurs: boolean; options?: Opt[]; pkgs?: { id: string; client_id: string; unit: string }[]; fee?: { amount: number; cur: string } | null
 }) {
   const [cid, setCid] = useState(preset || '')
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
@@ -76,6 +76,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
           {optSum > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optSum)} · {T('всего {a}', { a: usd(lang, sp.final + optSum) })}</span></div>}
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}
           {ext && <div className="kv"><span>{T('Ваша часть пула, не отданная клиенту')}</span><span>{pct(lang, Math.max(0, cond.agent_pool_pct - disc))} · {usd(lang, sp.agentPoolLeft)}</span></div>}
+          {fee && <div className="kv"><span>{T('Платная бронь')}</span><span className="small">{T('взнос {a} — офис подтвердит бронь после оплаты; при договоре засчитывается в цену', { a: `${fee.cur} ${num(lang, fee.amount)}` })}</span></div>}
           <div className="kv"><span>{T('Срок брони')}</span><span>{T('{a} дней + одно продление на {b}', { a: days, b: ext_days })}</span></div>
           <div className="kv"><span>{T('Выплата')}</span><span>{T('после оплаты застройщиком')}</span></div>
         </div>
