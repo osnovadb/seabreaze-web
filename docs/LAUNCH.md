@@ -38,6 +38,7 @@ psql -U <superuser> -d seabreeze -f db/catalog-v2.sql
 - **tick:** таймер раз в 15 минут — как сейчас.
 - **Падение tick:** добавить `OnFailure=getsestate-portal-tick-failed.service`, unit по образцу `ge-portal2-tick-failed` (запускает `scripts/tick-failed.mjs`).
 - **Заглушка Profitbase:** служба `ge-pbmock` есть только на стенде, на бой не ставить.
+- **Origin только через Cloudflare:** порты 80/443 боя открыть лишь для диапазонов Cloudflare (ufw, список с cloudflare.com/ips). Иначе `cf-connecting-ip` можно подделать прямым запросом, и лимит входа «20 попыток с IP» обходится. Лимит по e-mail работает в любом случае.
 
 ## 6. Данные
 

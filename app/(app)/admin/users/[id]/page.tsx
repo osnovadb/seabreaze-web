@@ -7,9 +7,11 @@ import { ROLE_NAMES, type Role } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { endSessions, setUserActive } from '@/lib/actions'
 import { EditUser, Secrets } from './form'
+import { needUuid } from '@/lib/ids'
 
 // Карточка пользователя в админке: владелец правит всех, руководитель рынка — агентов своего рынка
 export default async function UserCard({ params }: { params: { id: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

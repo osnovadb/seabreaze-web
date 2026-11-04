@@ -5,7 +5,7 @@ import { t, dateTime } from '@/lib/i18n'
 import { canSeeSources } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
-import { savePbSource, runPbSource, saveStatusMap, retryPbOutbox } from '@/lib/sourceActions'
+import { savePbSource, runPbSource, saveStatusMap, retryPbOutbox, unlockUnits } from '@/lib/sourceActions'
 
 export default async function Sources() {
   const c = await requireCtx()
@@ -17,6 +17,7 @@ export default async function Sources() {
   const lka = await q<{ n: number; at: string }>(`select count(*)::int n, max(raw->'lka'->>'snapshot') at from units where raw ? 'lka'`)
   const runs = await q<{ source_id: string; started_at: string; finished_at: string | null; status: string; stats: { checked?: number; changed?: number; created?: number; gone?: number; floors?: number; errors?: string[] } | null; error: string | null }>('select source_id, started_at, finished_at, status, stats, error from sync_runs order by started_at desc limit 20')
   // Profitbase (М1, М11): подключения, очередь записи броней и продаж, сопоставление статусов
+  const locks = new Map((await q<{ source_id: string; status: number; price: number }>(`select source_id, count(*) filter (where locked_fields ? 'status')::int status, count(*) filter (where locked_fields ? 'price_list')::int price from units where jsonb_array_length(locked_fields) > 0 group by source_id`)).map((r) => [r.source_id, r]))
   const pbs = await q<{ id: string; name: string; active: boolean; config: { account?: string; base_url?: string; key_env?: string; projects?: Record<string, string>; houses?: Record<string, string>; reserve_status?: string; sold_status?: string; currency?: string }; last_sync_at: string | null; last_sync_status: string | null }>(`select id, name, active, config, last_sync_at, last_sync_status from sources where kind = 'profitbase' order by id`)
   const outbox = await q<{ id: string; source_id: string; op: string; status_alias: string; state: string; attempts: number; last_error: string | null; created_at: string; no: string }>(`select o.id, o.source_id, o.op, o.status_alias, o.state, o.attempts, o.last_error, o.created_at, portal.unit_no(b.external_id, u.number) no
     from portal.pb_outbox o join units u on u.id = o.unit_id join buildings b on b.id = u.building_id order by o.created_at desc limit 30`)
@@ -48,6 +49,12 @@ export default async function Sources() {
                 <button className="btn btn--sm btn--p">{T('Запустить сейчас')}</button>
                 <label className="check"><input type="checkbox" name="full" value="1" /> <span className="small">{T('со статусами и планами этажей')}</span></label>
               </ActionForm>
+              {locks.get(p.id) && !c.impersonating && <form action={unlockUnits} className="row small" style={{ gap: 6, flexWrap: 'wrap' }}>
+                <input type="hidden" name="source" value={p.id} />
+                <span title={T('Ручная правка в портале фиксирует поле: синхронизация его не меняет. «Продано» у застройщика снимает замок статуса само.')}>🔒 {T('Ручные правки: статус — {s}, цена — {p}', { s: locks.get(p.id)!.status, p: locks.get(p.id)!.price })}</span>
+                <select className="in" name="field" style={{ width: 'auto' }} defaultValue=""><option value="">{T('все поля')}</option><option value="status">{T('статус')}</option><option value="price_list">{T('цена')}</option></select>
+                <button className="btn btn--sm">{T('Вернуть синхронизацию')}</button>
+              </form>}
               {owner && <details><summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Настройки')}</summary><PbForm v={p} /></details>}
             </div>
           ))}

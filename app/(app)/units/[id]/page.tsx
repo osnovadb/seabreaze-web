@@ -16,6 +16,8 @@ import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
 import { addToSelection, startShow } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
+import { unlockUnits } from '@/lib/sourceActions'
+import { needUuid } from '@/lib/ids'
 
 const ST_NAME: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
@@ -24,6 +26,7 @@ const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' 
 }
 
 export default async function UnitPage({ params, searchParams }: { params: { id: string }; searchParams: { img?: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)
@@ -130,6 +133,11 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
                 <div className="kv"><span>{T('Статус в источнике')}</span><span>{u.external_status || u.status}</span></div>
                 <div className="kv"><span>{T('Подтверждено')}</span><span>{dateTime(L, u.synced_at)}</span></div>
                 <div className="kv"><span>{T('Ручные правки')}</span><span className="small">{u.locked.length ? '🔒 ' + u.locked.map((x) => T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x)).join(', ') + ' · ' + T('синхронизация не меняет') : T('нет · синхронизация может менять цену и статус')}</span></div>
+                {u.locked.length > 0 && ['owner', 'office'].includes(c.user.role) && !c.impersonating && <form action={unlockUnits} className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                  <input type="hidden" name="unit" value={u.id} />
+                  {u.locked.length > 1 && u.locked.map((x) => <button key={x} name="field" value={x} className="btn btn--sm">{T('Вернуть синхронизацию: {f}', { f: T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x) })}</button>)}
+                  <button name="field" value="" className="btn btn--sm">{T(u.locked.length > 1 ? 'Вернуть синхронизацию: всё' : 'Вернуть синхронизацию')}</button>
+                </form>}
               </>}
               {bk && <div className="kv"><span>{T('Бронь')}</span><span className="small">{bk.client} · {bk.agent} · {T('до {d}', { d: date(L, bk.ends_at) })} · {usd(L, bk.final_price)}</span></div>}
               {hist.length > 0 && <><div className="label mt16">{T('История: статус и цена')}</div>{hist.map((h, i) => {

@@ -10,8 +10,10 @@ import { clientScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
+import { needUuid } from '@/lib/ids'
 
 export default async function SelectionEdit({ params }: { params: { id: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const cs = clientScope(c.user)

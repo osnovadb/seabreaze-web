@@ -4,9 +4,11 @@ import { t } from '@/lib/i18n'
 import { makeXlsx } from '@/lib/xlsx'
 import { COLS } from '@/lib/chessImport'
 import { TYPE_NAME } from '@/lib/catalog'
+import { isUuid } from '@/lib/ids'
 
 // Шахматка проекта в xlsx — она же шаблон для импорта: поправили цены или статусы и загрузили обратно
 export async function GET(_: Request, { params }: { params: { id: string } }) {
+  if (!isUuid(params.id)) return new Response('not found', { status: 404 })
   const c = await requireCtx()
   if (c.user.role !== 'owner') return new Response('forbidden', { status: 403 })
   const p = await one<{ slug: string }>('select slug from projects where id = $1', [params.id])

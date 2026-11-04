@@ -12,12 +12,14 @@ import { MARKS, SIDES, SIDE_NAME, type Sides } from '@/lib/surround'
 import { riser as riserOf } from '@/lib/catalog'
 import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode, saveOption, importChess, copyFloor } from '@/lib/objects'
 import { ChessImport } from '@/components/ChessImport'
+import { needUuid } from '@/lib/ids'
 
 const TYPES = UNIT_TYPES
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 
 // Карточка проекта в админке: всё, что влияет на деньги, наличие и доступ (ТЗ, «Портал и CMS»)
 export default async function ObjectCard({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string; b?: string; fl?: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

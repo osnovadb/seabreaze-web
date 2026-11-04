@@ -8,11 +8,13 @@ import { publishPriceList, revertPriceList, deletePriceList } from '@/lib/priceA
 import { Top, Pill } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { RuleForm, PL_STATUS } from '../form'
+import { needUuid } from '@/lib/ids'
 
 type Item = { unit_id: string; no: string; building: string; floor: number; area: number | null; old_price: number | null; new_price: number; currency: string; applied: boolean | null; now: number | null; now_cur: string }
 
 // Прайс-лист: черновик — правило и предпросмотр «было → стало»; опубликованный — что применено, что пропущено, откат
 export default async function PriceList({ params }: { params: { id: string } }) {
+  needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
