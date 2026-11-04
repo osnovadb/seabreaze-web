@@ -9,6 +9,7 @@ import { Top } from '@/components/ui'
 import { BookForm } from './form'
 import { fxFor } from '@/lib/fx'
 import { promoForUnit } from '@/lib/promo'
+import { optionsFor } from '@/lib/options'
 
 export default async function Book({ params, searchParams }: { params: { id: string }; searchParams: { client?: string } }) {
   const c = await requireCtx()
@@ -24,6 +25,7 @@ export default async function Book({ params, searchParams }: { params: { id: str
   const plans = await plansFor(u.project_id, u.building_id)
   const fx = await fxFor(c.user.market, L)
   const { promo, mode } = await promoForUnit(u)
+  const options = await optionsFor(u)
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [proj.name], [unitNo(u), `/units/${u.id}`], [T('Бронь')]]} title={T('Бронь {n}', { n: unitNo(u) })}
@@ -31,7 +33,7 @@ export default async function Book({ params, searchParams }: { params: { id: str
       <div className="page split-l">
         <div className="card">{planUrl(u.plan_file) ? <div className="planbox" style={{ border: 0 }}><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="muted">{T('План появится позже')}</div>}</div>
         <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct }}
-          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} preset={searchParams.client} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
+          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} preset={searchParams.client} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
       </div>
     </>
   )

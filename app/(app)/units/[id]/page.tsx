@@ -10,6 +10,7 @@ import { promoForUnit } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { unitHistory } from '@/lib/unitEvents'
+import { optionsFor } from '@/lib/options'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
 import { addToSelection, startShow } from '@/lib/actions'
@@ -43,6 +44,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const inSel = await q<{ id: string; client: string }>(`select s.id, cl.name client from portal.selection_items si join portal.selections s on s.id = si.selection_id join portal.clients cl on cl.id = s.client_id where si.unit_id = $1 and (${ext ? 's.user_id = $2' : 'true'})`, ext ? [u.id, c.user.id] : [u.id])
   const bk = u.booking_id ? (await q<{ client: string; agent: string; status: string; ends_at: string; final_price: number }>(`select cl.name client, us.name agent, b.status, b.ends_at, b.final_price::float from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [u.booking_id]))[0] : null
   const plans = await plansFor(u.project_id, u.building_id)
+  const opts = await optionsFor(u)
   const fx = await fxFor(c.user.market, L)
   const { promo, mode: promoMode } = await promoForUnit(u)
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
@@ -108,7 +110,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>
             )}
           </div>
-          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={promoMode} />}
+          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} />}
           {!ext && (
             <div className="card card--sand">
               <div className="label" style={{ color: 'var(--bronze)' }}>{T('Только для команды')}</div>

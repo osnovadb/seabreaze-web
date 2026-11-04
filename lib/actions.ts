@@ -9,6 +9,7 @@ import { getCtx, requireCtx, signSession, clearSession, setShow, clearShow, Ctx 
 import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegisterClient, canReviewAgents, isExternal, maxDiscount, discountCeiling, canApproveDiscount, type Role } from './perm'
 import { conditionsFor, split, unitById, projectVisible, plansFor } from './catalog'
 import { priceChain } from './plans'
+import { optionsFor } from './options'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, type Lang } from './i18n'
@@ -342,9 +343,15 @@ export async function createBooking(_: unknown, f: FormData) {
   if (!ch.poolAllowed && disc > 0) return { error: t(c.lang, 'По условиям акции скидка из пула не применяется — уберите скидку') }
   const usdPrice = ch.base
   const sp = split(cond, usdPrice, disc, isExternal(c.user.role))
-  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval])
+  // Опции (группа 4): только действующие для этой квартиры, цена в USD — на сервере, не из формы
+  const want = f.getAll('options').map(String)
+  const avail = want.length ? await optionsFor(unit) : []
+  if (want.some((id) => !avail.some((o) => o.id === id))) return { error: t(c.lang, 'Опция больше не действует — обновите страницу') }
+  const opts = avail.filter((o) => want.includes(o.id)).map((o) => ({ id: o.id, title: o.title, price: o.price, currency: o.currency, usd: o.usd }))
+  const optUsd = opts.reduce((a, o) => a + o.usd, 0)
+  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13) returning id`,
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval, JSON.stringify(opts), optUsd])
   await q(`update portal.clients set stage = 'booking', last_activity_at = now() where id = $1`, [clientId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: `${unit.block}-${unit.number}`, d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
   const u = `${unit.block}-${unit.number}`

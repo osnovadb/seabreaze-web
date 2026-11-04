@@ -3,14 +3,14 @@ import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, pct, num } from '@/lib/i18n'
-import { planUrl, toUsdSql, UNIT_TYPES } from '@/lib/catalog'
+import { planUrl, toUsdSql, UNIT_TYPES, TYPE_NAME } from '@/lib/catalog'
 import { PLAN_COLS, schedule, planBase, isFull, termUnknown, type Plan } from '@/lib/plans'
 import { Top, Pill, SALES } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
 import { saveGenplan, saveFacade, saveFloorPlan, saveRisers, saveSides } from '@/lib/markup'
 import { MARKS, SIDES, SIDE_NAME, type Sides } from '@/lib/surround'
 import { riser as riserOf } from '@/lib/catalog'
-import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode } from '@/lib/objects'
+import { saveProject, saveBuilding, saveLayout, saveUnit, generateUnits, savePlan, saveAccess, saveException, savePromo, savePromoMode, saveOption } from '@/lib/objects'
 
 const TYPES = UNIT_TYPES
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
@@ -26,7 +26,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
   const ps = await one<{ sales_status: string; agent_markets: string[]; site_urls: Record<string, string>; cover_file_id: string | null }>('select sales_status, agent_markets, site_urls, cover_file_id from portal.project_settings where project_id = $1', [p.id])
   const tab = owner ? searchParams.tab || 'main' : 'units'
   const cover = ps?.cover_file_id
-  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['prices', 'Прайс-листы'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры'], ['prices', 'Прайс-листы']]
+  const tabs: [string, string][] = owner ? [['main', 'Основное'], ['blocks', 'Блоки'], ['layouts', 'Планировки'], ['units', 'Квартиры'], ['prices', 'Прайс-листы'], ['plans', 'Планы оплаты'], ['promos', 'Акции'], ['options', 'Опции'], ['markup', 'Разметка'], ['orient', 'Ориентация'], ['terms', 'Условия'], ['access', 'Видимость']] : [['units', 'Квартиры'], ['prices', 'Прайс-листы']]
   const blocks = await q<{ id: string; name: string; external_id: string | null; kind: string; floors_total: number | null; delivery: string | null; sort: number; n: number }>(
     'select b.id, b.name, b.external_id, b.kind, b.floors_total, b.delivery, b.sort, (select count(*)::int from units u where u.building_id = b.id) n from buildings b where b.project_id = $1 order by b.sort, b.name', [p.id])
   const layouts = await q<{ id: string; code: string; unit_type: string; name: string | null; bedrooms: number | null; internal_area_m2: number | null; external_area_m2: number | null; total_area_m2: number | null; plan_file: string | null; n: number }>(
@@ -47,6 +47,7 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         {tab === 'units' && <Units />}
         {tab === 'plans' && <Plans />}
         {tab === 'promos' && <Promos />}
+        {tab === 'options' && <Options />}
         {tab === 'access' && <Access />}
         {tab === 'markup' && <Markup />}
         {tab === 'orient' && <Orient />}
@@ -275,6 +276,43 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
         {rows.map((o) => row(o))}
         <div className="label">{T('Новая акция')}</div>
         {row()}
+      </div>
+    )
+  }
+
+  // Опции: платные дополнения со своей валютой; пустые списки — для всего проекта
+  async function Options() {
+    const opts = await q<{ id: string; title: string; note: string | null; price: number; currency: string; building_ids: string[]; unit_types: string[]; units: string[]; active: boolean; sort: number }>(`
+      select o.id, o.title, o.note, o.price::float, o.currency, o.building_ids, o.unit_types, o.active, o.sort,
+        (select coalesce(array_agg(coalesce(b.external_id || '-', '') || u.number order by u.number), '{}') from units u join buildings b on b.id = u.building_id where u.id = any(o.unit_ids)) units
+      from portal.unit_options o where o.project_id = $1 order by o.sort, o.title`, [p!.id])
+    const types = (await q<{ unit_type: string }>('select distinct unit_type from units where project_id = $1', [p!.id])).map((x) => x.unit_type)
+    const Form = ({ o }: { o?: (typeof opts)[number] }) => (
+      <ActionForm action={saveOption} lang={L} className="card stack" style={{ gap: 8 }} reset={!o}>
+        <input type="hidden" name="project" value={p!.id} />{o && <input type="hidden" name="id" value={o.id} />}
+        <div className="row" style={{ gap: 6 }}>
+          <label className="field" style={{ flex: 3 }}><span>{T('Название')}</span><input className="in" name="title" defaultValue={o?.title} required placeholder={T('Кухня и шкафы под ключ')} /></label>
+          <label className="field" style={{ flex: 2 }}><span>{T('Цена')}</span><input className="in" name="price" inputMode="decimal" defaultValue={o?.price} required /></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Валюта')}</span><select className="in" name="currency" defaultValue={o?.currency || 'USD'}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select></label>
+        </div>
+        {blocks.length > 1 && <div className="chips">{blocks.map((b) => <label key={b.id} className="chip chk"><input type="checkbox" name="buildings" value={b.id} defaultChecked={o?.building_ids.includes(b.id)} /> {b.name}</label>)}</div>}
+        {types.length > 1 && <div className="chips">{types.map((x) => <label key={x} className="chip chk"><input type="checkbox" name="types" value={x} defaultChecked={o?.unit_types.includes(x)} /> {T(TYPE_NAME[x] || x)}</label>)}</div>}
+        <label className="field"><span>{T('Только квартиры (номера через запятую, пусто — все подходящие)')}</span><input className="in" name="units" defaultValue={o?.units.join(', ')} placeholder="A-101, A-102" /></label>
+        <div className="row" style={{ gap: 6 }}>
+          <label className="field" style={{ flex: 3 }}><span>{T('Пояснение для партнёра')}</span><input className="in" name="note" defaultValue={o?.note || ''} /></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Показывать')}</span><select className="in" name="active" defaultValue={o && !o.active ? '0' : '1'}><option value="1">{T('да')}</option><option value="0">{T('нет')}</option></select></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Порядок')}</span><input className="in" name="sort" type="number" defaultValue={o?.sort ?? 0} /></label>
+        </div>
+        <div className="row" style={{ gap: 6 }}><button className="btn btn--p btn--sm">{o ? T('Сохранить') : T('Добавить опцию')}</button>{o && <button className="btn btn--sm" name="delete" value="1">{T('Удалить')}</button>}</div>
+      </ActionForm>
+    )
+    return (
+      <div className="grid g2" style={{ alignItems: 'start' }}>
+        <div className="stack">
+          {opts.length === 0 && <div className="card small muted">{T('Опций пока нет. Опция — платное дополнение к квартире: отделка, мебель, кондиционеры, место в паркинге. В брони она пишется отдельно и в комиссию не входит.')}</div>}
+          {opts.map((o) => <Form key={o.id} o={o} />)}
+        </div>
+        <Form />
       </div>
     )
   }

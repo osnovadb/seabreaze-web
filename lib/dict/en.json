@@ -1563,5 +1563,22 @@
 "прайс-лист «{t}»": "price list “{t}”",
 "пропущено: цена менялась": "skipped: price had changed",
 "синхронизация": "sync",
-"цена уже другая": "price already differs"
+"цена уже другая": "price already differs",
+"Добавить опцию": "Add option",
+"Кухня и шкафы под ключ": "Fitted kitchen and wardrobes",
+"Нет таких квартир: {n}": "No such units: {n}",
+"Опции": "Options",
+"Опции оплачиваются застройщику сверх цены квартиры; скидки и ваша комиссия на них не распространяются.": "Options are paid to the developer on top of the unit price; discounts and your commission do not apply to them.",
+"Опций пока нет. Опция — платное дополнение к квартире: отделка, мебель, кондиционеры, место в паркинге. В брони она пишется отдельно и в комиссию не входит.": "No options yet. An option is a paid add-on to a unit: finishing, furniture, air conditioning, a parking space. It is recorded separately in the booking and is not commissionable.",
+"Опция больше не действует — обновите страницу": "The option is no longer available — refresh the page",
+"Показывать": "Show",
+"Пояснение для партнёра": "Note for partners",
+"Проверьте валюту": "Check the currency",
+"С опциями: +{a}": "With options: +{a}",
+"Только квартиры (номера через запятую, пусто — все подходящие)": "Only units (numbers, comma-separated; empty — all matching)",
+"всего {a}": "total {a}",
+"опции": "options",
+"итого с опциями": "total with options",
+"опции (список с ценами)": "options (list with prices)",
+"опции, сумма": "options, total"
 }

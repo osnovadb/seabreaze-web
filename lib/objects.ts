@@ -298,3 +298,31 @@ export const savePromoMode = safe(async (_: unknown, f: FormData) => {
   await log(c, 'object.promo_mode', 'project', pid, { mode }); done(pid)
   return { ok: true }
 })
+
+/* ── Опции: платные дополнения к квартире (группа 4) ── */
+export const saveOption = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), id = s(f, 'id')
+  if (s(f, 'delete')) { await q('delete from portal.unit_options where id = $1 and project_id = $2', [id, pid]); await log(c, 'object.option_delete', 'project', pid, { id }); done(pid); return { ok: true } }
+  const title = s(f, 'title'), price = num(f, 'price'), cur = s(f, 'currency')
+  if (!title) return { error: t(c.lang, 'Нужно название') }
+  if (price == null || Number.isNaN(price) || price <= 0) return { error: t(c.lang, 'Проверьте цену') }
+  if (!['USD', 'AZN', 'EUR'].includes(cur)) return { error: t(c.lang, 'Проверьте валюту') }
+  const blocks = (await q<{ id: string; external_id: string | null }>('select id, external_id from buildings where project_id = $1', [pid]))
+  const bids = f.getAll('buildings').map(String).filter((x) => blocks.some((b) => b.id === x))
+  const types = f.getAll('types').map(String).filter((x) => UNIT_TYPES.includes(x))
+  // Квартиры — номерами через запятую, как в шахматке (A-101 или 101); неизвестный номер — ошибка, а не тихий пропуск
+  const nums = s(f, 'units').split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)
+  let uids: string[] = []
+  if (nums.length) {
+    const us = await q<{ id: string; no: string; number: string }>(`select u.id, upper(coalesce(b.external_id || '-', '') || u.number) no, upper(u.number) number from units u join buildings b on b.id = u.building_id where u.project_id = $1`, [pid])
+    const miss = nums.filter((n) => !us.some((u) => u.no === n || u.number === n))
+    if (miss.length) return { error: t(c.lang, 'Нет таких квартир: {n}', { n: miss.slice(0, 5).join(', ') }) }
+    uids = Array.from(new Set(us.filter((u) => nums.includes(u.no) || nums.includes(u.number)).map((u) => u.id)))
+  }
+  const vals = [title, s(f, 'note') || null, price, cur, bids, types, uids, s(f, 'active') !== '0', num(f, 'sort') ?? 0]
+  if (id) await q(`update portal.unit_options set title = $3, note = $4, price = $5, currency = $6, building_ids = $7, unit_types = $8, unit_ids = $9, active = $10, sort = $11 where id = $1 and project_id = $2`, [id, pid, ...vals])
+  else await q(`insert into portal.unit_options (project_id, title, note, price, currency, building_ids, unit_types, unit_ids, active, sort) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [pid, ...vals])
+  await log(c, id ? 'object.option_update' : 'object.option_create', 'project', pid, { title, price, cur }); done(pid)
+  return { ok: true }
+})
