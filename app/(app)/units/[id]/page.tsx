@@ -1,15 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
-import { q } from '@/lib/db'
+import { q, one } from '@/lib/db'
 import { t, usd, m2, date, dateTime, num } from '@/lib/i18n'
-import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText } from '@/lib/catalog'
+import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText, riser } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
 import { promoForUnit } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
 import { canBook, seesSource, isExternal } from '@/lib/perm'
 import { unitHistory } from '@/lib/unitEvents'
+import { polyStr } from '@/lib/geom'
 import { optionsFor } from '@/lib/options'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
@@ -36,7 +37,11 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   const perM2 = u.usd ? u.usd / (u.area + outdoor) : null
   const imgs: [string, string][] = [['plan', T('План')]]
   if (proj.slug === 'premium-residence') { if (LOBBY[u.block]) imgs.push(['/img/' + LOBBY[u.block] + '.jpg', T('Лобби блока')]); if (DESIGN[u.rooms || 0]) imgs.push(['/img/' + DESIGN[u.rooms || 0][0] + '.jpg', T('Пример дизайна')]) }
-  const cur = searchParams.img || 'plan'
+  // План этажа с этой квартирой (поэтажные планы застройщика, Объекты → Разметка): вкладка «На этаже»
+  const fp = await one<{ file_id: string; cells: { riser: string; points: number[][] }[]; north_deg: number }>('select file_id, cells, north_deg from portal.floor_plans where building_id = $1 and $2 between floor_from and floor_to order by floor_to - floor_from limit 1', [u.building_id, u.floor])
+  const myCell = fp?.cells.find((x) => x.riser === riser(u))
+  if (fp) imgs.splice(1, 0, ['floor', T('На этаже')])
+  const cur = imgs.some(([k]) => k === searchParams.img) ? searchParams.img! : 'plan'
   const cs = clientScope(c.user)
   const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by last_activity_at desc limit 100`, cs.params)
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
@@ -64,10 +69,15 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
         <div className="card">
           <div className="chips">{imgs.map(([k, l]) => <Link key={k} href={`?img=${encodeURIComponent(k)}`} className={'chip' + (cur === k ? ' on' : '')}>{l}</Link>)}</div>
           <div className="mt16">
-            {cur === 'plan' ? (planUrl(u.plan_file) ? <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="planbox muted" style={{ height: 300 }}>{T('План появится после загрузки от застройщика')}</div>)
+            {cur === 'floor' && fp ? (
+              <Link href={`/projects/${proj.slug}/floor?b=${u.building_id}&f=${u.floor}&u=${u.id}`} className="fz" style={{ display: 'block' }}>
+                <img src={`/files/${fp.file_id}`} alt="" />
+                <svg viewBox="0 0 1 1" preserveAspectRatio="none">{fp.cells.map((x) => <polygon key={x.riser} points={polyStr(x.points)} className={x.riser === myCell?.riser ? 'z-here' : 'z-dim'} />)}</svg>
+              </Link>
+            ) : cur === 'plan' ? (planUrl(u.plan_file) ? <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="planbox muted" style={{ height: 300 }}>{T('План появится после загрузки от застройщика')}</div>)
               : <div className="ph"><img src={cur} alt="" /></div>}
           </div>
-          {cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
+          {cur === 'floor' ? <div className="small muted mt8">{myCell ? T('Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.') : T('План этажа — квартира на нём ещё не размечена.')}</div> : cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
         </div>
         <div className="stack">
           <div className="card">

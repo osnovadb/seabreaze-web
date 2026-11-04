@@ -4,9 +4,10 @@ import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, riser, planUrl, unitNo, riserInfo, orientOf, orientText } from '@/lib/catalog'
 import { one } from '@/lib/db'
-import { polyStr, centroid } from '@/lib/geom'
+import { centroid } from '@/lib/geom'
 import { cleanMarks, nearMarks, markIcon, markText, type Sides, type Side } from '@/lib/surround'
 import { ViewTabs } from '@/components/ViewTabs'
+import { FloorPlan, type FC } from '@/components/FloorPlan'
 import { Top, Legend } from '@/components/ui'
 
 export default async function Floor({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; f?: string; u?: string } }) {
@@ -60,20 +61,16 @@ export default async function Floor({ params, searchParams }: { params: { slug: 
         <div>
           {plan && marks.length > 0 && <><input type="checkbox" id="sur" className="sur-t" defaultChecked /><label htmlFor="sur" className="chip sur-l">{T('Окружение')}</label></>}
           {plan ? (
-            <div className="fz">
-              <img src={`/files/${plan.file_id}`} alt="" />
-              <svg viewBox="0 0 1 1" preserveAspectRatio="none">
-                {plan.cells.map((cell) => {
-                  const u = units.find((x) => riser(x) === cell.riser)
-                  if (!u) return null
-                  const code = codeFor(u, c.user, mode)
-                  const poly = <polygon points={polyStr(cell.points)} className={`z-${code}${sel?.id === u.id ? ' z-sel' : ''}`}><title>{code === 'X' ? '' : `${unitNo(u)} · ${orient(u)}`}</title></polygon>
-                  return code === 'X' ? <g key={cell.riser}>{poly}</g> : <Link key={cell.riser} href={`?b=${b.id}&f=${f}&u=${u.id}`} scroll={false}>{poly}</Link>
-                })}
-              </svg>
+            <FloorPlan src={`/files/${plan.file_id}`} selected={sel?.id} cells={plan.cells.map((cell): FC => {
+              const u = units.find((x) => riser(x) === cell.riser)
+              const code = u ? codeFor(u, c.user, mode) : 'X'
+              return { riser: cell.riser, points: cell.points, id: u?.id || null, code, href: u && code !== 'X' ? `?b=${b.id}&f=${f}&u=${u.id}` : null, no: u && code !== 'X' ? unitNo(u) : '',
+                info: u && code !== 'X' ? `${u.rooms ? T('{r} комн.', { r: u.rooms }) + ' · ' : ''}${m2(L, u.area)}` : '', orient: u && code !== 'X' ? orient(u) : '',
+                price: u && code === 'F' && u.usd ? usd(L, u.usd) : mode === 'team' && u?.usd ? usd(L, u.usd) : '' }
+            })}>
               {marks.map((m, i) => <span key={i} className="smark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}><i>{markIcon(m.kind)}</i><b>{markText(L, m)}</b></span>)}
-              <div className="compass" title={T('Север')}><span style={{ transform: `rotate(${plan.north_deg}deg)`, display: 'inline-block' }}>↑</span><span style={{ position: 'absolute', bottom: 4, fontSize: 9 }}>N</span></div>
-            </div>
+              {plan.north_deg ? <div className="compass" title={T('Север')}><span style={{ transform: `rotate(${plan.north_deg}deg)`, display: 'inline-block' }}>↑</span><span style={{ position: 'absolute', bottom: 4, fontSize: 9 }}>N</span></div> : null}
+            </FloorPlan>
           ) : (
           <div className="floor">
             <div className="label" style={{ marginBottom: 10 }}>{T('Схема этажа · порядок и стороны — по поэтажному плану застройщика')}</div>
