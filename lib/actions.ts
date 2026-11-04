@@ -11,6 +11,7 @@ import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, u
 import { priceChain } from './plans'
 import { optionsFor } from './options'
 import { toUsd } from './fx'
+import { pbEnqueue } from './pbQueue'
 import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mailOn } from './access'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
@@ -404,11 +405,13 @@ export async function bookingAction(f: FormData) {
     await q(`update portal.bookings set fee_status = $2, fee_by = $3 where id = $1 and fee_status = 'paid'`, [id, act === 'fee_refund' ? 'refunded' : 'kept', c.user.id])
   } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending' && b.fee_status !== 'due') {
     await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now() where id = $1`, [id, c.user.id])
+    await pbEnqueue(b.unit_id, 'reserve', id, c.user.id) // М3: бронь у застройщика в Profitbase
     await notify(b.agent_id, 'booking', 'Бронь подтверждена у застройщика', '/bookings')
   } else if (act === 'extend' && (mine || canConfirmBooking(c.user.role)) && !b.extended && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set ends_at = ends_at + ((snapshot->>'booking_ext_days') || ' days')::interval, extended = true where id = $1`, [id])
   } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
+    if (b.status === 'confirmed') await pbEnqueue(b.unit_id, 'release', id, c.user.id) // снять бронь и в Profitbase
     if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
   } else if (act === 'contract' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && b.status === 'confirmed') {
     // Договор — только после пройденного KYC (v2)
@@ -428,6 +431,7 @@ export async function bookingAction(f: FormData) {
         const d = await t.query<{ id: string }>(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount, group_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
           [x.id, b.client_id, x.unit_id, x.project_id, isExternal((seller?.role || 'seller') as any) ? x.agent_id : null, seller?.curator_id || x.agent_id, x.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0), g])
         made.push(d.rows[0].id)
+        await pbEnqueue(x.unit_id, 'sold', x.id, c.user.id) // М4: «продано через GetsEstate» в Profitbase
       }
       if (made.length) await t.query(`update portal.clients set stage = case when stage in ('payments','fee','support','handed') then stage else 'contract' end where id = $1`, [b.client_id])
     })

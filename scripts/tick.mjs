@@ -5,6 +5,7 @@ import pg from 'pg'
 import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
 import { bestOffer } from '../lib/promoMatch.mjs'
 import { notifyOut } from './notify-out.mjs'
+import { pbSync, pbFlush } from '../lib/pb.mjs'
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -20,6 +21,10 @@ const task = (client, user, title, vars, dedup) =>
 const out = {}
 
 // 1. Истёкшие брони: срок вышел — квартира снова свободна, агенту и куратору уведомление
+// М3: подтверждённая бронь из Profitbase истекает — снять её и у застройщика (очередь pb_outbox, отправка в шаге 10)
+await q(`insert into portal.pb_outbox (source_id, unit_id, booking_id, op, status_alias) select s.id, b.unit_id, b.id, 'release', 'AVAILABLE'
+  from portal.bookings b join units u on u.id = b.unit_id join sources s on s.id = u.source_id and s.kind = 'profitbase' and s.active
+  where b.status = 'confirmed' and b.ends_at < now()`)
 const expired = await q(`update portal.bookings b set status = 'expired' from units u join buildings bl on bl.id = u.building_id
   where u.id = b.unit_id and b.status in ('requested','confirmed') and b.ends_at < now()
   returning b.id, b.client_id, b.agent_id, portal.unit_no(bl.external_id, u.number) as unit`)
@@ -197,6 +202,18 @@ if (!(await q(`select 1 from currency_rates where source = 'cbar' and valid_from
     out.rates = n
   } catch (e) { out.rates_error = String(e.message || e) }
 }
+
+// 10. Profitbase (М1–М3, М11): прогон каждого источника, затем очередь записи; молчит больше часа — владельцу уведомление
+const txPb = async (fn) => { await db.query('begin'); try { const r = await fn(db); await db.query('commit'); return r } catch (e) { await db.query('rollback'); throw e } }
+const pbSources = await q(`select id, name, config from sources where kind = 'profitbase' and active`)
+for (const src of pbSources) {
+  const r = await pbSync(q, txPb, src, { notify })
+  out['pb_' + src.id] = r.ok ? { checked: r.checked, changed: r.changed, created: r.created, gone: r.gone, floors: r.floors } : { error: r.error.slice(0, 120) }
+  const okRecent = (await q(`select 1 from sync_runs where source_id = $1 and status in ('ok','partial') and started_at > now() - interval '1 hour'`, [src.id])).length
+  if (!okRecent) for (const o of await q(`select id from portal.users where active and role = 'owner'`))
+    await notify(o.id, 'access', 'Синхронизация с Profitbase «{s}» не проходит больше часа — проверьте «Источники»', '/sources', { s: src.name }, 'pb-stale:' + src.id + ':' + new Date().toISOString().slice(0, 13))
+}
+if (pbSources.length) out.pb_sent = await pbFlush(q, pbSources, { task })
 
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
