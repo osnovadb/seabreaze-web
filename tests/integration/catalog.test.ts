@@ -140,3 +140,18 @@ test('проект закрыли для партнёра после сохра�
   const nn = (await db.query(`select count(*)::int n from portal.notifications where dedup like $1`, [`search:${id}:%`])).rows[0].n
   assert.equal(nn, 0, 'партнёр получил уведомление о квартирах проекта, который ему закрыт')
 })
+
+// 63832f1: «цена от–до» сравнивается с ценой после акции (как в карточке) — и в каталоге, и в сохранённом поиске
+test('фильтр цены — по цене после акции: квартира с акцией попадает в «до», хотя прайс выше', { skip: SKIP }, async () => {
+  const c = await login(U.seller)
+  const u = (await db.query(`select id, price_list::float p from units where project_id=$1 and status='available' and price_currency='USD' and price_list > 50000
+    and not exists (select 1 from portal.bookings b where b.unit_id=units.id and b.status in ('requested','confirmed')) and not exists (select 1 from portal.deals d where d.unit_id=units.id and d.stage <> 'cancelled') limit 1`, [PR])).rows[0]
+  offers.push((await db.query(`insert into portal.special_offers (project_id, name, kind, value, unit_ids, active) values ($1,'QA cat net','pct',20,$2,true) returning id`, [PR, [u.id]])).rows[0].id)
+  const pmax = Math.floor(u.p * 0.9 / 1000) // между ценой после акции (80%) и прайсом
+  const qs = `p=premium-residence&pmax=${pmax}`
+  const cat = await catalogIds(c, qs), s = await viaSearch(c, MARTIN, qs)
+  assert.ok(cat.has(u.id), 'каталог: квартира с акцией не попала в «до»')
+  assert.ok(s.seen.has(u.id), 'поиск: квартира с акцией не попала в «до»')
+  const qs2 = `p=premium-residence&pmin=${Math.ceil(u.p * 0.85 / 1000)}&pmax=${Math.floor(u.p * 1.1 / 1000)}`
+  assert.ok(!(await catalogIds(c, qs2)).has(u.id), 'каталог: «от» тоже по цене после акции — квартира ниже «от» не показывается')
+})
