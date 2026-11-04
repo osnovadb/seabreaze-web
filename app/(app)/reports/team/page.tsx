@@ -32,6 +32,9 @@ export default async function Team({ searchParams }: { searchParams: { m?: strin
     order by us.role = 'owner', us.role, us.name`, [m, market])
   const months = Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.UTC(Number(cur.slice(0, 4)), Number(cur.slice(5)) - 1 - i, 1)); return d.toISOString().slice(0, 7) })
   const sum = (k: keyof R) => rows.reduce((a, r) => a + (r[k] as number), 0)
+  // Итог по сделкам — по разным сделкам: в строках сделка считается и агенту, и продавцу, в итоге — один раз
+  const tot = (await q<{ n: number; usd: number }>(`select count(*)::int n, coalesce(sum(d.final_price), 0)::float usd from portal.deals d where d.stage <> 'cancelled' and to_char(d.created_at, 'YYYY-MM') = $1
+    and exists (select 1 from portal.users us where us.id in (d.agent_id, d.seller_id) and us.active and us.role in ('owner','market_head','seller','agency_head','agent') and ($2::text is null or us.market = $2))`, [m, market]))[0]
   return (
     <>
       <Top crumbs={[[T('Отчёты'), '/reports'], [T('Команда')]]} title={T('Команда: брони, сделки, дисциплина')} sub={market ? T('Ваш рынок') + ' · ' + market : T('Все рынки')}
@@ -39,7 +42,7 @@ export default async function Team({ searchParams }: { searchParams: { m?: strin
       <div className="page">
         <div className="chips">{months.map((x) => <Link key={x} href={`?m=${x}`} className={'chip' + (x === m ? ' on' : '')}>{monthName(L, x)}</Link>)}</div>
         <div className="grid g4 mt16">
-          {[[num(L, sum('clients')), T('новых клиентов')], [num(L, sum('bookings')), T('броней · истекло {n}', { n: sum('expired') })], [num(L, sum('deals')), T('сделок на {a}', { a: usd(L, sum('deals_usd')) })], [num(L, sum('overdue')), T('просроченных задач сейчас')]].map(([a, b]) => (
+          {[[num(L, sum('clients')), T('новых клиентов')], [num(L, sum('bookings')), T('броней · истекло {n}', { n: sum('expired') })], [num(L, tot.n), T('сделок на {a}', { a: usd(L, tot.usd) })], [num(L, sum('overdue')), T('просроченных задач сейчас')]].map(([a, b]) => (
             <div key={b} className="card card--tight kpi"><div className="v" style={{ fontSize: 22 }}>{a}</div><div className="small muted">{b}</div></div>))}
         </div>
         <div className="tbl-wrap mt16"><table className="tbl">

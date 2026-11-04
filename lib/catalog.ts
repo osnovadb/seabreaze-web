@@ -26,7 +26,9 @@ export async function aznPerUsd() {
 }
 // Комнаты как в каталоге и на сайтах: студия = 1, 1br = 2 … (спальни + 1), если застройщик не дал своё число
 export const roomsSql = `coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end)`
-export const toUsdSql = `case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / (select azn_per_unit from currency_rates where currency = 'USD' order by valid_from desc limit 1) end`
+// Цена в USD по курсу ЦБ (через AZN), как lib/fx toUsd: USD как есть, AZN / курс USD, EUR × курс EUR / курс USD
+const RATE = (cur: string) => `(select azn_per_unit from currency_rates where currency = '${cur}' order by valid_from desc limit 1)`
+export const toUsdSql = `case when u.price_currency = 'USD' then u.price_list when u.price_currency = 'AZN' then u.price_list / ${RATE('USD')} when u.price_currency = 'EUR' then u.price_list * ${RATE('EUR')} / ${RATE('USD')} end`
 
 const UNIT_SELECT = `
   select u.id, u.project_id, u.building_id, b.name as building, coalesce(b.external_id, left(b.name, 1)) as block, u.number, u.floor, u.unit_type, u.bedrooms,
