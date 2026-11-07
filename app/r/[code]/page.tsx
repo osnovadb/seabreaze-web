@@ -4,7 +4,10 @@ import { t, usd, type Lang } from '@/lib/i18n'
 import { LinkLeadForm } from './form'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { robots: { index: false, follow: false } }
+export async function generateMetadata({ params }: { params: { code: string } }) {
+  const p = await linkPage(params.code)
+  return { title: p ? p.agency || p.partner : 'GetsEstate', robots: { index: false, follow: false } }
+}
 
 // 2.2 · §6 П8 Личная ссылка партнёра: под его брендом (имя агентства и контакты из регистрации), без наших контактов; форма — его кандидат
 export default async function PartnerLink({ params, searchParams }: { params: { code: string }; searchParams: { project?: string } }) {
