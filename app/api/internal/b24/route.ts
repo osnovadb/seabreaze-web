@@ -9,8 +9,10 @@ export const dynamic = 'force-dynamic'
 const sig = (action: string) => crypto.createHmac('sha256', process.env.SESSION_SECRET || '').update('b24-internal:' + action).digest('hex')
 
 export async function POST(req: Request) {
-  // через Cloudflare и nginx сюда не попасть: там есть x-forwarded-for; обработчик ходит напрямую на 127.0.0.1
-  if (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip')) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  // только с самого сервера: снаружи запрос идёт через Cloudflare и nginx (cf-connecting-ip, x-forwarded-for — адрес клиента);
+  // обработчик ходит напрямую на 127.0.0.1, и Next.js сам ставит x-forwarded-for = 127.0.0.1
+  const xff = (req.headers.get('x-forwarded-for') || '').split(',').map((x) => x.trim())
+  if (req.headers.get('cf-connecting-ip') || xff.length !== 1 || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(xff[0])) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   const body = await req.json().catch(() => ({}))
   const action = String(body.action || '')
   const got = req.headers.get('x-internal') || ''

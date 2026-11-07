@@ -40,7 +40,7 @@ export default async function Units({ params, searchParams }: { params: { id: st
         right={<Link className="btn" href={`/clients/${cl.id}`}>{T('Карточка клиента')}</Link>} />
       <div className="page">
         {searchParams.created && <div className="okbox" style={{ marginBottom: 12 }}>{T('Запрос брони отправлен бэк-офису — статус появится в сделке Bitrix24')}</div>}
-        <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`]].map(([k, l]) => <Link key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</Link>)}</div>
+        <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`]].map(([k, l]) => <a key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</a>)}</div>
         {tab === 'pick' && <div className="grid g3 mt16">{blds.map(({ p, bs }) => (
           <div key={p.id} className="card stack" style={{ gap: 8 }}>
             <div className="h3">{p.name}</div>
@@ -83,11 +83,11 @@ export default async function Units({ params, searchParams }: { params: { id: st
                 <form action={bookingAction}>{h('decline')}<button className="btn btn--sm">{T('Не согласовать')}</button></form></div>}
               {confirm && <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('confirm')}
-                  <label className="tiny">{T('№ брони застройщика')}<input name="dev_no" className="in" style={{ width: 120 }} /></label>
-                  <label className="tiny">{T('до какого числа у застройщика')}<input name="until" type="date" className="in" /></label>
+                  <label className="field"><span>{T('№ брони застройщика')}</span><input name="dev_no" className="in" style={{ width: 140 }} /></label>
+                  <label className="field"><span>{T('до какого числа у застройщика')}</span><input name="until" type="date" className="in" /></label>
                   <button className="btn btn--sm btn--p">{T('Подтвердить бронь')}</button></form>
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('reject')}
-                  <select name="reason" className="in">{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                  <label className="field"><span>{T('Причина отказа')}</span><select name="reason" className="in">{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <button className="btn btn--sm">{T('Отклонить')}</button></form></div>}
               {u.status === 'confirmed' && office && (cl.kyc_status === 'passed'
                 ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
@@ -95,7 +95,7 @@ export default async function Units({ params, searchParams }: { params: { id: st
               {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
               {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)
                 ? <form action={dealPaid} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.deal_id} />
-                    <label className="tiny">{T('Оплачено клиентом, %')}<input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>
+                    <label className="field"><span>{T('Оплачено клиентом, %')}</span><input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>
                     <button className="btn btn--sm btn--p">{T('Сохранить оплату')}</button></form>
                 : <div className="small muted">{T('Оплачено клиентом')}: {u.paid ?? 0}%</div>)}
             </div>
