@@ -10,7 +10,8 @@ type Cond = SplitCond & {
 type DealRow = {
   id: string; client_id: string; project_id: string; agent_id: string | null; seller_id: string | null; escort_id: string | null; booking_id: string | null
   final_price: number; paid_pct: number; stage: string; created_at: string; snapshot: Partial<Cond> | null; list: number | null; disc: number | null
-  owner_type: string; referrer_id: string | null; cl_created: string; market: string | null; agency_head: string | null; b_escort: string | null
+  owner_type: string; referrer_id: string | null; cl_created: string; market: string | null; b_escort: string | null
+  owner_id: string; owner_role: string; previous_partner_id: string | null; attached_at: string | null
 }
 export const ROLE_LABEL: Record<string, string> = { partner: 'Партнёр', referrer: 'Рекомендатель', consultant: 'Консультант по застройщикам', escort: 'Сопровождающий в Баку', seller: 'Сейлз', market_head: 'Руководитель рынка', caspian: 'Caspian' }
 const r2 = (x: number) => Math.round(x * 100) / 100
@@ -19,8 +20,8 @@ const num = (x: unknown, d = 0) => (x === null || x === undefined || x === '' ||
 async function dealRow(dealId: string) {
   return one<DealRow>(`select d.id, d.client_id, d.project_id, d.agent_id, d.seller_id, d.escort_id, d.booking_id, d.final_price::float, d.paid_pct::float, d.stage, d.created_at,
       b.snapshot, b.price_list::float list, b.discount_pct::float disc, b.escort_id b_escort, cl.owner_type, cl.referrer_id, cl.created_at cl_created, cl.market,
-      (select h.id from portal.users a join portal.users h on h.agency_id = a.agency_id and h.role = 'agency_head' and h.active where a.id = d.agent_id and a.agency_id is not null limit 1) agency_head
-    from portal.deals d left join portal.bookings b on b.id = d.booking_id join portal.clients cl on cl.id = d.client_id where d.id = $1`, [dealId])
+      cl.owner_id, ou.role owner_role, cl.previous_partner_id, cl.attached_at
+    from portal.deals d left join portal.bookings b on b.id = d.booking_id join portal.clients cl on cl.id = d.client_id join portal.users ou on ou.id = cl.owner_id where d.id = $1`, [dealId])
 }
 // Условия по сделке: снимок брони (условия на дату брони), недостающие поля — из действующей версии условий проекта
 async function condOf(d: DealRow): Promise<Cond> {
@@ -41,14 +42,19 @@ export async function computeShares(dealId: string) {
   if (!d || d.stage === 'cancelled') return null
   if (await one(`select 1 from portal.accruals where deal_id = $1 and kind = 'share' limit 1`, [dealId])) return null
   const c = await condOf(d)
-  const partnerSale = !!d.agent_id
+  // доля партнёра — по закреплению клиента (а не по тому, кто нажал бронь): свой клиент или бывший — в пределах 12 месяцев от закрепления (§8 «Повторные продажи»)
+  const within12 = d.attached_at && new Date(d.created_at).getTime() - new Date(d.attached_at).getTime() <= 366 * 86400000
+  const partnerUser = d.owner_type === 'partner' && ['agent', 'agency_head'].includes(d.owner_role) ? d.owner_id : d.previous_partner_id && within12 ? d.previous_partner_id : null
+  const partnerSale = !!partnerUser
+  // агентству платим целиком — руководителю агентства
+  const payee = partnerUser ? (await one<{ id: string }>(`select coalesce((select h.id from portal.users h where h.agency_id = a.agency_id and h.role = 'agency_head' and h.active and a.agency_id is not null limit 1), a.id) id from portal.users a where a.id = $1`, [partnerUser]))?.id || partnerUser : null
   const list = d.list || d.final_price, disc = d.disc ?? (list ? (1 - d.final_price / list) * 100 : 0)
   const sp = split(c, list, disc, partnerSale)
   const total = sp.agent + sp.ours
   const final = d.final_price
   const out: { role: string; user_id: string | null; recipient: string | null; pct: number | null; amount: number }[] = []
   // партнёр: свой фикс и неотданная часть пула; агентству платим целиком — руководителю агентства
-  if (partnerSale && sp.agent > 0) out.push({ role: 'partner', user_id: d.agency_head || d.agent_id, recipient: null, pct: null, amount: r2(sp.agent) })
+  if (partnerSale && sp.agent > 0) out.push({ role: 'partner', user_id: payee, recipient: null, pct: null, amount: r2(sp.agent) })
   // рекомендатель: 2% от итоговой цены договора с покупок в течение 12 месяцев от передачи контакта
   const refOk = d.referrer_id && new Date(d.created_at).getTime() - new Date(d.cl_created).getTime() <= 366 * 86400000
   const referrer = refOk ? r2((final * c.referrer_pct) / 100) : 0
@@ -62,8 +68,10 @@ export async function computeShares(dealId: string) {
   if (escort) out.push({ role: 'escort', user_id: escortId, recipient: null, pct: null, amount: escort })
   // бонусы — % от нашей выручки без НДС после доли партнёра и рекомендателя
   const rev = Math.max(0, sp.ours - referrer)
-  const seller = !partnerSale && d.seller_id ? r2((rev * c.seller_share_pct) / 100) : 0
-  if (seller) out.push({ role: 'seller', user_id: d.seller_id, recipient: null, pct: c.seller_share_pct, amount: seller })
+  // сейлз — по продажам команды: ответственный за клиента из команды, иначе продавец по брони
+  const sellerId = partnerSale ? null : (['seller'].includes(d.owner_role) ? d.owner_id : d.seller_id)
+  const seller = sellerId ? r2((rev * c.seller_share_pct) / 100) : 0
+  if (seller) out.push({ role: 'seller', user_id: sellerId, recipient: null, pct: c.seller_share_pct, amount: seller })
   const head = c.head_bonus_pct ? await one<{ id: string }>(`select id from portal.users where active and role = 'market_head' and market = $1 order by created_at limit 1`, [d.market]) : null
   const headAmt = head ? r2((rev * c.head_bonus_pct) / 100) : 0
   if (headAmt) out.push({ role: 'market_head', user_id: head!.id, recipient: null, pct: c.head_bonus_pct, amount: headAmt })

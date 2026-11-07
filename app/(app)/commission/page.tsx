@@ -38,8 +38,8 @@ export default async function Commission() {
        (select a.status from portal.accruals a where a.tranche_id = t.id and a.role = 'partner' limit 1) acc,
        (select r.month::text from portal.accruals a join portal.payout_registers r on r.id = a.register_id where a.tranche_id = t.id and a.role = 'partner' limit 1) reg_month
      from portal.tranches t join portal.deals d on d.id = t.deal_id join portal.deal_shares s on s.deal_id = d.id and s.role = 'partner'
-       join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.bookings b on b.id = d.booking_id
-     where t.status <> 'cancelled' and ${bs.sql} order by d.created_at desc, t.no`, bs.params)
+       join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id
+     where t.status <> 'cancelled' and (s.user_id = $1 or cl.owner_id = $1) order by d.created_at desc, t.no`, [c.user.id])
   const debt = payee ? (await one<{ s: number }>(`select coalesce(sum(amount), 0)::float s from portal.accruals where user_id = $1 and status = 'open' and role = 'partner'`, [c.user.id]))?.s || 0 : 0
   const prof = await one<{ partner_form: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null; tax_no: string | null; tax_cert_until: string | null }>(
     'select partner_form, vat_payer, vat_no, tax_country, tax_no, tax_cert_until::text from portal.users where id = $1', [c.user.id])
