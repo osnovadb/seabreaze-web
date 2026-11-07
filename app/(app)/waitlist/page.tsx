@@ -12,7 +12,7 @@ export default async function Waitlist() {
   const waits = await q<{ id: string; unit_id: string; unit: string; project: string; client: string | null; created_at: string; pos: number; free: boolean }>(`
     select w.id, w.unit_id, portal.unit_no(b.external_id, u.number) unit, p.name project, cl.name client, w.created_at,
       (select count(*)::int from portal.waitlist w2 where w2.unit_id = w.unit_id and w2.active and w2.created_at <= w.created_at) pos,
-      (u.status = 'available' and not exists (select 1 from portal.bookings bk where bk.unit_id = u.id and bk.status in ('requested','confirmed'))) free
+      (u.status = 'available' and not exists (select 1 from portal.bookings bk where bk.unit_id = u.id and bk.status in ('hold','queued','requested','confirmed','release_pending'))) free
     from portal.waitlist w join units u on u.id = w.unit_id join buildings b on b.id = u.building_id join projects p on p.id = u.project_id left join portal.clients cl on cl.id = w.client_id
     where w.user_id = $1 and w.active order by w.created_at`, [c.user.id])
   const searches = await q<{ id: string; name: string; filters: { project: string; rooms: number | null; max: number | null; outdoor: string | null }; slug: string; n: number; checked_at: string | null }>(`

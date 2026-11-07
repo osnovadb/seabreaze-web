@@ -14,18 +14,18 @@ import { polyStr } from '@/lib/geom'
 import { optionsFor } from '@/lib/options'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, DESIGN, LOBBY } from '@/components/ui'
-import { addToSelection, startShow } from '@/lib/actions'
+import { addToSelection, holdUnit, startShow } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
 import { unlockUnits } from '@/lib/sourceActions'
 import { needUuid } from '@/lib/ids'
 
 const ST_NAME: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
-  F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Квота SeaBreeze', 'off'],
+  F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Передана агентству (Sea Breeze)', 'off'],
   O: ['Наша бронь', 'ours'], M: ['Ваша бронь', 'ours'], D: ['Наша сделка', 'ink'], X: ['Недоступно', 'off'],
 }
 
-export default async function UnitPage({ params, searchParams }: { params: { id: string }; searchParams: { img?: string } }) {
+export default async function UnitPage({ params, searchParams }: { params: { id: string }; searchParams: { img?: string; err?: string; held?: string } }) {
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -99,9 +99,17 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
               <div className="kv"><span>{T('Отделка')}</span><span>{T('без ремонта')}</span></div>
               <div className="kv"><span>{T('Сдача')}</span><span>{u.delivery || T('уточняется у застройщика')}</span></div>
             </div>
-            {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Забронировать')}</Link>}
+            {searchParams.err && <div className="err mt16">{searchParams.err}</div>}
+            {searchParams.held && <div className="okbox mt16">{T('Квартира придержана на 24 часа — за это время запросите бронь')}</div>}
+            {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Запросить бронь')}</Link>}
+            {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && clients.length > 0 && (
+              <form action={holdUnit} className="row mt8"><input type="hidden" name="unit" value={u.id} />
+                <select className="in" name="client" style={{ flex: 1 }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+                <button className="btn">{T('Придержать 24 ч')}</button></form>
+            )}
+            {code === 'M' && u.booking_status === 'hold' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Ваш холд до {d} · запросить бронь', { d: date(L, u.booking_ends) })}</Link>}
             {u.sales_status === 'stop' && <div className="note mt16">{T('Проект на стоп-продажах — новые брони не принимаются')}</div>}
-            {code === 'M' && <Link className="btn btn--lg btn--block mt16" href="/bookings">{T('Ваша бронь до {d} →', { d: date(L, u.booking_ends) })}</Link>}
+            {code === 'M' && u.booking_status !== 'hold' && <Link className="btn btn--lg btn--block mt16" href="/bookings">{T('Ваша бронь до {d} →', { d: date(L, u.booking_ends) })}</Link>}
             {code === 'F' && clients.length > 0 && (
               <form action={addToSelection} className="row mt8">
                 <input type="hidden" name="unit" value={u.id} />

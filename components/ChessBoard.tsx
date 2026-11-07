@@ -13,7 +13,7 @@ export type CU = {
   plot_area: number | null; ext_area: number | null; is_corner: boolean | null; building_id: string; project_id: string; hidden: boolean
 }
 type Mode = 'price' | 'm2' | 'rooms' | 'area'
-const STATUS: [string, string][] = [['F', 'Свободно'], ['M', 'Ваша бронь'], ['O', 'Наша бронь'], ['D', 'Наша сделка'], ['B', 'Бронь застройщика'], ['S', 'Продано'], ['N', 'Не в продаже'], ['SB', 'Квота SeaBreeze'], ['X', 'Недоступно']]
+const STATUS: [string, string][] = [['F', 'Свободно'], ['M', 'Ваша бронь'], ['O', 'Наша бронь'], ['D', 'Наша сделка'], ['B', 'Бронь застройщика'], ['S', 'Продано'], ['N', 'Не в продаже'], ['SB', 'Передана агентству (Sea Breeze)'], ['X', 'Недоступно']]
 
 export function ChessBoard({ units, lang, team, selected, hrefFor, views, layouts, clients, bulk, projectId, canPick, initial }: {
   units: CU[]; lang: Lang; team: boolean; selected?: string; hrefFor: Record<string, string>; views: [string, string][]; layouts: string[]

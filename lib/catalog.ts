@@ -42,7 +42,7 @@ const UNIT_SELECT = `
   left join portal.project_settings ps on ps.project_id = u.project_id
   join buildings b on b.id = u.building_id
   left join layouts l on l.id = u.layout_id
-  left join lateral (select id, status, agent_id, ends_at from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed') order by created_at desc limit 1) bk on true
+  left join lateral (select id, status, agent_id, ends_at from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending') order by created_at desc limit 1) bk on true
   left join lateral (select id from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled' limit 1) dl on true`
 
 // Видимость для партнёров: статус «в продаже» или «стоп-продажи», рынок открыт или исключение «открыть»; исключение «закрыть» сильнее рынка.
@@ -60,7 +60,7 @@ export async function listProjects(viewer?: User | null): Promise<Project[]> {
     select coalesce((select sales_status from portal.project_settings ps where ps.project_id = p.id), 'draft') as sales_status, p.id, p.slug, p.name, p.status, p.delivery, p.city, p.location, d.name as developer,
       (select count(*)::int from units u where u.project_id = p.id) as units,
       (select count(*)::int from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null
-         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed'))
+         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
          and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''}) as free,
       (select min(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null${f ? HIDDEN : ''}) as min_usd,
       (select count(*)::int from buildings b where b.project_id = p.id) as buildings
@@ -74,7 +74,7 @@ export async function buildingsOf(projectId: string, viewer?: User | null): Prom
   return q<Building>(`
     select b.id, b.name, b.external_id, b.floors_total, b.delivery, b.sort, count(u.*)::int as units,
       count(*) filter (where u.status = 'available' and u.price_list is not null
-        and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed'))
+        and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
         and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''})::int as free,
       min(${toUsdSql}) filter (where u.status = 'available' and u.price_list is not null)::float as min_usd
     from buildings b left join units u on u.building_id = b.id where b.project_id = $1 group by b.id order by b.sort, b.name`, [projectId])

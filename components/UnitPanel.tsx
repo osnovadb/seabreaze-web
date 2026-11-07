@@ -8,7 +8,7 @@ import { quickUnit } from '@/lib/objects'
 import { ActionForm } from '@/components/ActionForm'
 
 const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
-  F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Квота SeaBreeze', 'off'],
+  F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Передана агентству (Sea Breeze)', 'off'],
   O: ['Наша бронь', 'ours'], M: ['Ваша бронь', 'ours'], D: ['Наша сделка', 'ink'], X: ['Недоступно', 'off'],
 }
 

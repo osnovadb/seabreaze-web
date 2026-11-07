@@ -94,7 +94,14 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
           <span className="tiny muted">{T('Например, машиноместо или кладовка к квартире: договор по всем броням пакета оформляется разом, комиссия — по каждой квартире.')}</span></label>}
         <input type="hidden" name="unit" value={unitId} />
         {st?.error && <div className="err mt8">{T(st.error)}</div>}
-        <div className="mt16"><Submit label={T('Поставить бронь по {p}', { p: usd(lang, sp.final) })} /></div>
+        <div className="grid g2 mt16">
+          <label className="field"><span>{T('Тур в Баку: с')}</span><input className="in" type="date" name="tour_from" /></label>
+          <label className="field"><span>{T('по')}</span><input className="in" type="date" name="tour_to" /></label>
+        </div>
+        <div className="tiny muted">{T('Бронь можно продлить до даты тура + 3 дня — с одобрения бэк-офиса')}</div>
+        <label className="field mt8"><span>{T('Подписание')}</span><select className="in" name="signing" defaultValue=""><option value="">—</option><option value="in_person">{T('лично в Баку')}</option><option value="remote">{T('дистанционно')}</option><option value="power_of_attorney">{T('по доверенности')}</option></select></label>
+        <label className="field mt8"><span>{T('Комментарий для бэк-офиса')}</span><input className="in" name="comment" /></label>
+        <div className="mt16"><Submit label={T('Запросить бронь по {p}', { p: usd(lang, sp.final) })} /></div>
         <div className="tiny muted mt8">{T('Цена и условия фиксируются в брони. Офис в Баку подтверждает бронь у застройщика.')}</div>
       </div>
     </form>

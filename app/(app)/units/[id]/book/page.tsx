@@ -15,7 +15,7 @@ export default async function Book({ params, searchParams }: { params: { id: str
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)
-  if (!u || codeFor(u, c.user, viewMode(c.user, false)) !== 'F' || !canBook(c.user.role) || u.sales_status !== 'sales' || (isExternal(c.user.role) && !(await projectVisible(u.project_id, c.user)))) notFound()
+  if (!u || !(codeFor(u, c.user, viewMode(c.user, false)) === 'F' || (u.booking_status === 'hold' && u.booking_agent === c.user.id)) || !canBook(c.user.role) || u.sales_status !== 'sales' || (isExternal(c.user.role) && !(await projectVisible(u.project_id, c.user)))) notFound()
   const ext = isExternal(c.user.role)
   const cond = await conditionsFor(u.project_id, ext ? c.user : null)
   if (!cond) return <><Top title={T('Бронь {n}', { n: unitNo(u) })} /><div className="page"><div className="note">{T('Для проекта не заведены условия')}. {T('Брони откроются, когда владелец опубликует коммерческие условия проекта.')}</div></div></>

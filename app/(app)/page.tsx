@@ -36,7 +36,7 @@ export default async function Home() {
       (select count(distinct ph.unit_id)::int from price_history ph join portal.selection_items si on si.unit_id = ph.unit_id join portal.selections se on se.id = si.selection_id
          where se.user_id = $3 and ph.changed_at > $2 and ph.changed_at > si.created_at and exists (select 1 from price_history p0 where p0.unit_id = ph.unit_id and p0.changed_at < ph.changed_at)) in_sel,
       (select count(*)::int from units u where u.project_id = any($1) and u.updated_at > $2 and u.status = 'available' and u.price_list is not null
-         and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('requested','confirmed'))) freed,
+         and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('hold','queued','requested','confirmed','release_pending'))) freed,
       (select count(*)::int from portal.project_settings ps where ps.project_id = any($1) and ps.updated_at > $2 and ps.sales_status = 'sales') opened`, [pids, since, u.id]) : null
   const apps = await one<{ n: number }>(`select count(*)::int n from portal.agent_applications where status in ('new','review') and ($1 = 'owner' or market = $2)`, [u.role, u.market])
   const disp = ['owner', 'market_head'].includes(u.role) ? await one<{ n: number }>(`select count(*)::int n from portal.disputes d join portal.clients cl on cl.id = d.client_id where d.status = 'open' ${u.role === 'market_head' ? 'and cl.market = $1' : ''}`, u.role === 'market_head' ? [u.market] : []) : null

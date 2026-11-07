@@ -20,7 +20,7 @@ export default async function Projects() {
       (select image from portal.genplans g where g.project_id = p.id) gp,
       (select max(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null) max_usd,
       (select jsonb_object_agg(r, n) from (select least(${roomsSql}, 4) r, count(*)::int n from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null
-         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed'))
+         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
          and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')
          ${ext ? 'and not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id)' : ''} and ${roomsSql} is not null group by 1) m) mix,
       (select count(*)::int from portal.special_offers o where o.project_id = p.id and o.active and (o.starts_on is null or o.starts_on <= current_date) and (o.ends_on is null or o.ends_on >= current_date)) promos

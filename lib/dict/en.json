@@ -1835,5 +1835,6 @@
 "Ручная правка в портале фиксирует поле: синхронизация его не меняет. «Продано» у застройщика снимает замок статуса само.": "A manual edit in the portal locks the field: sync won't change it. \"Sold\" at the developer removes the status lock automatically.",
 "все поля": "all fields",
 "Ссылка для входа": "Sign-in link",
-"Ссылка для входа:": "Sign-in link:"
+"Ссылка для входа:": "Sign-in link:",
+"Передана агентству (Sea Breeze)": "Assigned to agency (Sea Breeze)"
 }

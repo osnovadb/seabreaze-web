@@ -21,14 +21,33 @@ const task = (client, user, title, vars, dedup) =>
 const out = {}
 
 // 1. Истёкшие брони: срок вышел — квартира снова свободна, агенту и куратору уведомление
-// М3: подтверждённая бронь из Profitbase истекает — снять её и у застройщика (очередь pb_outbox, отправка в шаге 10)
-await q(`insert into portal.pb_outbox (source_id, unit_id, booking_id, op, status_alias) select s.id, b.unit_id, b.id, 'release', 'AVAILABLE'
-  from portal.bookings b join units u on u.id = b.unit_id join sources s on s.id = u.source_id and s.kind = 'profitbase' and s.active
-  where b.status = 'confirmed' and b.ends_at < now()`)
+// 2.2 · §7 п.7: подтверждённая бронь в день окончания — Release pending, бэк-офис подтверждает снятие у застройщика (до этого квартира — «бронь»);
+// снятие в Profitbase уходит при подтверждении (bookingAction release_confirm)
+const releasing = await q(`update portal.bookings b set status = 'release_pending' from units u join buildings bl on bl.id = u.building_id
+  where u.id = b.unit_id and b.status = 'confirmed' and b.ends_at < now() returning b.id, portal.unit_no(bl.external_id, u.number) as unit`)
+for (const b of releasing) for (const o of await q(`select id from portal.users where active and role in ('office','owner')`)) await notify(o.id, 'booking', 'Бронь {u} закончилась — снимите у застройщика и подтвердите', '/bookings', { u: b.unit }, `release:${b.id}:${o.id}`)
+// Холд 24 ч и неподтверждённый запрос истекают сами
 const expired = await q(`update portal.bookings b set status = 'expired' from units u join buildings bl on bl.id = u.building_id
-  where u.id = b.unit_id and b.status in ('requested','confirmed') and b.ends_at < now()
-  returning b.id, b.client_id, b.agent_id, portal.unit_no(bl.external_id, u.number) as unit`)
+  where u.id = b.unit_id and b.status in ('requested','hold') and b.ends_at < now()
+  returning b.id, b.client_id, b.agent_id, b.snapshot->>'kind' kind, portal.unit_no(bl.external_id, u.number) as unit`)
+// §7 п.4: очередь лимита застройщика — по времени запроса; освободилось место — следующий запрос сам переходит в Requested; в очереди живёт 7 дней
+const qOut = await q(`update portal.bookings set status = 'cancelled' where status = 'queued' and queue_until < now() returning id, agent_id`)
+for (const b of qOut) await notify(b.agent_id, 'booking', 'Запрос в очереди застройщика снят через 7 дней — запросите снова, если нужно', '/bookings', {}, 'qout:' + b.id)
+const devs = await q(`select d.id, d.catalog_id, d.max_bookings_total lim,
+    (select count(*)::int from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = d.catalog_id and b.status in ('requested','confirmed','release_pending')) used
+  from portal.developers d where d.active`)
+for (const d of devs) {
+  if (d.used >= d.lim) continue
+  const moved = await q(`update portal.bookings set status = 'requested', ends_at = now() + ((snapshot->>'booking_days') || ' days')::interval
+    where id in (select b.id from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = $1 and b.status = 'queued' order by b.queued_at limit $2)
+    returning id, agent_id`, [d.catalog_id, d.lim - d.used])
+  for (const b of moved) {
+    await notify(b.agent_id, 'booking', 'Место у застройщика освободилось — запрос брони передан бэк-офису', '/bookings', {}, 'qin:' + b.id)
+    for (const o of await q(`select id from portal.users where active and role = 'office'`)) await notify(o.id, 'booking', 'Запрос из очереди ждёт подтверждения у застройщика', '/bookings', {}, `qin:${b.id}:${o.id}`)
+  }
+}
 for (const b of expired) {
+  if (b.kind === 'hold') { await notify(b.agent_id, 'booking', 'Холд {u} снят через 24 часа', `/bookings`, { u: b.unit }, 'hold-off:' + b.id); continue }
   await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Бронь {u} истекла',$2)`, [b.client_id, JSON.stringify({ u: b.unit })])
   await notify(b.agent_id, 'booking', 'Бронь {u} истекла', '/bookings', { u: b.unit }, 'expired:' + b.id)
   const cur = (await q('select curator_id from portal.users where id = $1', [b.agent_id]))[0]?.curator_id
@@ -43,8 +62,8 @@ out.expired = expired.length
 // 2. Бронь кончается через 3 дня или меньше
 const soon = await q(`select b.id, b.agent_id, b.ends_at, portal.unit_no(bl.external_id, u.number) as unit, ceil(extract(epoch from b.ends_at - now()) / 86400)::int as d
   from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id
-  where b.status in ('requested','confirmed') and b.ends_at < now() + interval '3 days'`)
-for (const b of soon) await notify(b.agent_id, 'booking', 'Бронь {u} истекает через {d} дн.', '/bookings', { u: b.unit, d: b.d }, 'soon:' + b.id + ':' + (b.ends_at.toISOString?.() || b.ends_at))
+  where b.status = 'confirmed' and b.ends_at < now() + interval '3 days'`)
+for (const b of soon) await notify(b.agent_id, 'booking', 'Бронь {u} заканчивается через {d} дн. — продлите или снимите', '/bookings', { u: b.unit, d: b.d }, 'soon:' + b.id + ':' + (b.ends_at.toISOString?.() || b.ends_at))
 out.soon = soon.length
 
 // 3. Защита клиента заканчивается через неделю
@@ -96,7 +115,7 @@ out.promo_ended = promoEnd.length
 
 // 7в. Лист ожидания (М12): квартира свободна — первому в очереди сразу, следующему — через паузу проекта после предыдущего
 const FREE = `u.status = 'available' and u.price_list is not null
-  and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('requested','confirmed'))
+  and not exists (select 1 from portal.bookings b where b.unit_id = u.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
   and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')`
 const waitUnits = await q(`select u.id, portal.unit_no(bl.external_id, u.number) unit, coalesce(ps.waitlist_pause_hours, 24) pause,
     (select max(w.notified_at) from portal.waitlist w where w.unit_id = u.id and w.notified_at > now() - interval '30 days') last

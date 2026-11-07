@@ -23,7 +23,7 @@ export default async function Stock({ searchParams }: { searchParams: { p?: stri
   const key = by === 'rooms' ? `case when ${roomsSql} is null then u.unit_type else least(${roomsSql}, 4)::text end` : `${p ? '' : "pr.name || ' · ' || "}b.name`
   const rows = await q<St>(`with x as (
       select ${key} key, u.status, u.area_total_m2::float area, (${toUsdSql})::float usd, b.sort bs, pr.sort ps,
-        exists (select 1 from portal.bookings bk where bk.unit_id = u.id and bk.status in ('requested','confirmed')) or exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled') ours
+        exists (select 1 from portal.bookings bk where bk.unit_id = u.id and bk.status in ('hold','queued','requested','confirmed','release_pending')) or exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled') ours
       from units u join buildings b on b.id = u.building_id join projects pr on pr.id = u.project_id where ${where})
     select key, count(*)::int total,
       count(*) filter (where status = 'available' and usd is not null and not ours)::int free, count(*) filter (where ours)::int ours,

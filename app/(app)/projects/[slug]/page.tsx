@@ -37,7 +37,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
   // Свободные по типам и комнатам: сколько, площадь и цена от — сводка для партнёра без открытия шахматки
   const mix = await q<{ k: string; n: number; amin: number; amax: number; pmin: number | null }>(`select case when ${roomsSql} is null then u.unit_type else least(${roomsSql}, 4)::text end k, count(*)::int n,
       min(u.area_total_m2)::float amin, max(u.area_total_m2)::float amax, min(${toUsdSql})::float pmin from units u where u.project_id = $1 and u.status = 'available' and u.price_list is not null
-      and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('requested','confirmed')) and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')
+      and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending')) and not exists (select 1 from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled')
       ${ext ? 'and not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id)' : ''} group by 1 order by 1`, [p.id])
   const finishes = (await q<{ finish: string }>('select distinct finish from units where project_id = $1 and finish is not null', [p.id])).map((r) => r.finish)
   const FIN: Record<string, string> = { shell: 'без ремонта', white_box: 'white box', turnkey: 'с ремонтом', furnished: 'с мебелью' }

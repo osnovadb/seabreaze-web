@@ -28,7 +28,7 @@ export function Pill({ kind, children }: { kind: 'ok' | 'warn' | 'bad' | 'off' |
 
 export function Legend({ lang, team }: { lang: Lang; team: boolean }) {
   const items: [string, string][] = team
-    ? [['F', 'Свободно'], ['B', 'Бронь застройщика'], ['O', 'Наша бронь'], ['D', 'Наша сделка'], ['S', 'Продано'], ['N', 'Не в продаже'], ['SB', 'Квота SeaBreeze']]
+    ? [['F', 'Свободно'], ['B', 'Бронь застройщика'], ['O', 'Наша бронь'], ['D', 'Наша сделка'], ['S', 'Продано'], ['N', 'Не в продаже'], ['SB', 'Передана агентству (Sea Breeze)']]
     : [['F', 'Свободно — можно бронировать'], ['M', 'Ваша бронь'], ['X', 'Недоступно']]
   return <div className="legend">{items.map(([k, l]) => <span key={k}><i className={`c-${k}`} />{t(lang, l)}</span>)}</div>
 }

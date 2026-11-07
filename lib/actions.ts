@@ -21,6 +21,7 @@ import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
+import { developerOfProject } from './developers'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -360,6 +361,28 @@ export async function transferClient(f: FormData) {
 }
 
 /* ── Брони ── */
+/* ── Холд 24 часа (§7 п.1) ── */
+export async function holdUnit(f: FormData) {
+  const c = await writeCtx()
+  if (!canBook(c.user.role)) return
+  const unit = await unitById(s(f, 'unit'))
+  const clientId = s(f, 'client')
+  if (!unit || !clientId) return
+  await stageGuard(c, clientId)
+  const err = (m: string) => back(`/units/${unit.id}`, { err: t(c.lang, m) })
+  if (unit.status !== 'available' || unit.price == null || unit.booking_id || unit.deal_id) return err('Квартира уже придержана или в брони')
+  if (unit.hidden && isExternal(c.user.role)) return err('Квартира уже недоступна')
+  // повторно тот же человек — не раньше чем через 24 часа после прошлого холда; до этого — только запрос брони
+  if (await one(`select 1 from portal.bookings where unit_id = $1 and agent_id = $2 and snapshot->>'kind' = 'hold' and ends_at > now() - interval '24 hours'`, [unit.id, c.user.id]))
+    return err('Повторно придержать можно через 24 часа после прошлого холда — сейчас только запрос брони')
+  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, snapshot, ends_at, status)
+    values ($1,$2,$3,$4,$5,0,$5,'{"kind":"hold"}', now() + interval '24 hours', 'hold') returning id`, [unit.id, unit.project_id, clientId, c.user.id, Math.round(unit.usd || 0)])
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Квартира {u} придержана на 24 часа',$3)`, [clientId, c.user.id, { u: unitNo(unit) }])
+  await audit(c.real.id, 'booking.hold', 'booking', b!.id, { unit: unit.id }, c.impersonating ? c.user.id : null)
+  revalidatePath(`/units/${unit.id}`)
+  back(`/units/${unit.id}`, { held: '1' })
+}
+
 export async function createBooking(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canBook(c.user.role)) return { error: 'Нет прав на бронь' }
@@ -369,7 +392,12 @@ export async function createBooking(_: unknown, f: FormData) {
   if (!clientId) return { error: 'Выберите закреплённого клиента' }
   const cl = await stageGuard(c, clientId).catch(() => null)
   if (!cl) return { error: 'Этот клиент не закреплён за вами' }
-  if (unit.status !== 'available' || unit.price == null || unit.booking_id || unit.deal_id) return { error: 'Квартира уже недоступна' }
+  // §10: кандидата застройщикам не передаём — сначала квалификация
+  if ((await one<{ a: string }>('select attach_status a from portal.clients where id = $1', [clientId]))?.a === 'candidate') return { error: 'Сначала квалифицируйте клиента: цель, бюджет, срок, страна и язык' }
+  // §7 п.1: свой холд превращается в запрос; чужой холд блокирует запрос на 24 часа — можно встать в лист ожидания
+  const myHold = unit.booking_status === 'hold' && unit.booking_agent === c.user.id
+  if (unit.booking_status === 'hold' && !myHold) return { error: 'Квартиру придержал другой — запрос станет доступен после снятия холда; можно встать в лист ожидания' }
+  if (unit.status !== 'available' || unit.price == null || (unit.booking_id && !myHold) || unit.deal_id) return { error: 'Квартира уже недоступна — встаньте в лист ожидания' }
   if (unit.sales_status !== 'sales' && c.user.role !== 'owner') return { error: 'Проект на стоп-продажах — новые брони не принимаются' }
   if (unit.hidden && isExternal(c.user.role)) return { error: 'Квартира уже недоступна' }
   if (isExternal(c.user.role) && !(await projectVisible(unit.project_id, c.user))) return { error: 'Квартира уже недоступна' }
@@ -385,7 +413,14 @@ export async function createBooking(_: unknown, f: FormData) {
     from portal.bookings where project_id = $3 and status in ('requested','confirmed')`, [clientId, c.user.id, unit.project_id])
   if (active!.cl >= cond.max_bookings_client) return { error: t(c.lang, 'У клиента уже {n} активных брони — это максимум', { n: active!.cl }) }
   if (isExternal(c.user.role) && active!.ag >= cond.max_bookings_agent) return { error: t(c.lang, 'Лимит броней агента: {n}', { n: cond.max_bookings_agent }) }
-  if (active!.tot >= cond.max_bookings_total) return { error: 'Общий лимит броней у застройщика исчерпан — лист ожидания' }
+  // §7 п.4: лимит одновременных броней — на всю GetsEstate у застройщика; занят — запрос встаёт в очередь (Queued) на 7 дней
+  const dev = await developerOfProject(unit.project_id)
+  const limit = dev?.max_bookings_total ?? cond.max_bookings_total
+  const used = dev ? (await one<{ n: number }>(`select count(*)::int n from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = $1 and b.status in ('requested','confirmed','release_pending')`, [dev.catalog_id]))!.n : active!.tot
+  const queued = used >= limit
+  const days = dev?.booking_days ?? cond.booking_days
+  const tour = { from: s(f, 'tour_from') || null, to: s(f, 'tour_to') || null }
+  const signing = ['in_person', 'remote', 'power_of_attorney'].includes(s(f, 'signing')) ? s(f, 'signing') : null
   // План оплаты: «100% сразу» со скидкой застройщика снижает цену до раздела денег
   const plan = s(f, 'plan') ? (await plansFor(unit.project_id, unit.building_id)).find((p) => p.id === s(f, 'plan')) : undefined
   if (s(f, 'plan') && !plan) return { error: t(c.lang, 'План оплаты больше не действует — обновите страницу') }
@@ -409,9 +444,14 @@ export async function createBooking(_: unknown, f: FormData) {
   // Платная бронь: взнос из условий проекта; офис подтвердит бронь только после отметки об оплате
   const fee = cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency, usd: Math.round(await toUsd(cond.booking_fee, cond.booking_fee_currency)) } : null
   if (pkg && !pkg.group_id) await q('update portal.bookings set group_id = $1 where id = $1', [pkg.id])
-  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd, group_id, fee_amount, fee_currency, fee_usd, fee_status)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), cond.booking_days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none'])
+  if (myHold) await q(`update portal.bookings set status = 'cancelled' where id = $1 and status = 'hold'`, [unit.booking_id])
+  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd, group_id, fee_amount, fee_currency, fee_usd, fee_status,
+      status, queued_at, queue_until, developer_id, tour_from, tour_to, signing, comment)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18,
+      $19, case when $19 = 'queued' then now() end, case when $19 = 'queued' then now() + interval '7 days' end, $20, $21, $22, $23, $24) returning id`,
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, booking_ext_days: dev?.booking_ext_days ?? cond.booking_ext_days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
+      queued ? 'queued' : 'requested', dev?.id || null, tour.from, tour.to, signing, s(f, 'comment') || null])
+  if (queued) await notify(c.user.id, 'booking', 'Лимит броней застройщика занят — запрос {u} в очереди (до 7 дней)', '/bookings', { u: unitNo(unit) })
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: unitNo(unit), d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
@@ -419,7 +459,7 @@ export async function createBooking(_: unknown, f: FormData) {
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
-  } else for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
+  } else if (!queued) for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
   if (c.show) redirect(`/show/unit/${unit.id}?booked=1`)
   redirect(`/bookings?created=${b!.id}`)
@@ -445,12 +485,26 @@ export async function bookingAction(f: FormData) {
   } else if ((act === 'fee_refund' || act === 'fee_keep') && ['owner', 'finance'].includes(c.user.role) && b.fee_status === 'paid' && ['cancelled', 'expired'].includes(b.status)) {
     await q(`update portal.bookings set fee_status = $2, fee_by = $3 where id = $1 and fee_status = 'paid'`, [id, act === 'fee_refund' ? 'refunded' : 'kept', c.user.id])
   } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending' && b.fee_status !== 'due') {
-    await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now() where id = $1`, [id, c.user.id])
+    // §7 п.5: номер и срок брони застройщика; цена брони фиксируется
+    const until = s(f, 'until')
+    await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now(), dev_booking_no = nullif($3, ''),
+      ends_at = case when $4 <> '' then ($4::date + interval '1 day' - interval '1 second') else now() + ((snapshot->>'booking_days') || ' days')::interval end where id = $1`, [id, c.user.id, s(f, 'dev_no'), until])
     await pbEnqueue(b.unit_id, 'reserve', id, c.user.id) // М3: бронь у застройщика в Profitbase
     await notify(b.agent_id, 'booking', 'Бронь подтверждена у застройщика', '/bookings')
+  } else if (act === 'reject' && canConfirmBooking(c.user.role) && ['requested', 'queued'].includes(b.status)) {
+    const why = ['sold', 'developer_refused', 'registration_failed', 'other'].includes(s(f, 'reason')) ? s(f, 'reason') : 'other'
+    await q(`update portal.bookings set status = 'declined', decline_reason = $2 where id = $1`, [id, why])
+    await notify(b.agent_id, 'booking', 'Бронь отклонена: {r}', '/bookings', { r: why })
+  } else if (act === 'release_hold' && b.status === 'hold' && (mine || c.user.role === 'market_head')) {
+    await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id]) // досрочно снять холд может автор и руководитель рынка
+  } else if (act === 'release_confirm' && canConfirmBooking(c.user.role) && b.status === 'release_pending') {
+    // §7 п.7: бэк-офис подтвердил снятие у застройщика — квартира свободна, лист ожидания получит уведомление
+    await q(`update portal.bookings set status = 'expired' where id = $1`, [id])
+    await pbEnqueue(b.unit_id, 'release', id, c.user.id)
+    await notify(b.agent_id, 'booking', 'Бронь снята у застройщика — квартира свободна', '/bookings')
   } else if (act === 'extend' && (mine || canConfirmBooking(c.user.role)) && !b.extended && ['requested', 'confirmed'].includes(b.status)) {
     await q(`update portal.bookings set ends_at = ends_at + ((snapshot->>'booking_ext_days') || ' days')::interval, extended = true where id = $1`, [id])
-  } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed'].includes(b.status)) {
+  } else if (act === 'cancel' && (mine || canConfirmBooking(c.user.role)) && ['requested', 'confirmed', 'queued'].includes(b.status)) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
     if (b.status === 'confirmed') await pbEnqueue(b.unit_id, 'release', id, c.user.id) // снять бронь и в Profitbase
     if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
