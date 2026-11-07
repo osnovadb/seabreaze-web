@@ -208,13 +208,33 @@ export async function collectRegister(month: string, by: string) {
 export async function confirmMarket(regId: string, market: string, by: string) {
   await q(`update portal.payout_registers set confirmations = confirmations || jsonb_build_object($2::text, jsonb_build_object('by', $3::text, 'at', now())) where id = $1 and status = 'collected'`, [regId, market, by])
 }
+// Утверждение: партнёрам и рекомендателям — акты (номер по счётчику, валюта получателя по курсу ЦБА на дату акта; ЕЦБ / Банк Израиля — позже, решение 207)
+const CUR: Record<string, string> = { DE: 'EUR', IL: 'ILS' }
 export async function approveRegister(regId: string, by: string) {
-  await q(`update portal.payout_registers set status = 'approved', approved_at = now(), approved_by = $2 where id = $1 and status = 'collected'`, [regId, by])
+  const r = await one<{ id: string }>(`update portal.payout_registers set status = 'approved', approved_at = now(), approved_by = $2 where id = $1 and status = 'collected' returning id`, [regId, by])
+  if (!r) return
+  const lines = await q<{ id: string; user_id: string | null; market: string | null; net: number }>(`select id, user_id, market, net::float from portal.payout_lines where register_id = $1 and not carried and role in ('partner','referrer') and act_no is null`, [regId])
+  for (const l of lines) {
+    const cur = CUR[l.market || ''] || 'USD'
+    const fx = cur === 'USD' ? 1 : num((await one<{ r: number }>(`select (select azn_per_unit from currency_rates where currency = 'USD' order by override desc, valid_from desc limit 1) / azn_per_unit r
+      from currency_rates where currency = $1 order by override desc, valid_from desc limit 1`, [cur]))?.r, 1)
+    await q(`update portal.payout_lines set act_no = 'A-' || to_char(current_date, 'YYYY') || '-' || lpad(nextval('portal.payout_act_seq')::text, 4, '0'), act_date = current_date,
+        currency = $2, fx_rate = $3, fx_source = $4, amount_cur = round(net * $3, 2) where id = $1`, [l.id, cur, fx, cur === 'USD' ? null : 'cbar cross'])
+    if (l.user_id) await notify(l.user_id, 'payout', 'Акт за месяц готов — проверьте и нажмите «Согласен с актом»', '/commission#acts')
+  }
 }
 // Оплачено в банке: начисления — Paid; партнёрам и сотрудникам — уведомление
 export async function payRegister(regId: string, by: string) {
   const r = await one<{ id: string }>(`update portal.payout_registers set status = 'paid', paid_at = now(), paid_by = $2 where id = $1 and status = 'approved' returning id`, [regId, by])
   if (!r) return
+  // без «Согласен с актом» (и счёта у компании или ИП) выплата не уходит — переносится на следующий месяц
+  const hold = await q<{ id: string; user_id: string; role: string }>(`select l.id, l.user_id, l.role from portal.payout_lines l join portal.users u on u.id = l.user_id
+    where l.register_id = $1 and not l.carried and l.role in ('partner','referrer') and (l.agreed_at is null or (u.partner_form in ('company','sole') and l.invoice_file_id is null))`, [regId])
+  for (const h of hold) {
+    await q(`update portal.accruals set status = 'open', register_id = null where register_id = $1 and user_id = $2 and role = $3 and status = 'in_register'`, [regId, h.user_id, h.role])
+    await q(`update portal.payout_lines set carried = true, note = coalesce(note || '; ', '') || 'нет согласия с актом или счёта — перенос' where id = $1`, [h.id])
+    await notify(h.user_id, 'payout', 'Выплата перенесена: нет согласия с актом или счёта — подтвердите акт в разделе «Комиссия»', '/commission#acts')
+  }
   await q(`update portal.accruals set status = 'paid' where register_id = $1 and status = 'in_register'`, [regId])
   for (const l of await q<{ user_id: string; net: number }>(`select user_id, net::float from portal.payout_lines where register_id = $1 and not carried and user_id is not null`, [regId]))
     await notify(l.user_id, 'payout', 'Выплата отправлена: {a}', '/commission', { a: '$' + Math.round(l.net).toLocaleString('en') })
@@ -222,4 +242,18 @@ export async function payRegister(regId: string, by: string) {
   await q(`update portal.deals d set stage = 'paid_out', paid_out_at = current_date where d.stage = 'fee_received'
     and not exists (select 1 from portal.accruals a where a.deal_id = d.id and a.status in ('open','in_register'))
     and exists (select 1 from portal.accruals a where a.deal_id = d.id and a.register_id = $1)`, [regId])
+}
+
+// Корректировка после закрытого месяца (выданные акты не правим): строка в следующем акте со ссылкой на продажу
+export async function addAdjustment(dealId: string, role: string, amount: number, note: string, by: string) {
+  const sh = await one<{ user_id: string | null; recipient: string | null }>('select user_id, recipient from portal.deal_shares where deal_id = $1 and role = $2', [dealId, role])
+  if (!sh || !amount) return false
+  await q(`insert into portal.accruals (deal_id, role, user_id, recipient, kind, amount, month, note) values ($1,$2,$3,$4,'adjustment',$5, date_trunc('month', now() at time zone 'Asia/Baku')::date, $6)`,
+    [dealId, role, sh.user_id, sh.recipient, r2(amount), `корректировка: ${note}`.slice(0, 300)])
+  return !!by
+}
+// Списать долг партнёра может только админ (§8 «Клаубэк»)
+export async function writeOffDebt(userId: string, role: string, by: string) {
+  const n = await q<{ id: string }>(`update portal.accruals set status = 'void', note = coalesce(note || ' · ', '') || 'долг списан админом' where user_id = $1 and role = $2 and status = 'open' returning id`, [userId, role])
+  return n.length && by
 }

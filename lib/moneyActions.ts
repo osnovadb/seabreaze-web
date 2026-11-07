@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { q, one, audit } from './db'
 import { requireCtx } from './auth'
-import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares } from './money22'
+import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares, addAdjustment, writeOffDebt } from './money22'
+import { storeFile, isFile } from './files'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function role(roles: string[]) {
@@ -84,4 +85,42 @@ export async function setEscort(f: FormData) {
   await q(`update portal.deals set escort_id = nullif($2, '')::uuid where booking_id = $1`, [s(f, 'id'), s(f, 'escort')])
   await audit(c.real.id, 'booking.escort', 'booking', s(f, 'id'), { escort: s(f, 'escort') || null })
   if (b) revalidatePath(`/b24/units/${b.client_id}`)
+}
+
+// Партнёр: «Согласен с актом» — запись в журнал (решение 247)
+export async function agreeAct(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) throw new Error('read-only')
+  const l = await one<{ id: string }>(`update portal.payout_lines set agreed_at = now(), agreed_by = $2 where id = $1 and user_id = $2 and act_no is not null and agreed_at is null returning id`, [s(f, 'id'), c.user.id])
+  if (l) await audit(c.real.id, 'act.agree', 'payout_line', l.id)
+  revalidatePath('/commission'); revalidatePath(`/commission/act/${s(f, 'id')}`)
+}
+// Компания или ИП загружает счёт против нашего акта
+export async function uploadInvoice(_: unknown, f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating) return { error: 'Только чтение' }
+  const file = f.get('file')
+  if (!isFile(file)) return { error: 'Выберите файл' }
+  const l = await one<{ id: string }>('select id from portal.payout_lines where id = $1 and user_id = $2 and act_no is not null', [s(f, 'id'), c.user.id])
+  if (!l) return { error: 'Нет прав' }
+  let fid: string
+  try { fid = await storeFile(file, c.user.id, { exts: ['pdf', 'jpg', 'jpeg', 'png'], max: 10 * 1024 * 1024 }) } catch { return { error: 'Счёт — PDF или фото до 10 МБ' } }
+  await q('update portal.payout_lines set invoice_file_id = $2, invoice_at = now() where id = $1', [l.id, fid])
+  await audit(c.real.id, 'act.invoice', 'payout_line', l.id)
+  revalidatePath('/commission'); revalidatePath(`/commission/act/${l.id}`)
+  return { ok: true }
+}
+export async function adjustment(f: FormData) {
+  const c = await role(['owner', 'finance'])
+  const amt = Number(s(f, 'amount').replace(',', '.'))
+  if (Number.isNaN(amt) || !amt) return
+  await addAdjustment(s(f, 'deal'), s(f, 'role'), amt, s(f, 'note') || '—', c.user.id)
+  await audit(c.real.id, 'accrual.adjustment', 'deal', s(f, 'deal'), { role: s(f, 'role'), amount: amt })
+  done()
+}
+export async function writeOff(f: FormData) {
+  const c = await role(['owner'])
+  await writeOffDebt(s(f, 'user'), s(f, 'role'), c.user.id)
+  await audit(c.real.id, 'accrual.writeoff', 'user', s(f, 'user'), { role: s(f, 'role') })
+  done()
 }

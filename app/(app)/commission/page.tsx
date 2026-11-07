@@ -43,6 +43,9 @@ export default async function Commission() {
   const debt = payee ? (await one<{ s: number }>(`select coalesce(sum(amount), 0)::float s from portal.accruals where user_id = $1 and status = 'open' and role = 'partner'`, [c.user.id]))?.s || 0 : 0
   const prof = await one<{ partner_form: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null; tax_no: string | null; tax_cert_until: string | null }>(
     'select partner_form, vat_payer, vat_no, tax_country, tax_no, tax_cert_until::text from portal.users where id = $1', [c.user.id])
+  const myActs = await q<{ id: string; act_no: string; act_date: string; net: number; currency: string | null; amount_cur: number | null; agreed_at: string | null; carried: boolean; paid: boolean }>(
+    `select l.id, l.act_no, l.act_date::text, l.net::float, l.currency, l.amount_cur::float, l.agreed_at, l.carried, r.status = 'paid' and not l.carried paid
+     from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id where l.user_id = $1 and l.act_no is not null order by l.act_date desc`, [c.user.id])
   const trL = (x: { status: string; acc: string | null; reg_month: string | null; expected_at: string | null }): [string, 'ok' | 'warn' | 'ink' | 'off'] =>
     x.acc === 'paid' ? [T('выплачено'), 'ink'] : x.acc === 'in_register' ? [T('в реестре выплат за {m}', { m: (x.reg_month || '').slice(0, 7) }), 'ok'] : x.status === 'received' ? [T('получено — войдёт в ближайший реестр'), 'ok']
       : x.status === 'expected' ? [T('ожидаем от застройщика') + (x.expected_at ? ' · ' + date(L, x.expected_at) : ''), 'warn'] : [T('ждём оплату клиента'), 'off']
@@ -60,6 +63,14 @@ export default async function Commission() {
           <div className="tbl-wrap mt8"><table className="tbl"><thead><tr>{['Квартира', 'Транш', 'Доля', 'Статус'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
             <tbody>{trs.map((x, i) => { const [l, k] = trL(x); return <tr key={i}><td><b>{x.unit}</b></td><td className="small">№{x.no} · {Math.round(x.pct * 100) / 100}%</td><td>{usd(L, x.share)}</td><td><Pill kind={k}>{l}</Pill></td></tr> })}</tbody></table></div>
           <div className="tiny muted mt8">{T('Выплата раз в месяц: поступление от застройщика до конца месяца — выплата до 10-го следующего месяца. Меньше 100 $ переносится.')}</div>
+        </>}
+        {myActs.length > 0 && <>
+          <div className="h2 mt24" id="acts">{T('Акты за месяц')}</div>
+          <div className="tbl-wrap mt8"><table className="tbl"><thead><tr>{['Акт', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
+            <tbody>{myActs.map((a) => <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td>
+              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
+              <td><Pill kind={a.paid ? 'ink' : a.carried ? 'warn' : a.agreed_at ? 'ok' : 'warn'}>{T(a.paid ? 'выплачено' : a.carried ? 'перенесено' : a.agreed_at ? 'согласован — ждёт оплаты' : 'нужно согласие')}</Pill></td>
+              <td><Link className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</Link></td></tr>)}</tbody></table></div>
         </>}
         {debt < 0 && <div className="err mt16">{T('Удержание по расторгнутой сделке: {a} — зачтём из следующих выплат', { a: usd(L, -debt) })}</div>}
         {payee && <form action={savePayoutProfile} className="card stack mt24" style={{ gap: 10 }}>

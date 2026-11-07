@@ -8,7 +8,7 @@ import { dealPaid } from '@/lib/actions'
 import { actDocument, payActNow } from '@/lib/docActions'
 import { ACT_STATUS } from '@/lib/acts'
 import { ROLE_LABEL } from '@/lib/money22'
-import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding } from '@/lib/moneyActions'
+import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding, adjustment, writeOff } from '@/lib/moneyActions'
 import { ActionForm } from '@/components/ActionForm'
 
 // 2.2 · §8 Деньги. Админ — весь путь денег; руководитель рынка — свой рынок без доли Caspian; финансы — суммы к получению и выплате.
@@ -39,14 +39,15 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
        join public.developers dv on dv.id = p.developer_id join portal.clients cl on cl.id = d.client_id
      where true ${mk} order by array_position(array['expected','scheduled','received','cancelled'], t.status), t.expected_at nulls last limit 300`) : []
   const reg = tab === 'register' ? (await q<{ id: string; month: string; status: string; confirmations: Record<string, { at: string }>; collected_at: string; approved_at: string | null; paid_at: string | null }>(`select id, month::text, status, confirmations, collected_at, approved_at, paid_at from portal.payout_registers where month = $1::date`, [month + '-01']))[0] : null
-  const lines = reg ? await q<{ role: string; who: string | null; market: string | null; gross: number; withheld: number; net: number; doc_ok: boolean; carried: boolean; note: string | null }>(
-    `select l.role, coalesce(u.name, l.recipient) who, l.market, l.gross::float, l.withheld::float, l.net::float, l.doc_ok, l.carried, l.note from portal.payout_lines l left join portal.users u on u.id = l.user_id
+  const lines = reg ? await q<{ id: string; role: string; who: string | null; market: string | null; gross: number; withheld: number; net: number; doc_ok: boolean; carried: boolean; note: string | null; act_no: string | null; agreed: boolean; invoice: boolean; needs_inv: boolean }>(
+    `select l.id, l.role, coalesce(u.name, l.recipient) who, l.market, l.gross::float, l.withheld::float, l.net::float, l.doc_ok, l.carried, l.note, l.act_no, l.agreed_at is not null agreed,
+       l.invoice_file_id is not null invoice, coalesce(u.partner_form in ('company','sole'), false) needs_inv from portal.payout_lines l left join portal.users u on u.id = l.user_id
      where l.register_id = $1 ${head ? `and l.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''} order by l.carried, l.role, who`, [reg.id]) : []
   const markets = Array.from(new Set(lines.filter((l) => !l.carried && l.market).map((l) => l.market!)))
   const pending = tab === 'register' && !reg ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
-  const debts = tab === 'debts' ? await q<{ role: string; who: string; bal: number; since: string }>(
-    `select a.role, coalesce(u.name, a.recipient) who, sum(a.amount)::float bal, min(a.created_at) filter (where a.kind = 'clawback')::text since
-     from portal.accruals a left join portal.users u on u.id = a.user_id where a.status = 'open' group by a.role, u.name, a.recipient having sum(a.amount) < 0 order by bal`) : []
+  const debts = tab === 'debts' ? await q<{ role: string; user_id: string | null; who: string; bal: number; since: string }>(
+    `select a.role, a.user_id, coalesce(u.name, a.recipient) who, sum(a.amount)::float bal, min(a.created_at) filter (where a.kind = 'clawback')::text since
+     from portal.accruals a left join portal.users u on u.id = a.user_id where a.status = 'open' group by a.role, a.user_id, u.name, a.recipient having sum(a.amount) < 0 order by bal`) : []
   const acts = tab === 'acts' ? await q<{ id: string; unit: string; client: string; agent: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; docx: string | null }>(
     `select ca.id, portal.unit_no(bl.external_id, un.number) unit, cl.name client, ag.name agent, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, doc.docx_file_id docx
      from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id join portal.users ag on ag.id = ca.agent_id left join portal.documents doc on doc.id = ca.document_id
@@ -66,7 +67,12 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
               <td className="tiny">{(d.shares || []).filter((s) => !(head && s.role === 'caspian')).map((s) => <div key={s.role}>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' ? ` · ${s.who}` : ''}: <b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</div>)}
                 {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}</td>
               <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><button className="btn btn--sm">%</button></form> : pct(L, d.paid_pct)}</td>
-              <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻</button></form>}</td>
+              <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻</button></form>}
+                {fin && d.shares && <details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка')}</summary>
+                  <form action={adjustment} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="deal" value={d.id} />
+                    <select className="in" name="role">{d.shares.filter((x) => x.role !== 'caspian').map((x) => <option key={x.role} value={x.role}>{T(ROLE_LABEL[x.role])}</option>)}</select>
+                    <input className="in" name="amount" placeholder={T('Сумма, USD (минус — удержание)')} /><input className="in" name="note" placeholder={T('Причина')} />
+                    <button className="btn btn--sm">{T('Добавить в следующий акт')}</button></form></details>}</td>
             </tr>))}</tbody></table></div>}
         {tab === 'tranches' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Продажа', 'Застройщик', 'Транш', 'Сумма', 'Статус', 'Ожидаем', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
@@ -95,14 +101,16 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
               <thead><tr>{['Получатель', 'Роль', 'Рынок', 'Начислено', 'Удержание налога', 'К выплате', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
               <tbody>{lines.length === 0 ? <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr> : lines.map((l, i) => (
                 <tr key={i} style={{ opacity: l.carried ? 0.6 : 1 }}><td>{l.who || '—'}</td><td className="small">{T(ROLE_LABEL[l.role] || l.role)}</td><td className="small">{l.market || '—'}</td><td>{usd(L, l.gross)}</td><td>{l.withheld ? '−' + usd(L, l.withheld) : '—'}</td><td><b>{usd(L, l.net)}</b></td>
-                  <td className="tiny">{l.carried ? <span className="warnc">{T('перенос')}: {(l.note || '').split('; ').map((x) => T(x)).join('; ')}</span> : ''}</td></tr>))}</tbody></table></div>
-            <div className="small muted">{T('Итого к выплате')}: <b>{usd(L, lines.filter((l) => !l.carried).reduce((a, l) => a + l.net, 0))}</b></div>
+                  <td className="tiny">{l.act_no && <div><a href={`/commission/act/${l.id}`}>{l.act_no}</a> · {T(l.agreed ? 'согласован' : 'ждём согласия')}{l.needs_inv ? ' · ' + T(l.invoice ? 'счёт есть' : 'ждём счёт') : ''}</div>}{l.carried ? <span className="warnc">{T('перенос')}: {(l.note || '').split('; ').map((x) => T(x)).join('; ')}</span> : ''}</td></tr>))}</tbody></table></div>
+            <div className="row" style={{ justifyContent: 'space-between' }}><div className="small muted">{T('Итого к выплате')}: <b>{usd(L, lines.filter((l) => !l.carried).reduce((a, l) => a + l.net, 0))}</b></div>
+              {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
           </div>}
         </>}
         {tab === 'debts' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Кто', 'Роль', 'Долг', 'С какого числа'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{debts.length === 0 ? <tr><td colSpan={4} className="muted">{T('Долгов нет')}</td></tr> : debts.map((d, i) => (
-            <tr key={i}><td>{d.who}</td><td className="small">{T(ROLE_LABEL[d.role] || d.role)}</td><td className="badc"><b>{usd(L, -d.bal)}</b></td><td className="small">{date(L, d.since)}{d.role === 'partner' && d.since && Date.now() - new Date(d.since).getTime() > 90 * 86400000 ? <div className="tiny badc">{T('3 месяца без зачёта — выставить счёт на возврат')}</div> : ''}</td></tr>))}</tbody></table>
+            <tr key={i}><td>{d.who}</td><td className="small">{T(ROLE_LABEL[d.role] || d.role)}</td><td className="badc"><b>{usd(L, -d.bal)}</b></td><td className="small">{date(L, d.since)}{d.role === 'partner' && d.since && Date.now() - new Date(d.since).getTime() > 90 * 86400000 ? <div className="tiny badc">{T('3 месяца без зачёта — выставить счёт на возврат')}</div> : ''}
+              {owner && d.user_id && <form action={writeOff} className="mt8"><input type="hidden" name="user" value={d.user_id} /><input type="hidden" name="role" value={d.role} /><button className="btn btn--sm btn--ghost">{T('Списать долг')}</button></form>}</td></tr>))}</tbody></table>
           <div className="small muted mt8">{T('Клаубэк партнёра зачитывается против следующих выплат; через 3 месяца без зачёта — счёт на возврат по соглашению; списать долг может только админ. Клаубэк сотрудника — только против будущих бонусов, из оклада не удерживаем.')}</div></div>}
         {tab === 'acts' && fin && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Сделка', 'Партнёр', 'Комиссия', 'Удержано', 'Статус', 'Документ'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
