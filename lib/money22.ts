@@ -103,7 +103,7 @@ export async function buildTranches(dealId: string) {
     return buildTranches(dealId)
   }
   // сумма комиссии изменилась до поступлений — пересчитать суммы траншей
-  await q(`update portal.tranches set amount = round($2 * pct / 100, 2) where deal_id = $1 and status in ('scheduled','expected')`, [dealId, total])
+  await q(`update portal.tranches set amount = round($2::numeric * pct / 100, 2) where deal_id = $1 and status in ('scheduled','expected')`, [dealId, total])
   const due = (id: string) => q(`update portal.tranches set status = 'expected', due_from = current_date, expected_at = portal.add_workdays(current_date, $2) where id = $1 and status = 'scheduled'`, [id, wait])
   for (const x of ts.filter((x) => x.status === 'scheduled')) {
     if (x.trigger === 'first_payment' && d.paid_pct > 0) await due(x.id)
@@ -114,10 +114,10 @@ export async function buildTranches(dealId: string) {
       const add = Math.min(x.pct, Math.max(0, d.paid_pct - covered))
       if (add > 0.0001) {
         const no = Math.max(...ts.map((y) => y.no)) + 1
-        await q(`insert into portal.tranches (deal_id, no, pct, amount, trigger, status, due_from, expected_at) values ($1,$2,$3, round($4 * $3 / 100, 2), $5, 'expected', current_date, portal.add_workdays(current_date, $6))`,
+        await q(`insert into portal.tranches (deal_id, no, pct, amount, trigger, status, due_from, expected_at) values ($1,$2,$3::numeric, round($4::numeric * $3::numeric / 100, 2), $5, 'expected', current_date, portal.add_workdays(current_date, $6::int))`,
           [dealId, no, add, total, `paid:${Math.round(covered + add)}`, wait])
         if (x.pct - add <= 0.0001) await q(`delete from portal.tranches where id = $1`, [x.id])
-        else await q(`update portal.tranches set pct = pct - $2, amount = round($3 * (pct - $2) / 100, 2) where id = $1`, [x.id, add, total])
+        else await q(`update portal.tranches set pct = pct - $2::numeric, amount = round($3::numeric * (pct - $2::numeric) / 100, 2) where id = $1`, [x.id, add, total])
       }
     }
   }

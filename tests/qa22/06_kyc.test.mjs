@@ -7,7 +7,10 @@ after(close)
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF').toString('base64')
 const up = (u, cl, kind, buyer = '') => act(u, 'uploadBuyerDoc', { client: cl, kind, buyer }, { files: [{ field: 'file', name: `${kind}.pdf`, content: PDF, type: 'application/pdf' }] })
 let S, OF, OW
-test('setup', async () => { S = await user('seller'); OF = await user('office'); OW = await user('owner', { market: null }) })
+test('setup', async () => {
+  // QA-база: лимит одновременных броней не должен мешать сценариям денег и KYC (лимит проверяет 04_bookings)
+  await q(`update portal.conditions set max_bookings_total = 100000, max_bookings_client = 100`)
+  S = await user('seller'); OF = await user('office'); OW = await user('owner', { market: null }) })
 test('без паспорта и адреса KYC не отправляется; с минимумом — на проверке', async () => {
   const cl = (await register(S)).result.id
   await act(S, 'saveKycData', { client: cl, citizenship: 'DE', tax_residence: 'DE', pep: 'no' })

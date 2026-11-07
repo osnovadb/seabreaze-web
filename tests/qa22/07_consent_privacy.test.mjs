@@ -5,7 +5,10 @@ import { user, register, q, one, close, act, client, page, tick, freeUnit, lastB
 
 after(close)
 let S, P, OF, OW
-test('setup', async () => { S = await user('seller'); P = await user('agent'); OF = await user('office'); OW = await user('owner', { market: null }) })
+test('setup', async () => {
+  // QA-база: лимит одновременных броней не должен мешать сценариям денег и KYC (лимит проверяет 04_bookings)
+  await q(`update portal.conditions set max_bookings_total = 100000, max_bookings_client = 100`)
+  S = await user('seller'); P = await user('agent'); OF = await user('office'); OW = await user('owner', { market: null }) })
 test('клиент даёт согласие по ссылке: данные + реклама → журнал, статус given', async () => {
   const cl = (await register(P)).result.id
   const tok = (await client(cl)).consent_token
@@ -34,12 +37,13 @@ test('отказ: Do not contact и задача бэк-офису', async () =>
   const c = await client(cl)
   assert.equal(c.consent_status, 'declined'); assert.equal(c.do_not_contact, true)
 })
+const CE = `qa-consent-${Date.now()}@qa.test`
 test('напоминания: 3 дня → письмо клиенту и уведомление; 14 дней → Do not contact (tick)', async () => {
-  const cl = (await register(S, { email: 'qa-consent@qa.test' })).result.id
+  const cl = (await register(S, { email: CE })).result.id
   await q(`update portal.clients set consent_requested_at = now() - interval '4 days', consent_reminders = 0 where id = $1`, [cl])
   await tick()
   assert.equal((await client(cl)).consent_reminders, 1, 'напоминание на 3-й день не ушло')
-  assert.ok(await one(`select 1 from portal.outbox_messages where to_addr = 'qa-consent@qa.test' and kind = 'consent' and subject like '%апомин%'`), 'письмо-напоминание не в очереди')
+  assert.ok(await one(`select 1 from portal.outbox_messages where to_addr = $1 and kind = 'consent' and subject like '%апомин%'`, [CE]), 'письмо-напоминание не в очереди')
   await q(`update portal.clients set consent_requested_at = now() - interval '15 days' where id = $1`, [cl])
   await tick()
   assert.equal((await client(cl)).do_not_contact, true, 'через 14 дней не Do not contact')
@@ -55,7 +59,7 @@ test('форма сайта с галочками — согласие сраз�
   assert.equal(c.consent_status, 'given'); assert.equal(c.attach_status, 'candidate'); assert.equal(c.marketing_consent_at, null, 'реклама без второй галочки')
 })
 test('удаление по запросу: без сделки — данные удалены, клиент обезличен; повтор того же человека снова регистрируется', async () => {
-  const r = await register(S, { email: 'qa-del@qa.test' })
+  const r = await register(S)
   const cl = r.result.id
   await act(OF, 'createPrivacyRequest', { client: (await client(cl)).reg_no, channel: 'email' })
   const req = await one(`select id from portal.privacy_requests where client_id = $1`, [cl])

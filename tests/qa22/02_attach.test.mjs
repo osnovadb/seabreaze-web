@@ -28,7 +28,7 @@ test('без телефона и e-mail — ошибка', async () => {
   assert.ok(r.result?.error)
 })
 test('квалификация без языка — остаётся кандидатом; со всеми 5 полями — закреплён на 6 месяцев', async () => {
-  const r = await register(P1)
+  const r = await register(P1, { language: '' })
   await qualify(P1, r.result.id, { language: '' })
   assert.equal((await client(r.result.id)).attach_status, 'candidate', 'закрепился без языка')
   await qualify(P1, r.result.id)

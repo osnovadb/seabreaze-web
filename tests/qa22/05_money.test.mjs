@@ -22,6 +22,8 @@ async function sale(owner, unitSlug = 'premium-residence', disc = 0) {
 }
 const shares = async (dealId) => Object.fromEntries((await q('select role, amount::float a, user_id from portal.deal_shares where deal_id = $1', [dealId])).map((s) => [s.role, s]))
 test('setup', async () => {
+  // QA-база: лимит одновременных броней не должен мешать сценариям денег и KYC (лимит проверяет 04_bookings)
+  await q(`update portal.conditions set max_bookings_total = 100000, max_bookings_client = 100`)
   OW = await user('owner', { market: null }); OF = await user('office'); FI = await user('finance'); MH = await user('market_head', { market: 'DE' })
   const ag = await agency('DE')
   HEAD_AG = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-TAX' }); AG = await user('agent', { agency_id: ag.id })
