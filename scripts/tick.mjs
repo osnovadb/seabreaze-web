@@ -294,6 +294,21 @@ for (const p of inactive) {
 }
 out.registrations = { inactive: inactive.length, silence: bySilence.length, quiet: quiet.length, renew: renew.length, transferred: gone.length }
 
+// 12. 2.2 · §8 Деньги. 12а. Долг застройщика: транш не поступил через 10 рабочих дней после ожидаемой даты — финансам и админу
+try {
+  const late = await q(`select t.id, t.amount::float a, portal.unit_no(bl.external_id, un.number) u, p.name pr from portal.tranches t join portal.deals d on d.id = t.deal_id
+    join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id
+    where t.status = 'expected' and portal.add_workdays(t.expected_at, 10) < current_date`)
+  for (const r of late) for (const u of await q(`select id from portal.users where active and role in ('finance','owner')`))
+    await notify(u.id, 'payout', 'Застройщик задерживает комиссию: {p} · {u}, {a} — уточните дату', '/finance?tab=tranches', { p: r.pr, u: r.u, a: '$' + Math.round(r.a).toLocaleString('en') }, `tr-late:${r.id}:${u.id}:${new Date().toISOString().slice(0, 7)}`)
+  // 12б. 1-го и 5-го — партнёрам и рекомендателям без документа для выплаты (налоговый номер или счёт), если есть начисления
+  const day = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Baku', day: '2-digit' }).format(new Date()))
+  if (day === 1 || day === 5) for (const u of await q(`select distinct u.id from portal.accruals a join portal.users u on u.id = a.user_id
+      where a.status = 'open' and a.role in ('partner','referrer') and u.tax_no is null and u.vat_no is null and u.active`))
+    await notify(u.id, 'payout', 'Для выплаты нужен документ: укажите налоговый номер (или загрузите счёт) — иначе выплата перенесётся на следующий месяц', '/commission', {}, `doc-remind:${u.id}:${new Date().toISOString().slice(0, 10)}`)
+  out.money = { late: late.length }
+} catch (e) { out.money_error = String(e.message || e).slice(0, 200) }
+
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
 

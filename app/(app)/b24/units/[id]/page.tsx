@@ -7,9 +7,10 @@ import { listProjects, buildingsOf } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction, dealPaid } from '@/lib/actions'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
+import { setEscort } from '@/lib/moneyActions'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null }
+type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 export default async function Units({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string; created?: string } }) {
@@ -22,7 +23,7 @@ export default async function Units({ params, searchParams }: { params: { id: st
   const units = await q<U>(`with b as (select distinct on (unit_id) * from portal.bookings where client_id = $1 and status in ('hold','queued','requested','confirmed','release_pending','converted') order by unit_id, created_at desc),
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
-      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no,
+      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id,
       d.id deal_id, d.paid_pct::float paid
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
@@ -34,6 +35,8 @@ export default async function Units({ params, searchParams }: { params: { id: st
   const ps = tab === 'pick' ? await listProjects(c.user) : []
   const blds = tab === 'pick' ? await Promise.all(ps.map(async (p) => ({ p, bs: await buildingsOf(p.id, c.user) }))) : []
   const active = units.filter((u) => u.status)
+  // сопровождающий в Баку (§8): назначает бэк-офис при Reserved; фикс — из условий проекта
+  const staff = canConfirmBooking(c.user.role) && active.some((u) => ['confirmed', 'converted'].includes(u.status!)) ? await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('office','seller','market_head') order by name`) : []
   return (
     <>
       <Top title={cl.name} sub={[cl.attach_status === 'candidate' ? T('кандидат партнёра') : cl.protected_until ? T('закреплён до {d}', { d: date(L, cl.protected_until) }) : '', regs?.all ? T('регистрации у застройщиков: {a} из {b}', { a: regs.ok, b: regs.all }) : '', cl.b24_deal_id ? T('сделка Bitrix24 № {n}', { n: cl.b24_deal_id }) : ''].filter(Boolean).join(' · ')}
@@ -92,6 +95,9 @@ export default async function Units({ params, searchParams }: { params: { id: st
               {u.status === 'confirmed' && office && (cl.kyc_status === 'passed'
                 ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
                 : <div className="small muted">{T('«Договор подписан» — после пройденного KYC')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></div>)}
+              {['confirmed', 'converted'].includes(u.status!) && office && staff.length > 0 && <form action={setEscort} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.booking_id!} />
+                <label className="field"><span>{T('Сопровождающий в Баку')}</span><select name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                <button className="btn btn--sm">{T('Сохранить')}</button></form>}
               {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
               {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)
                 ? <form action={dealPaid} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.deal_id} />

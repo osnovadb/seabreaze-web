@@ -7,6 +7,8 @@ import { conditionsFor, listProjects } from '@/lib/catalog'
 import { expectedAgent, type SplitCond } from '@/lib/money'
 import { Top, Pill } from '@/components/ui'
 import { ACT_STATUS } from '@/lib/acts'
+import { one } from '@/lib/db'
+import { savePayoutProfile } from '@/lib/moneyActions'
 
 export default async function Commission() {
   const c = await requireCtx()
@@ -29,6 +31,21 @@ export default async function Commission() {
   const paid = deals.filter((d) => d.stage === 'paid_out').reduce((a, d) => a + d.agent_amount, 0)
   const pending = deals.filter((d) => d.stage !== 'paid_out' && d.stage !== 'cancelled').reduce((a, d) => a + d.agent_amount, 0)
   const inBookings = pipe.reduce((a, b) => a + (b.agent || 0), 0)
+  // 2.2 · §8: доля по траншам — «ждём оплату клиента / ожидаем от застройщика / в реестре за месяц / выплачено»; сотрудник агентства видит долю агентства как ориентир
+  const payee = c.user.role === 'agency_head' || !c.user.agency_id
+  const trs = await q<{ unit: string; no: number; pct: number; share: number; status: string; expected_at: string | null; acc: string | null; reg_month: string | null }>(
+    `select portal.unit_no(bl.external_id, un.number) unit, t.no, t.pct::float, round(s.amount * t.pct / 100, 2)::float share, t.status, t.expected_at::text,
+       (select a.status from portal.accruals a where a.tranche_id = t.id and a.role = 'partner' limit 1) acc,
+       (select r.month::text from portal.accruals a join portal.payout_registers r on r.id = a.register_id where a.tranche_id = t.id and a.role = 'partner' limit 1) reg_month
+     from portal.tranches t join portal.deals d on d.id = t.deal_id join portal.deal_shares s on s.deal_id = d.id and s.role = 'partner'
+       join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.bookings b on b.id = d.booking_id
+     where t.status <> 'cancelled' and ${bs.sql} order by d.created_at desc, t.no`, bs.params)
+  const debt = payee ? (await one<{ s: number }>(`select coalesce(sum(amount), 0)::float s from portal.accruals where user_id = $1 and status = 'open' and role = 'partner'`, [c.user.id]))?.s || 0 : 0
+  const prof = await one<{ partner_form: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null; tax_no: string | null; tax_cert_until: string | null }>(
+    'select partner_form, vat_payer, vat_no, tax_country, tax_no, tax_cert_until::text from portal.users where id = $1', [c.user.id])
+  const trL = (x: { status: string; acc: string | null; reg_month: string | null; expected_at: string | null }): [string, 'ok' | 'warn' | 'ink' | 'off'] =>
+    x.acc === 'paid' ? [T('выплачено'), 'ink'] : x.acc === 'in_register' ? [T('в реестре выплат за {m}', { m: (x.reg_month || '').slice(0, 7) }), 'ok'] : x.status === 'received' ? [T('получено — войдёт в ближайший реестр'), 'ok']
+      : x.status === 'expected' ? [T('ожидаем от застройщика') + (x.expected_at ? ' · ' + date(L, x.expected_at) : ''), 'warn'] : [T('ждём оплату клиента'), 'off']
   const stageL: Record<string, [string, 'ok' | 'warn' | 'ink' | 'off']> = { contract: ['договор подписан, ждём платёж', 'warn'], payments: ['клиент платит, ждём оплату застройщика', 'warn'], fee_received: ['застройщик оплатил — к выплате', 'ok'], paid_out: ['выплачено', 'ink'], cancelled: ['отменена', 'off'] }
   return (
     <>
@@ -37,6 +54,27 @@ export default async function Commission() {
         <div className="grid g3">
           {[[T('Выплачено'), usd(L, paid)], [T('По сделкам в работе'), usd(L, pending)], [T('В активных бронях (ожидаемо)'), usd(L, inBookings)]].map(([a, b]) => <div key={a} className="card card--tight kpi"><div className="small muted">{a}</div><div className="v">{b}</div></div>)}
         </div>
+        {trs.length > 0 && <>
+          <div className="h2 mt24">{T('Доля по траншам застройщика')}</div>
+          {!payee && <div className="small muted">{T('Ориентир: доля агентства по вашим сделкам. Акты и выплаты — у руководителя агентства.')}</div>}
+          <div className="tbl-wrap mt8"><table className="tbl"><thead><tr>{['Квартира', 'Транш', 'Доля', 'Статус'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
+            <tbody>{trs.map((x, i) => { const [l, k] = trL(x); return <tr key={i}><td><b>{x.unit}</b></td><td className="small">№{x.no} · {Math.round(x.pct * 100) / 100}%</td><td>{usd(L, x.share)}</td><td><Pill kind={k}>{l}</Pill></td></tr> })}</tbody></table></div>
+          <div className="tiny muted mt8">{T('Выплата раз в месяц: поступление от застройщика до конца месяца — выплата до 10-го следующего месяца. Меньше 100 $ переносится.')}</div>
+        </>}
+        {debt < 0 && <div className="err mt16">{T('Удержание по расторгнутой сделке: {a} — зачтём из следующих выплат', { a: usd(L, -debt) })}</div>}
+        {payee && <form action={savePayoutProfile} className="card stack mt24" style={{ gap: 10 }}>
+          <div className="h3" style={{ margin: 0 }}>{T('Данные для выплат')}</div>
+          <div className="small muted">{T('Компания или ИП — счёт против нашего акта; физлицо — акт и налоговый номер. Без документа выплата переносится на следующий месяц.')}</div>
+          <div className="grid g3">
+            <label className="field"><span>{T('Форма')}</span><select className="in" name="partner_form" defaultValue={prof?.partner_form || ''}><option value="">—</option><option value="company">{T('Компания')}</option><option value="sole">{T('ИП')}</option><option value="individual">{T('Физлицо')}</option></select></label>
+            <label className="field"><span>{T('Налоговый номер')}</span><input className="in" name="tax_no" defaultValue={prof?.tax_no || ''} /></label>
+            <label className="field"><span>{T('Страна налогового резидентства (код)')}</span><input className="in" name="tax_country" maxLength={2} defaultValue={prof?.tax_country || ''} placeholder="DE" /></label>
+            <label className="field"><span>{T('Сертификат резидентства действует до')}</span><input className="in" type="date" name="tax_cert_until" defaultValue={prof?.tax_cert_until || ''} /></label>
+            <label className="field"><span>{T('Номер плательщика НДС')}</span><input className="in" name="vat_no" defaultValue={prof?.vat_no || ''} /></label>
+            <label className="check" style={{ alignSelf: 'end' }}><input type="checkbox" name="vat_payer" defaultChecked={!!prof?.vat_payer} /> {T('Плательщик НДС — добавлю НДС к сумме акта')}</label>
+          </div>
+          <div><button className="btn btn--sm">{T('Сохранить')}</button></div>
+        </form>}
         <div className="h2 mt24">{T('Сделки')}</div>
         <div className="tbl-wrap mt8"><table className="tbl">
           <thead><tr>{['Квартира', 'Клиент', 'Цена сделки', 'Ваша комиссия', 'Оплачено клиентом', 'Статус'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>

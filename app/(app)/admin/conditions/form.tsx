@@ -30,6 +30,9 @@ export function CondForm({ lang, projectId, cur, canEdit, example }: { lang: Lan
         <div className="grid g3 mt8">{N('agent_fix_pct', 'Фикс агенту (из нашего фикса)')}{N('agent_pool_pct', 'Часть пула агенту')}{N('agent_our_pool_share', 'Доля нашей части пула агенту')}</div>
         <div className="label mt16">{T('Скидка и продавцы')}</div>
         <div className="grid g3 mt8">{N('seller_self_disc', 'Продавец сам')}{N('seller_max_disc', 'С согласованием до')}{N('seller_share_pct', 'Доля продавца (% от нашего дохода)')}</div>
+        <div className="label mt16">{T('Распределение по ролям (§8)')}</div>
+        <div className="tiny muted">{T('Бонусы сейлза и руководителя рынка — % от нашей выручки без НДС после доли партнёра и рекомендателя; начисляются по мере поступления от застройщика. Остаток — Caspian.')}</div>
+        <div className="grid g3 mt8">{N('head_bonus_pct', 'Руководитель рынка (% от нашей выручки)')}{N('escort_fix_usd', 'Сопровождающий в Баку, фикс', '$')}{N('referrer_pct', 'Рекомендатель (% от цены договора)')}{N('consultant_pct', 'Консультант по застройщикам (% от цены без НДС)')}{N('vat_rate', 'НДС в цене квартиры')}</div>
         <div className="label mt16">{T('Бронь и защита')}</div>
         <div className="grid g3 mt8">{N('booking_days', 'Бронь', 'дней')}{N('booking_ext_days', 'Продление', 'дней')}{N('protect_months', 'Защита клиента агента', 'мес.')}{N('max_bookings_client', 'Броней на клиента', 'шт.')}{N('max_bookings_agent', 'Броней на агента', 'шт.')}{N('max_bookings_total', 'Одновременных броней по проекту', 'шт.')}</div>
         <div className="grid g3 mt8">{N('booking_fee', 'Платная бронь: взнос', '0 — нет')}

@@ -125,11 +125,14 @@ export type Conditions = {
   reg_method?: string; reg_response_days?: number; silence_rule?: string; silence_extra_days?: number; reg_protect_months?: number; reg_protect_months_sub?: number | null
   renew_remind_days?: number; booking_write_api?: boolean; rates_by_market?: Record<string, number>; vat_mode?: string; options_in_base?: boolean; fx_rule?: string | null
   clawback_months?: number; clawback_offset?: string; payment_wait_days?: number; sells_to_az?: boolean
+  // 2.2 · §8 ставки ролей
+  head_bonus_pct?: number; escort_fix_usd?: number; referrer_pct?: number; consultant_pct?: number; vat_rate?: number; consultant_name?: string | null
 }
 const COND = `id, project_id, version, status, valid_from::text valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float,
   seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at, booking_fee::float, booking_fee_currency,
   reg_method, reg_response_days, silence_rule, silence_extra_days, reg_protect_months, reg_protect_months_sub, renew_remind_days, booking_write_api, rates_by_market, vat_mode,
-  options_in_base, fx_rule, clawback_months, clawback_offset, payment_wait_days, sells_to_az`
+  options_in_base, fx_rule, clawback_months, clawback_offset, payment_wait_days, sells_to_az,
+  head_bonus_pct::float, escort_fix_usd::float, referrer_pct::float, consultant_pct::float, vat_rate::float, consultant_name`
 export async function conditionsFor(projectId: string, agent?: User | null): Promise<Conditions | undefined> {
   const c = await one<Conditions>(`select ${COND} from portal.conditions where project_id = $1 and status = 'published' and valid_from <= current_date order by valid_from desc, version desc limit 1`, [projectId])
   if (!c || !agent) return c

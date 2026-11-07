@@ -23,6 +23,7 @@ import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
 import { pushDeal, queueSync, queueApp, queueTask } from './b24sync'
 import { grantAccess, invite, noPassword } from './partnerAccess'
+import { computeShares, buildTranches } from './money22'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -564,6 +565,7 @@ export async function bookingAction(f: FormData) {
     })
     if (made.length) await notify(b.agent_id, 'deal', made.length > 1 ? 'Договор подписан — сделок в работе: {n}' : 'Договор подписан — сделка в работе', '/commission', made.length > 1 ? { n: made.length } : undefined)
     for (const d of made) await syncAct(d)
+    for (const d of made) await computeShares(d) // §8: доли по ролям и транши комиссии застройщика
     if (made.length) await partnerProgress(b.agent_id) // §13 п.20: Active
   }
   await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
@@ -723,10 +725,12 @@ export async function saveConditions(_: unknown, f: FormData) {
   for (const m of ['DE', 'IL', 'GLOBAL']) { const v = s(f, 'rate_' + m).replace(',', '.'); if (v) { if (Number.isNaN(Number(v))) return { error: 'Ставка рынка ' + m }; rates[m] = Number(v) } }
   const pick = (k: string, ok: string[], d: string) => (ok.includes(s(f, k)) ? s(f, k) : d)
   await q(`update portal.conditions set reg_method = $2, silence_rule = $3, vat_mode = $4, clawback_offset = $5, fx_rule = $6, booking_write_api = $7, options_in_base = $8, sells_to_az = $9,
-      rates_by_market = $10, reg_protect_months_sub = $11, reg_response_days = $12, silence_extra_days = $13, reg_protect_months = $14, renew_remind_days = $15, clawback_months = $16, payment_wait_days = $17
+      rates_by_market = $10, reg_protect_months_sub = $11, reg_response_days = $12, silence_extra_days = $13, reg_protect_months = $14, renew_remind_days = $15, clawback_months = $16, payment_wait_days = $17,
+      head_bonus_pct = $18, escort_fix_usd = $19, referrer_pct = $20, consultant_pct = $21, vat_rate = $22
     where project_id = $1 and status = 'draft'`, [pid, pick('reg_method', ['crm', 'email', 'api', 'file'], 'email'), pick('silence_rule', ['confirm', 'remind'], 'remind'), pick('vat_mode', ['over', 'incl'], 'over'),
       pick('clawback_offset', ['any', 'same_client'], 'any'), s(f, 'fx_rule') || null, f.get('booking_write_api') === 'on', f.get('options_in_base') === 'on', f.get('sells_to_az') === 'on',
-      JSON.stringify(rates), s(f, 'reg_protect_months_sub') ? Number(s(f, 'reg_protect_months_sub')) : null, ...ints])
+      JSON.stringify(rates), s(f, 'reg_protect_months_sub') ? Number(s(f, 'reg_protect_months_sub')) : null, ...ints,
+      ...(['head_bonus_pct', 'escort_fix_usd', 'referrer_pct', 'consultant_pct', 'vat_rate'] as const).map((k, i) => { const v = Number(s(f, k).replace(',', '.')); return s(f, k) === '' || Number.isNaN(v) ? [0, 500, 2, 1, 18][i] : v })])
   await audit(c.real.id, 'conditions.save', 'project', pid)
   if (s(f, 'publish')) {
     const pub = await one<{ version: number }>(`update portal.conditions set status = 'published' where project_id = $1 and status = 'draft' returning version`, [pid])
@@ -950,6 +954,7 @@ export async function dealPaid(f: FormData) {
   if (Number.isNaN(v)) return
   const d = await one<{ client_id: string }>('update portal.deals set paid_pct = $2 where id = $1 returning client_id', [s(f, 'id'), v])
   if (d) await q('select portal.sync_client_stage($1)', [d.client_id]) // первый платёж — стадия «Платежи»
+  if (d) await buildTranches(s(f, 'id')) // §8: условие транша выполнено — ждём поступление от застройщика
   if (d) await pushDeal(d.client_id, `оплата клиента по сделке: ${v}%`) // §13 п.13: Won, Installments, Aftercare
   await audit(c.real.id, 'deal.paid', 'deal', s(f, 'id'), { paid_pct: v }, c.impersonating ? c.user.id : null)
   revalidatePath('/finance')
