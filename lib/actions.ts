@@ -120,6 +120,28 @@ async function stageGuard(c: Ctx, clientId: string) {
   return cl
 }
 
+/* ── Закрепление (§10) ── */
+// Кандидат партнёра квалифицирован (цель, бюджет, срок, страна, язык — 245): закрепление на 6 месяцев, регистрации у застройщиков,
+// соперник-кандидат другого партнёра закрывается как Duplicate
+async function qualifyIfReady(by: string, id: string) {
+  const cl = await one<{ attach_status: string; goal: string | null; budget: string | null; timeline: string | null; country: string | null; language: string | null; candidate_until: string | null; name: string }>(
+    `select attach_status, goal, budget, timeline, country, language, candidate_until::text, name from portal.clients where id = $1`, [id])
+  if (!cl || cl.attach_status !== 'candidate') return false
+  if (![cl.goal, cl.budget, cl.timeline, cl.country, cl.language].every(Boolean)) return false
+  const won = await one<{ id: string; until: string }>(`update portal.clients set attach_status = 'protected', attached_at = now(), protected_until = current_date + interval '6 months', candidate_until = null
+    where id = $1 and attach_status = 'candidate' returning id, protected_until::text until`, [id])
+  if (!won) return false
+  // все остальные кандидаты с тем же человеком — Duplicate (партнёр видит «уже закреплён» без имени владельца)
+  const rivals = await q<{ id: string; owner_id: string }>(`update portal.clients set attach_status = 'junk', lost_reason = 'duplicate'
+    where attach_status = 'candidate' and id <> $1 and (other_claimant_of = $1 or id = (select other_claimant_of from portal.clients where id = $1)
+      or other_claimant_of = (select other_claimant_of from portal.clients where id = $1)) returning id, owner_id`, [id])
+  for (const r of rivals) await notify(r.owner_id, 'client', 'Кандидат уже закреплён за другим партнёром — карточка закрыта', `/clients/${r.id}`, {})
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент квалифицирован и закреплён до {d}',$3)`, [id, by, { d: won.until }])
+  await q('select portal.enqueue_registrations($1, null, false, $2)', [id, by])
+  await audit(by, 'client.qualified', 'client', id, { rivals: rivals.length })
+  return true
+}
+
 export async function registerClient(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canRegisterClient(c.user.role)) return { error: 'Нет прав на регистрацию клиента' }
@@ -127,25 +149,42 @@ export async function registerClient(_: unknown, f: FormData) {
   if (!name || (!phone && !email)) return { error: 'Нужны имя и телефон или e-mail' }
   if (!f.get('consent')) return { error: 'Без согласия клиента регистрация невозможна' }
   const pn = norm.phone(phone), em = norm.email(email)
-  const dup = await one<{ id: string; owner_id: string }>(`select id, owner_id from portal.clients where (length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or (email_norm <> '' and email_norm = $2) limit 1`, [pn, em])
-  if (dup) {
+  const ext = isExternal(c.user.role)
+  const dup = await one<{ id: string; owner_id: string; attach_status: string; owner_type: string; market: string | null }>(`select id, owner_id, attach_status, owner_type, market from portal.clients
+    where ((length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or (email_norm <> '' and email_norm = $2)) and attach_status <> 'junk'
+    order by (attach_status = 'candidate'), created_at limit 1`, [pn, em])
+  // §10: два партнёра с одним кандидатом — оба кандидаты, выигрывает первый квалифицировавший; партнёры друг друга не видят
+  const rival = dup && ext && dup.attach_status === 'candidate' && dup.owner_type === 'partner' && dup.owner_id !== c.user.id ? dup.id : null
+  if (dup && !rival && !ext && dup.attach_status === 'candidate' && dup.owner_type === 'partner') {
+    // Команда касается кандидата партнёра: уведомление менеджеру по партнёрам, партнёру — приоритет 14 дней
+    for (const m of await q<{ id: string }>(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [dup.market]))
+      await notify(m.id, 'client', 'Команда заводит кандидата партнёра — у партнёра приоритет 14 дней', `/clients/${dup.id}`, {})
+  }
+  if (dup && !rival) {
     await audit(c.real.id, 'client.duplicate', 'client', dup.id, { tried_by: c.user.id }, c.impersonating ? c.user.id : null)
     // Возвращаем только то, что ввёл сам пользователь, — для кнопки «Запросить проверку»; владельца не раскрываем
     return { duplicate: true, tried: { name, phone, email } }
   }
-  const pid = await one<{ id: string }>(`select id from projects where slug = 'premium-residence'`)
-  const cond = pid ? await conditionsFor(pid.id) : undefined
-  const months = cond?.protect_months ?? 3
+  // §10: клиент команды закрепляется сразу на 6 месяцев; клиент партнёра — кандидат на 14 дней без защиты, закрепление — после квалификации
+  const months = 6
   // номер — из последовательности (v2): count(*) давал одинаковые номера при одновременной регистрации
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
-  const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage, protected_until)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead', current_date + ($18 || ' months')::interval) returning id, protected_until::text`,
-    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, isExternal(c.user.role) ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months])
-  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент зарегистрирован ({r}), закреплён до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.protected_until }])
+  const r = await one<{ id: string; protected_until: string | null; candidate_until: string | null }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage,
+      owner_type, attach_status, protected_until, candidate_until, attached_at, other_claimant_of, segment)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead',
+      $19, $20, case when $20 = 'protected' then current_date + ($18 || ' months')::interval end, case when $20 = 'candidate' then current_date + 14 end,
+      case when $20 = 'protected' then now() end, $21, $22) returning id, protected_until::text, candidate_until::text`,
+    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, ext ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months,
+      ext ? 'partner' : 'team', ext ? 'candidate' : 'protected', rival, s(f, 'segment') || null])
+  if (ext) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Кандидат заведён ({r}): квалифицируйте до {d}, тогда клиент закрепится за вами',$3)`, [r!.id, c.user.id, { r: reg, d: r!.candidate_until! }])
+  else {
+    await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент зарегистрирован ({r}), закреплён до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.protected_until! }])
+    await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id]) // §7: клиента команды — в очередь регистрации у всех застройщиков
+  }
   if (c.user.curator_id) await notify(c.user.curator_id, 'client', 'Новый клиент агента {a}: {c}', `/clients/${r!.id}`, { a: c.user.name, c: name })
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
-  return { ok: true, id: r!.id, reg, until: r!.protected_until }
+  return { ok: true, id: r!.id, reg, until: (r!.protected_until || r!.candidate_until)!, candidate: ext }
 }
 
 /* ── Споры «чей клиент» ── */
@@ -235,7 +274,9 @@ export async function saveQualification(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'client')
   await stageGuard(c, id)
-  await q(`update portal.clients set goal = $2, budget = $3, timeline = $4, payment = $5, interest = $6, last_activity_at = now() where id = $1`, [id, s(f, 'goal'), s(f, 'budget'), s(f, 'timeline'), s(f, 'payment'), s(f, 'interest')])
+  await q(`update portal.clients set goal = $2, budget = $3, timeline = $4, payment = $5, interest = $6, country = coalesce(nullif($7, ''), country), language = coalesce(nullif($8, ''), language),
+    segment = coalesce(nullif($9, ''), segment), last_activity_at = now() where id = $1`, [id, s(f, 'goal'), s(f, 'budget'), s(f, 'timeline'), s(f, 'payment'), s(f, 'interest'), s(f, 'country'), langCode(s(f, 'language')), s(f, 'segment')])
+  await qualifyIfReady(c.user.id, id)
   revalidatePath(`/clients/${id}`)
 }
 export async function addTask(f: FormData) {

@@ -216,6 +216,48 @@ for (const src of pbSources) {
 }
 if (pbSources.length) out.pb_sent = await pbFlush(q, pbSources, { task })
 
+// 11. 2.2 · Регистрации у застройщиков (§7) и закрепление (§10)
+// 11а. Срок ответа вышел: по договору молчание = подтверждение — Confirmed by silence; иначе напоминание бэк-офису
+const office = await q(`select id from portal.users where active and role in ('office','owner')`)
+const bySilence = await q(`update portal.registrations r set status = 'confirmed_silence', decided_at = now(),
+    valid_until = current_date + (d.protect_months || ' months')::interval
+  from portal.developers d where d.id = r.developer_id and r.status = 'sent' and r.answer_due < current_date and d.silence_rule = 'confirm'
+  returning r.id, r.client_id`)
+for (const r of bySilence) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Застройщик промолчал — регистрация подтверждена по договору', '{}')`, [r.client_id])
+const quiet = await q(`select r.id, cl.name client, d.name dev from portal.registrations r join portal.clients cl on cl.id = r.client_id join portal.developers d on d.id = r.developer_id
+  where r.status = 'sent' and r.answer_due < current_date and d.silence_rule = 'remind'`)
+for (const r of quiet) for (const u of office) await notify(u.id, 'registration', 'Застройщик {d} молчит по регистрации {c} — напомните', '/registrations?f=silence', { d: r.dev, c: r.client }, `reg-quiet:${r.id}:${u.id}:${new Date().toISOString().slice(0, 10)}`)
+// 11б. SLA передачи: не отправили к сроку — бэк-офису
+const late = await q(`select count(*)::int n from portal.registrations where status = 'to_send' and due_send < current_date`)
+if (late[0].n) for (const u of office) await notify(u.id, 'registration', 'Регистрации просрочены по SLA: {n}', '/registrations', { n: late[0].n }, `reg-late:${u.id}:${new Date().toISOString().slice(0, 10)}`)
+// 11в. За N дней до окончания — «продлить»: клиент команды — бэк-офису, клиент партнёра — менеджеру по партнёрам (руководителю рынка)
+const renew = await q(`update portal.registrations r set renew_task_at = current_date from portal.developers d, portal.clients cl
+  where d.id = r.developer_id and cl.id = r.client_id and r.status in ('confirmed','confirmed_silence') and r.renew_task_at is null
+    and r.valid_until <= current_date + d.renew_remind_days
+  returning r.id, r.client_id, cl.owner_type, cl.market, cl.name client, d.name dev, r.valid_until::text until`)
+for (const r of renew) {
+  const to = r.owner_type === 'partner' ? await q(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [r.market]) : office
+  for (const u of to) await notify(u.id, 'registration', 'Регистрация {c} у {d} истекает {u} — продлите', '/registrations?f=expiring', { c: r.client, d: r.dev, u: r.until }, `reg-renew:${r.id}:${u.id}`)
+}
+// 11г. Регистрация истекла
+await q(`update portal.registrations set status = 'expired' where status in ('confirmed','confirmed_silence') and valid_until < current_date`)
+// 11д. Кандидат партнёра не квалифицирован за 14 дней — защиты не было, карточка остаётся у партнёра без приоритета; уведомление партнёру
+const cands = await q(`select id, owner_id, name from portal.clients where attach_status = 'candidate' and candidate_until < current_date`)
+for (const c of cands) await notify(c.owner_id, 'client', 'Кандидат {c}: 14 дней на квалификацию прошли — приоритет снят', `/clients/${c.id}`, { c: c.name }, `cand-over:${c.id}`)
+// 11е. Закрепление 6 месяцев: при брони или сделке — продлено; без них по истечении — клиента ведёт руководитель рынка, партнёр — Previous partner
+await q(`update portal.clients cl set attach_status = 'extended' where attach_status = 'protected' and protected_until < current_date
+  and (exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
+    or exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled'))`)
+await q(`update portal.clients cl set attach_status = 'protected' where attach_status = 'extended'
+  and not exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
+  and not exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled')`)
+const gone = await q(`update portal.clients cl set attach_status = 'transferred',
+    previous_partner_id = case when cl.owner_type = 'partner' then cl.owner_id end,
+    owner_id = coalesce((select id from portal.users h where h.active and h.role = 'market_head' and h.market = cl.market order by h.created_at limit 1), cl.owner_id)
+  where attach_status = 'protected' and protected_until < current_date returning id, previous_partner_id, name`)
+for (const g of gone) if (g.previous_partner_id) await notify(g.previous_partner_id, 'client', 'Закрепление {c} истекло: клиента ведёт офис; при покупке в течение 12 месяцев доля ваша', `/clients/${g.id}`, { c: g.name }, `transf:${g.id}`)
+out.registrations = { silence: bySilence.length, quiet: quiet.length, renew: renew.length, transferred: gone.length }
+
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
 

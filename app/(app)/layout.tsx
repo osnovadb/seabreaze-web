@@ -11,11 +11,12 @@ import { impersonate, logout } from '@/lib/actions'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const c = await requireCtx()
   const u = c.user, T = (s: string) => t(c.lang, s)
-  const cnt = await one<{ notif: number; req: number; apps: number; kyc: number }>(`select
+  const cnt = await one<{ notif: number; req: number; apps: number; kyc: number; regs: number }>(`select
     (select count(*)::int from portal.notifications where user_id = $1 and not read) notif,
     (select count(*)::int from portal.bookings where status = 'requested') req,
     (select count(*)::int from portal.agent_applications where status in ('new','review') and ($2 = 'owner' or market = $3)) apps, /* как «Заявки агентов на проверке» на главной */
-    (select count(*)::int from portal.clients where kyc_status = 'pending') kyc`, [u.id, u.role, u.market])
+    (select count(*)::int from portal.clients where kyc_status = 'pending') kyc,
+    (select count(*)::int from portal.registrations where status = 'to_send') regs`, [u.id, u.role, u.market])
   const ext = isExternal(u.role)
   const newsUnread = (await feed(u, { limit: 100 })).filter((p) => !p.read).length
   const items: { href: string; label: string; cnt?: number }[] = [{ href: '/', label: T('Главная'), cnt: cnt!.notif }]
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/clients', label: ext ? T('Клиенты') : T('CRM · клиенты') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/bookings', label: T('Брони'), cnt: u.role === 'office' || u.role === 'owner' ? cnt!.req : 0 })
   if (u.role !== 'finance' && u.role !== 'content' && u.role !== 'office') items.push({ href: '/selections', label: T('Подборки') })
+  if (['office', 'owner', 'market_head'].includes(u.role)) items.push({ href: '/registrations', label: T('Регистрации'), cnt: u.role === 'market_head' ? 0 : cnt!.regs })
   if (u.role === 'office' || u.role === 'owner') items.push({ href: '/kyc', label: 'KYC', cnt: cnt!.kyc })
   if (u.role !== 'finance' && u.role !== 'content' && u.role !== 'office') items.push({ href: '/waitlist', label: T('Ожидание и поиски') })
   if (ext) items.push({ href: '/commission', label: T('Комиссия') })
