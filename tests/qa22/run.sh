@@ -6,7 +6,7 @@ mkdir -p tests/qa22/out
 exec 9>/root/ge-qa22.lock; flock -w 1800 9 || { echo "другой прогон QA идёт"; exit 1; }
 set -a; . /opt/ge-portal22/qa.env; set +a
 node --test tests/unit22/pure.test.mjs > tests/qa22/out/unit.tap 2>&1
-node --test --test-concurrency=1 tests/qa22/0*.test.mjs tests/qa22/10_*.test.mjs > tests/qa22/out/e2e.tap 2>&1
+node --test --test-concurrency=1 $(ls tests/qa22/[0-9][0-9]_*.test.mjs | grep -v 11_b24) > tests/qa22/out/e2e.tap 2>&1
 if [ "$1" != "--no-b24" ]; then
   set -a; . /opt/ge-portal22/qa-b24.env; set +a; export QA_URL=http://127.0.0.1:3044
   node --test --test-concurrency=1 tests/qa22/11_b24.test.mjs > tests/qa22/out/b24.tap 2>&1
