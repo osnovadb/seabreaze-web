@@ -31,3 +31,16 @@ export function contactKeys(c: { PHONE?: { VALUE: string }[]; EMAIL?: { VALUE: s
   const email = (c.EMAIL || []).map((e) => e.VALUE).find(Boolean) || ''
   return { phone, email, phoneNorm: phone.replace(/\D/g, '').replace(/^00/, ''), emailNorm: email.trim().toLowerCase() }
 }
+
+// Вкладки модуля (§12): Units в сделке и контакте, Selection в лиде; привязываем только недостающие
+const TABS: [string, string][] = [['CRM_DEAL_DETAIL_TAB', 'Units'], ['CRM_CONTACT_DETAIL_TAB', 'Units'], ['CRM_LEAD_DETAIL_TAB', 'Selection']]
+export async function ensurePlacements(domain: string, auth: string, handler: string) {
+  const have = (await restApp<{ placement: string; handler: string }[]>(domain, auth, 'placement.get')) || []
+  const done: string[] = []
+  for (const [p, title] of TABS) {
+    if (have.some((x) => x.placement === p && x.handler === handler)) continue
+    await restApp(domain, auth, 'placement.bind', { PLACEMENT: p, HANDLER: handler, TITLE: title, LANG_ALL: { en: { TITLE: title }, ru: { TITLE: title }, de: { TITLE: title } } })
+    done.push(p)
+  }
+  return done
+}
