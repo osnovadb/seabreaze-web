@@ -11,9 +11,9 @@ export async function saveMarket(f: FormData) {
   const c = await owner()
   const code = s(f, 'code')
   const days = s(f, 'workdays').split(/[\s,]+/).map(Number).filter((d) => d >= 1 && d <= 7)
-  await q(`update portal.markets set price_negotiation = $2, sla_minutes = $3, work_from = $4::time, work_to = $5::time, workdays = $6, languages = $7 where code = $1`,
+  await q(`update portal.markets set price_negotiation = $2, sla_minutes = $3, work_from = $4::time, work_to = $5::time, workdays = $6, languages = $7, mailbox = nullif($8, '') where code = $1`,
     [code, f.get('price_negotiation') === 'on', Math.max(5, Number(s(f, 'sla_minutes')) || 15), s(f, 'work_from') || '09:00', s(f, 'work_to') || '18:00', days.length ? days : [1, 2, 3, 4, 5],
-      s(f, 'languages').toUpperCase().split(/[\s,;]+/).filter(Boolean)])
+      s(f, 'languages').toUpperCase().split(/[\s,;]+/).filter(Boolean), s(f, 'mailbox').toLowerCase()])
   await audit(c.real.id, 'market.save', 'market', code)
   revalidatePath('/admin/markets')
 }

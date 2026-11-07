@@ -505,7 +505,11 @@ export async function createBooking(_: unknown, f: FormData) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
     await queueTask(clientId, `Discount approval · ${disc}% · ${u}`, `Скидка ${disc}% сверх порога автора (${c.user.name}). Согласовать или отклонить — во вкладке Units → Условия покупки.`, 'market_head') // §13 п.9
-  } else if (!queued) for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
+  } else if (!queued) {
+    for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
+    // §12 «Reservation request: задача бэк-офису» — в Bitrix24, к сделке клиента
+    await queueTask(clientId, `Confirm reservation · ${u}`, `Проверьте квартиру ${u} у застройщика, забронируйте и внесите номер и срок брони — «Подтвердить бронь» во вкладке Units.`, 'office')
+  }
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
   await pushDeal(clientId, queued ? `запрос брони ${unitNo(unit)} в очереди лимита застройщика` : `запрос брони ${unitNo(unit)}: ${Math.round(sp.final).toLocaleString('en')} $, скидка ${disc}%`)
   if (c.show) redirect(`/show/unit/${unit.id}?booked=1`)

@@ -28,7 +28,9 @@ const out = {}
 // 2.2 · §7 п.7: подтверждённая бронь в день окончания — Release pending, бэк-офис подтверждает снятие у застройщика (до этого квартира — «бронь»);
 // снятие в Profitbase уходит при подтверждении (bookingAction release_confirm)
 const releasing = await q(`update portal.bookings b set status = 'release_pending' from units u join buildings bl on bl.id = u.building_id
-  where u.id = b.unit_id and b.status = 'confirmed' and b.ends_at < now() returning b.id, portal.unit_no(bl.external_id, u.number) as unit`)
+  where u.id = b.unit_id and b.status = 'confirmed' and b.ends_at < now() returning b.id, b.client_id, portal.unit_no(bl.external_id, u.number) as unit`)
+// §12 «Reserved: в день окончания — бэк-офису подтвердить снятие» — задача в Bitrix24 и стадия сделки
+for (const b of releasing) { await enqueueTask(q, b.client_id, `Release reservation · ${b.unit}`, `Бронь ${b.unit} закончилась: снимите её у застройщика и подтвердите во вкладке Units («Снято у застройщика»).`, 'office'); await enqueueSync(q, b.client_id, `бронь ${b.unit} закончилась — к снятию у застройщика`) }
 for (const b of releasing) for (const o of await q(`select id from portal.users where active and role in ('office','owner')`)) await notify(o.id, 'booking', 'Бронь {u} закончилась — снимите у застройщика и подтвердите', '/bookings', { u: b.unit }, `release:${b.id}:${o.id}`)
 // Холд 24 ч и неподтверждённый запрос истекают сами
 const expired = await q(`update portal.bookings b set status = 'expired' from units u join buildings bl on bl.id = u.building_id
@@ -67,6 +69,12 @@ out.expired = expired.length
 const soon = await q(`select b.id, b.agent_id, b.ends_at, portal.unit_no(bl.external_id, u.number) as unit, ceil(extract(epoch from b.ends_at - now()) / 86400)::int as d
   from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id
   where b.status = 'confirmed' and b.ends_at < now() + interval '3 days'`)
+// §12 «Reserved: задача за 3 дня до конца брони» — ответственному по сделке в Bitrix24 (сейлзу или менеджеру по партнёрам), один раз на бронь
+for (const b of await q(`select b.id, b.client_id, portal.unit_no(bl.external_id, u.number) as unit from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id
+    where b.status = 'confirmed' and b.ends_at < now() + interval '3 days' and not exists (select 1 from portal.audit a where a.action = 'b24.task.soon' and a.entity_id = b.id::text)`)) {
+  await enqueueTask(q, b.client_id, `Extend or release · ${b.unit}`, `Бронь ${b.unit} заканчивается через 3 дня или раньше — продлить (до даты тура + 3 дня, с одобрения бэк-офиса) или снять.`, 'market_head')
+  await q(`insert into portal.audit (action, entity, entity_id) values ('b24.task.soon', 'booking', $1)`, [b.id])
+}
 for (const b of soon) await notify(b.agent_id, 'booking', 'Бронь {u} заканчивается через {d} дн. — продлите или снимите', '/bookings', { u: b.unit, d: b.d }, 'soon:' + b.id + ':' + (b.ends_at.toISOString?.() || b.ends_at))
 out.soon = soon.length
 

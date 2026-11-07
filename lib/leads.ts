@@ -1,5 +1,6 @@
 // Заявки с сайтов и смарт-каталога (М5). Портал принимает сырую заявку, проверяет «чей клиент» по телефону и e-mail
 // (правило «кто раньше»), заводит или находит клиента и ставит лид в очередь Bitrix24 (bitrix_outbox).
+import { enqueueWebLead, processJob } from './b24x.mjs'
 import { q, one, tx, notify } from './db'
 import { bakuYear } from './i18n'
 import { conditionsFor } from './catalog'
@@ -76,16 +77,12 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
   const lead = await ins(result)
   await q('update portal.inbound_leads set client_id = $2 where id = $1', [lead!.id, clientId])
   if (unitId) await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Интерес к квартире с сайта',$2)`, [clientId, { unit: unitId }])
-  // Лид в Bitrix24 — через очередь; поля по ТЗ развёртывания (Source, Market, язык, метки, «чей клиент»)
-  await q(`insert into portal.bitrix_outbox (method, payload, ref_kind, ref_id) values ('crm.lead.add', $1, 'inbound_lead', $2)`, [{
-    fields: {
-      TITLE: `${source === 'smart_catalog' ? 'Smart catalog' : 'Website'}: ${name || phone || email}`, NAME: name, SOURCE_ID: 'WEB', SOURCE_DESCRIPTION: source,
-      PHONE: phone ? [{ VALUE: phone, VALUE_TYPE: 'WORK' }] : undefined, EMAIL: email ? [{ VALUE: email, VALUE_TYPE: 'WORK' }] : undefined,
-      UTM_SOURCE: utm.utm_source, UTM_MEDIUM: utm.utm_medium, UTM_CAMPAIGN: utm.utm_campaign, UTM_CONTENT: utm.utm_content, UTM_TERM: utm.utm_term,
-      COMMENTS: [clip(raw.comment, 1000), utm.page ? 'Page: ' + utm.page : '', result === 'partner_client' ? 'Клиент партнёра — закреплён в портале' : ''].filter(Boolean).join('\n'),
-    },
-    portal: { client_id: clientId, market, lang, result, unit_id: unitId, gclid: utm.gclid, fbclid: utm.fbclid, ttclid: utm.ttclid, consent },
-  }, lead!.id])
+  // 2.2 · §13 п.1: лид в Bitrix24 — через очередь обмена (метки, согласия, «чей клиент», распределение); копия — письмом в ящик рынка
+  const job = await enqueueWebLead(q, clientId, { source, result, lang, comment: clip(raw.comment, 1000), page: utm.page, utm })
+  if (job) await processJob(q, job).catch(() => null)
+  const box = await one<{ mailbox: string | null }>('select mailbox from portal.markets where code = $1', [market || 'GLOBAL'])
+  if (box?.mailbox) await q(`insert into portal.outbox_messages (channel, to_addr, subject, body, kind) values ('email',$1,$2,$3,'lead_copy')`,
+    [box.mailbox, `GetsEstate · ${source}: ${name || phone || email}`, [`${name || ''} · ${phone || ''} · ${email || ''}`, `Source: ${source} · ${utm.page || ''}`, `Result: ${result}`, clip(raw.comment, 1000) || '', `${(process.env.PUBLIC_URL || '').replace(/\/$/, '')}/clients/${clientId}`].join('\n')])
   return { id: lead!.id, result, clientId }
   }
 }

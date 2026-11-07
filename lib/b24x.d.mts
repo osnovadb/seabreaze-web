@@ -11,3 +11,4 @@ export function pull(q: Q, out?: Record<string, unknown>): Promise<Record<string
 export function enqueueTask(q: Q, clientId: string, title: string, description: string, who?: string): Promise<number | null>
 export function enqueueApp(q: Q, appId: string, note?: string): Promise<number | null>
 export function enqueuePrivacy(q: Q, params: unknown): Promise<number | null>
+export function enqueueWebLead(q: Q, clientId: string, params: unknown): Promise<number | null>

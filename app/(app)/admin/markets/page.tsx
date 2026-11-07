@@ -13,8 +13,8 @@ export default async function Markets() {
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const edit = c.user.role === 'owner'
-  const markets = await q<{ code: string; name: string; countries: string; entity: string; currency: string; tz: string; workdays: number[]; wf: string; wt: string; sla_minutes: number; price_negotiation: boolean; languages: string[] }>(
-    `select code, name, countries, entity, currency, tz, workdays, to_char(work_from, 'HH24:MI') wf, to_char(work_to, 'HH24:MI') wt, sla_minutes, price_negotiation, languages from portal.markets order by array_position(array['DE','IL','GLOBAL'], code)`)
+  const markets = await q<{ code: string; name: string; countries: string; entity: string; currency: string; tz: string; workdays: number[]; wf: string; wt: string; sla_minutes: number; price_negotiation: boolean; languages: string[]; mailbox: string | null }>(
+    `select code, name, countries, entity, currency, tz, workdays, to_char(work_from, 'HH24:MI') wf, to_char(work_to, 'HH24:MI') wt, sla_minutes, price_negotiation, languages, mailbox from portal.markets order by array_position(array['DE','IL','GLOBAL'], code)`)
   const offices = await q<{ id: string; market: string; city: string; address: string | null; phone: string | null; schedule: string | null; tz: string }>('select * from portal.offices order by market, city')
   const dict = await q<{ kind: string; code: string; label: string; market: string }>('select kind, code, label, market from portal.dict order by kind, sort, label')
   return (
@@ -32,6 +32,7 @@ export default async function Markets() {
             <div className="row" style={{ gap: 6 }}><label className="field"><span>{T('Рабочий день с')}</span><input className="in" type="time" name="work_from" defaultValue={m.wf} disabled={!edit} /></label><label className="field"><span>{T('до')}</span><input className="in" type="time" name="work_to" defaultValue={m.wt} disabled={!edit} /></label></div>
             <label className="field"><span>{T('Рабочие дни (1 — пн … 7 — вс)')}</span><input className="in" name="workdays" defaultValue={m.workdays.join(', ')} disabled={!edit} /></label>
             <label className="field"><span>{T('SLA первого ответа, мин')}</span><input className="in" name="sla_minutes" type="number" defaultValue={m.sla_minutes} disabled={!edit} /></label>
+            <label className="field"><span>{T('Ящик рынка (копия каждой заявки с сайта)')}</span><input className="in" name="mailbox" type="email" defaultValue={m.mailbox || ''} placeholder="de@getsestate.com" disabled={!edit} /></label>
             <label className="field"><span>{T('Языки рынка')}</span><input className="in" name="languages" defaultValue={m.languages.join(', ')} disabled={!edit} /></label>
             {edit && <div><button className="btn btn--sm">{T('Сохранить')}</button></div>}
           </form>))}</div>
