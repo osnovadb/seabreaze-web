@@ -69,7 +69,7 @@ test('удаление по запросу: без сделки — данные
   assert.equal((await client(cl)).do_not_contact, true, 'до исполнения — Do not contact')
   await act(OF, 'executePrivacyRequest', { id: req.id })
   const c = await client(cl)
-  assert.ok(c.anonymized_at); assert.equal(c.phone, null); assert.equal(c.email, null); assert.match(c.name, /Удалено/)
+  assert.ok(c.anonymized_at); assert.equal(c.phone, null); assert.equal(c.email, null); assert.match(c.name, /^Deleted · R-/)
   assert.equal((await one(`select status from portal.privacy_requests where id = $1`, [req.id])).status, 'done')
   assert.equal((await page(null, `/c/${c.consent_token || 'x'}`)).status, 404, 'ссылка согласия жива после удаления')
 })

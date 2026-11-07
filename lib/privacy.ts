@@ -49,7 +49,7 @@ export async function executePrivacyRequest(f: FormData) {
     await t.query(`update portal.clients set name = $2, phone = null, phone_norm = '', email = null, email_norm = '', country = null, goal = null, budget = null, timeline = null, payment = null, interest = null,
         segment = null, nurture = null, marketing_consent_at = null, consent_token = null, do_not_contact = true, anonymized_at = now(),
         kyc_citizenship = case when $3 then kyc_citizenship end, kyc_tax_residence = case when $3 then kyc_tax_residence end, kyc_pep = case when $3 then kyc_pep end
-      where id = $1`, [cl.id, `Удалено по запросу · ${cl.reg_no}`, hasDeal])
+      where id = $1`, [cl.id, `Deleted · ${cl.reg_no}`, hasDeal]) // нейтральное имя для всех языков интерфейса
     await t.query(`insert into portal.consents (client_id, kind, granted, source, by_user) values ($1,'data',false,'withdraw',$2), ($1,'marketing',false,'withdraw',$2)`, [cl.id, c.user.id])
     await t.query(`update portal.privacy_requests set status = 'done', done_by = $2, done_at = now(), result = $3 where id = $1`, [r.id, c.user.id, JSON.stringify(out)])
     return out
