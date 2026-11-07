@@ -10,6 +10,8 @@ const to = (req: NextRequest, path: string) => {
 export function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname
   if (PUBLIC.some((x) => p.startsWith(x))) return NextResponse.next()
+  // Bitrix24: обработчик приложения и установки принимают POST без нашей cookie — сотрудника проверяем через user.current
+  if (p === '/b24' || p === '/b24/install') return NextResponse.next()
   if (!req.cookies.get('ge_s')) return NextResponse.redirect(to(req, '/login'))
   // В режиме показа клиенту рабочие разделы недоступны
   if (req.cookies.get('ge_show') && !p.startsWith('/show')) return NextResponse.redirect(to(req, '/show'))

@@ -19,7 +19,9 @@ export type Ctx = { user: User; real: User; impersonating: boolean; lang: Lang; 
 export async function signSession(uid: string, as?: string) {
   const ver = (await one<{ session_ver: number }>('select session_ver from portal.users where id = $1', [uid]))?.session_ver ?? 0
   const token = await new SignJWT({ uid, as: as || null, ver }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime('14d').sign(KEY())
-  cookies().set(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 14 * 86400 })
+  // 2.2: портал открывается во фрейме Bitrix24 — cookie должна уходить и в стороннем контексте (SameSite=None; Secure)
+  const sec = process.env.NODE_ENV === 'production'
+  cookies().set(COOKIE, token, { httpOnly: true, sameSite: sec ? 'none' : 'lax', secure: sec, path: '/', maxAge: 14 * 86400 })
 }
 export function clearSession() {
   cookies().delete(COOKIE)
@@ -67,6 +69,6 @@ export async function requireCtx(): Promise<Ctx> {
 
 export async function setShow(clientId: string | null, lang: Lang) {
   const token = await new SignJWT({ client: clientId, lang }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime('4h').sign(KEY())
-  cookies().set(SHOW, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 4 * 3600 })
+  cookies().set(SHOW, token, { httpOnly: true, sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 4 * 3600 })
 }
 export function clearShow() { cookies().delete(SHOW) }

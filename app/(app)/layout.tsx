@@ -7,6 +7,7 @@ import { Nav } from '@/components/Nav'
 import { feed } from '@/lib/posts'
 import { LangSwitch } from '@/components/LangSwitch'
 import { impersonate, logout } from '@/lib/actions'
+import { cookies } from 'next/headers'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const c = await requireCtx()
@@ -43,6 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   else if (canSeeJournal(u.role)) items.push({ href: '/admin/journal', label: T('Журнал') })
   const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []
   const initials = u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase()
+  // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24
+  if (cookies().get('ge_embed')?.value === '1') return <div className="app app--embed"><div className="main" style={{ marginLeft: 0 }}>{children}</div></div>
   return (
     <div className="app">
       <aside className="side">
