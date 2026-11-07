@@ -13,7 +13,8 @@ import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { MakeDoc, DocStatus } from './docs'
 import { split, type SplitCond } from '@/lib/money'
-import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
+import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc, type Buyer } from '@/lib/kyc'
+import { BuyersBox } from '@/components/BuyersBox'
 
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
 import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
@@ -53,7 +54,9 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const made = await q<{ id: string; kind: string; number: string; lang: string; status: string; pdf_file_id: string | null; docx_file_id: string | null; signed_file_id: string | null; created_at: string }>(
     `select d.id, d.kind, d.number, d.lang, d.status, d.pdf_file_id, d.docx_file_id, d.signed_file_id, d.created_at from portal.documents d where d.client_id = $1
       and (d.kind <> 'commission_act' or $2 or exists (select 1 from portal.commission_acts ca where ca.document_id = d.id and ca.agent_id = $3)) order by d.created_at desc`, [cl.id, ['owner', 'finance'].includes(c.user.role), c.user.id])
-  const kycMiss = kycMissing(docKinds, cl)
+  const buyers = await q<Buyer>('select id, kind, name, citizenship, tax_residence, pep, reg_no, ubo from portal.buyers where client_id = $1 order by created_at', [cl.id])
+  const docRows = await q<{ kind: string; buyer_id: string | null }>('select distinct kind, buyer_id from portal.client_documents where client_id = $1', [cl.id])
+  const kycMiss = kycMissing(docRows, cl, buyers)
   const kycLocked = cl.kyc_status === 'pending' || (cl.kyc_status === 'passed' && !canReviewKyc(c.user.role))
   // Ожидаемая комиссия: партнёру — его доля, команде — наш доход; по активным броням (снимок условий) и сделкам в работе
   const activeB = await q<{ snapshot: SplitCond; price_list: number; discount_pct: number; agent_role: string }>(`select b.snapshot, b.price_list::float, b.discount_pct::float, u.role agent_role from portal.bookings b join portal.users u on u.id = b.agent_id where b.client_id = $1 and b.status in ('requested','confirmed')`, [cl.id])
@@ -68,7 +71,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
           {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
           {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат: квалифицируйте до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
           {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
-          <Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill>
+          <Pill kind={cl.kyc_status === 'passed' ? 'ok' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'отказ' : 'не начат')}</Pill>
           <span className="small muted">{cl.reg_no}{!ext ? ` · ${T('владелец')}: ${cl.owner_name}` : ''}</span>
         </span>}
         right={<>
@@ -180,8 +183,8 @@ export default async function ClientCard({ params }: { params: { id: string } })
             </div>
             {/* 2.2: регистрации у застройщиков ведёт бэк-офис через очередь (/registrations) — блок «Регистрации у застройщиков» выше */}
             <div className="card stack" style={{ gap: 8 }}>
-              <div className="between"><div className="h3" style={{ margin: 0 }}>KYC</div><Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>{T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill></div>
-              {KYC_DOCS.map((k) => <div key={k} className="kv"><span>{T(KYC_DOC_NAMES[k])}</span><span className={docKinds.includes(k) ? 'okc' : 'muted'}>{docKinds.includes(k) ? '✓' : T('нет')}</span></div>)}
+              <div className="between"><div className="h3" style={{ margin: 0 }}>KYC</div><Pill kind={cl.kyc_status === 'passed' ? 'ok' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>{T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'отказ' : 'не начат')}</Pill></div>
+              <BuyersBox lang={L} clientId={cl.id} buyers={buyers} docs={docRows} locked={kycLocked} kycToken={cl.kyc_token} />
               <form action={saveKycData} className="stack" style={{ gap: 6 }}>
                 <input type="hidden" name="client" value={cl.id} />
                 <div className="row" style={{ gap: 6 }}>
@@ -193,6 +196,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
                 {!kycLocked && <div><button className="btn btn--sm">{T('Сохранить анкету')}</button></div>}
               </form>
               {cl.kyc_status === 'rejected' && cl.kyc_note && <div className="err small">{T('Причина отказа')}: {cl.kyc_note}</div>}
+              {cl.kyc_status === 'compliance' && <div className="err small">{ext ? T('Отказ по проверке') : `${T('Отказ по проверке (Compliance)')}: ${cl.kyc_note || ''}`}</div>}
               {['none', 'rejected'].includes(cl.kyc_status) && (kycMiss.length
                 ? <div className="tiny muted">{T('Для отправки на проверку не хватает')}: {kycMiss.map((m) => T(m)).join(', ')}</div>
                 : <form action={submitKyc}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--p btn--block">{T('Отправить на проверку KYC')}</button></form>)}
@@ -201,7 +205,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
                 <form action={reviewKyc} className="stack" style={{ gap: 6 }}>
                   <input type="hidden" name="client" value={cl.id} />
                   <input className="in" name="note" placeholder={T('Комментарий (для отказа — обязателен)')} />
-                  <div className="row" style={{ gap: 6 }}><button className="btn btn--p" name="decision" value="passed">{T('KYC пройден')}</button><button className="btn" name="decision" value="rejected">{T('Отклонить')}</button></div>
+                  <div className="row" style={{ gap: 6 }}><button className="btn btn--p" name="decision" value="passed">{T('KYC пройден')}</button><button className="btn" name="decision" value="rejected">{T('Отклонить')}</button><button className="btn btn--ghost" name="decision" value="compliance" title={T('Окончательный отказ: Lost «Compliance», брони снимаются, клиент исключается из маркетинга')}>{T('Отказ (Compliance)')}</button></div>
                 </form>
               )}
               {canReviewKyc(c.user.role) && cl.kyc_status === 'passed' && <form action={reviewKyc}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--sm" name="decision" value="none">{T('Сбросить KYC')}</button></form>}

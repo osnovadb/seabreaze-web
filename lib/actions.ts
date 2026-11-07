@@ -17,7 +17,7 @@ import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS } from './stages'
-import { canReviewKyc, kycMissing, type KycFields } from './kyc'
+import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
@@ -341,8 +341,9 @@ export async function submitKyc(f: FormData) {
   const cl = await stageGuard(c, s(f, 'client'))
   const row = await one<KycFields & { kyc_status: string }>('select kyc_status, kyc_citizenship, kyc_tax_residence, kyc_pep from portal.clients where id = $1', [cl.id])
   if (!row || !['none', 'rejected'].includes(row.kyc_status)) return
-  const kinds = (await q<{ kind: string }>('select distinct kind from portal.client_documents where client_id = $1', [cl.id])).map((r) => r.kind)
-  if (kycMissing(kinds, row).length) return
+  const kinds = await q<{ kind: string; buyer_id: string | null }>('select distinct kind, buyer_id from portal.client_documents where client_id = $1', [cl.id])
+  const buyers = await q<Buyer>('select id, kind, name, citizenship, tax_residence, pep, reg_no, ubo from portal.buyers where client_id = $1', [cl.id])
+  if (kycMissing(kinds, row, buyers).length) return
   await q(`update portal.clients set kyc_status = 'pending', kyc_submitted_at = now(), kyc_note = null where id = $1`, [cl.id])
   await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system','KYC отправлен на проверку')`, [cl.id, c.user.id])
   for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'kyc', 'KYC {c} ждёт проверки', `/clients/${cl.id}`, { c: cl.name })
@@ -353,20 +354,25 @@ export async function submitKyc(f: FormData) {
 export async function reviewKyc(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'client'), decision = s(f, 'decision')
-  if (!canReviewKyc(c.user.role) || !['passed', 'rejected', 'none'].includes(decision)) return
+  if (!canReviewKyc(c.user.role) || !['passed', 'rejected', 'none', 'compliance'].includes(decision)) return
   const cl = await one<{ owner_id: string; name: string; kyc_status: string }>('select owner_id, name, kyc_status from portal.clients where id = $1', [id])
   if (!cl) return
-  if (decision === 'rejected' && !s(f, 'note')) return
+  if ((decision === 'rejected' || decision === 'compliance') && !s(f, 'note')) return
   // решение — только по отправленному KYC; сброс — только после решения; своему клиенту KYC не проходит никто
-  if ((decision === 'passed' || decision === 'rejected') && cl.kyc_status !== 'pending') return
+  if ((decision === 'passed' || decision === 'rejected' || decision === 'compliance') && cl.kyc_status !== 'pending') return
   if (decision === 'none' && !['passed', 'rejected'].includes(cl.kyc_status)) return
   if (decision !== 'none' && cl.owner_id === c.user.id) return
   await q(`update portal.clients set kyc_status = $2, kyc_note = $3, kyc_checked_by = $4, kyc_checked_at = now() where id = $1`, [id, decision, s(f, 'note').slice(0, 500) || null, c.user.id])
-  const text = decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? 'KYC отклонён: {r}' : 'KYC сброшен — нужна повторная проверка'
+  // §5 П4: окончательный отказ по проверке — Lost «Compliance», брони снимаются, клиент исключается из маркетинга; партнёр видит только «отказ по проверке»
+  if (decision === 'compliance') {
+    await q(`update portal.bookings set status = case when status = 'confirmed' then 'release_pending' else 'cancelled' end where client_id = $1 and status in ('hold','queued','requested','confirmed')`, [id])
+    await q(`update portal.clients set marketing_consent_at = null, stage = 'lost', lost_reason = 'Compliance' where id = $1`, [id])
+  }
+  const text = decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? 'KYC отклонён: {r}' : decision === 'compliance' ? 'Отказ по проверке (Compliance)' : 'KYC сброшен — нужна повторная проверка'
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`, [id, c.user.id, text, { r: s(f, 'note') }])
-  if (cl.owner_id !== c.user.id) await notify(cl.owner_id, 'kyc', decision === 'passed' ? 'KYC {c} пройден' : decision === 'rejected' ? 'KYC {c} отклонён — посмотрите причину' : 'KYC {c} нужно пройти заново', `/clients/${id}`, { c: cl.name })
+  if (cl.owner_id !== c.user.id) await notify(cl.owner_id, 'kyc', decision === 'passed' ? 'KYC {c} пройден' : decision === 'rejected' ? 'KYC {c} отклонён — посмотрите причину' : decision === 'compliance' ? 'Клиент {c}: отказ по проверке' : 'KYC {c} нужно пройти заново', `/clients/${id}`, { c: cl.name })
   await audit(c.real.id, 'client.kyc_' + decision, 'client', id, { note: s(f, 'note') || null }, c.impersonating ? c.user.id : null)
-  await pushDeal(id, decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? `KYC отклонён: ${s(f, 'note').slice(0, 300)}` : 'KYC сброшен — нужна повторная проверка')
+  await pushDeal(id, decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? `KYC отклонён: ${s(f, 'note').slice(0, 300)}` : decision === 'compliance' ? 'отказ по проверке (Compliance) — сделка закрыта как Lost, брони сняты' : 'KYC сброшен — нужна повторная проверка')
   revalidatePath(`/clients/${id}`)
   revalidatePath('/kyc'); revalidatePath('/', 'layout')
 }
