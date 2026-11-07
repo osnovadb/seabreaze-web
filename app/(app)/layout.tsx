@@ -45,7 +45,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []
   const initials = u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase()
   // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24
-  if (cookies().get('ge_embed')?.value === '1') return <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>{children}</div></div>
+  if (cookies().get('ge_embed')?.value === '1') {
+    // «Текущий клиент» вкладки Bitrix24: полоса сверху на всех экранах — подбор, шахматка, бронь идут для него
+    const cid = cookies().get('ge_client')?.value
+    const cur = cid && /^[0-9a-f-]{36}$/.test(cid) ? await one<{ id: string; name: string }>('select id, name from portal.clients where id = $1', [cid]) : null
+    return <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>
+      {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
+        <span className="small">{T('Клиент')}: <b>{cur.name}</b></span>
+        <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>
+        <Link href={`/b24/units/${cur.id}?tab=pick`} className="small" style={{ color: '#fff' }}>{T('Подбор')}</Link>
+        <Link href={`/b24/units/${cur.id}?tab=units`} className="small" style={{ color: '#fff' }}>{T('Квартиры клиента')}</Link>
+      </div>}
+      {children}</div></div>
+  }
   return (
     <div className="app">
       <aside className="side">

@@ -22,5 +22,5 @@ export async function createFromB24(f: FormData) {
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент заведён из Bitrix24 ({r}), закреплён за командой',$3)`, [r!.id, c.user.id, { r: reg }])
   await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id])
   await audit(c.real.id, 'client.from_b24', 'client', r!.id, { kind, id })
-  redirect(`/clients/${r!.id}?embed=1`)
+  redirect(`/b24/ctx?client=${r!.id}`)
 }

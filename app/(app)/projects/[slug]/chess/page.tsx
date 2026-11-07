@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
@@ -57,7 +58,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const shown = side ? cu.filter((u) => u.view_side === side) : cu
   const layouts = Array.from(new Set(cu.map((u) => u.layout).filter(Boolean))).sort() as string[]
   const cs = clientScope(c.user)
-  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by last_activity_at desc limit 200`, cs.params) : []
+  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by (cl.id::text = '${(cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
   const editor = ['owner', 'office'].includes(c.user.role)
   return (
     <>

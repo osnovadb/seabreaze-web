@@ -13,7 +13,7 @@ export default async function B24Tab({ params, searchParams }: { params: { kind:
   if (!['deal', 'contact', 'lead'].includes(kind) || !/^\d+$/.test(params.id)) notFound()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const r = await resolveClient(kind, Number(params.id))
-  if (r.id) redirect(`/clients/${r.id}?embed=1`)
+  if (r.id) redirect(`/b24/ctx?client=${r.id}`) // запомнить клиента вкладки и открыть Units
   const what = kind === 'deal' ? T('Сделка') : kind === 'contact' ? T('Контакт') : T('Лид')
   return (
     <>

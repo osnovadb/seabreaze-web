@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
@@ -36,7 +37,7 @@ export default async function Book({ params, searchParams }: { params: { id: str
       <div className="page split-l">
         <div className="card">{planUrl(u.plan_file) ? <div className="planbox" style={{ border: 0 }}><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="muted">{T('План появится позже')}</div>}</div>
         <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct }}
-          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
+          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || cookies().get('ge_client')?.value} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
       </div>
     </>
   )

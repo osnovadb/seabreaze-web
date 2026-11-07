@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
@@ -46,7 +47,7 @@ export default async function UnitPage({ params, searchParams }: { params: { id:
   if (fp) imgs.splice(1, 0, ['floor', T('На этаже')])
   const cur = imgs.some(([k]) => k === searchParams.img) ? searchParams.img! : 'plan'
   const cs = clientScope(c.user)
-  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by last_activity_at desc limit 100`, cs.params)
+  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by (cl.id::text = '${(cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 100`, cs.params)
   const simOffers = await offersFor(u.project_id) // «Похожие свободные» — тоже с ценой по акции, как сверху
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
   const hist = ext ? [] : await unitHistory(u.id, 12)

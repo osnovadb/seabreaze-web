@@ -21,6 +21,7 @@ import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
+import { pushDeal } from './b24sync'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -378,6 +379,7 @@ export async function holdUnit(f: FormData) {
     values ($1,$2,$3,$4,$5,0,$5,'{"kind":"hold"}', now() + interval '24 hours', 'hold') returning id`, [unit.id, unit.project_id, clientId, c.user.id, Math.round(unit.usd || 0)])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Квартира {u} придержана на 24 часа',$3)`, [clientId, c.user.id, { u: unitNo(unit) }])
   await audit(c.real.id, 'booking.hold', 'booking', b!.id, { unit: unit.id }, c.impersonating ? c.user.id : null)
+  await pushDeal(clientId, `квартира ${unitNo(unit)} придержана на 24 часа`)
   revalidatePath(`/units/${unit.id}`)
   back(`/units/${unit.id}`, { held: '1' })
 }
@@ -459,7 +461,9 @@ export async function createBooking(_: unknown, f: FormData) {
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
   } else if (!queued) for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
+  await pushDeal(clientId, queued ? `запрос брони ${unitNo(unit)} в очереди лимита застройщика` : `запрос брони ${unitNo(unit)}: ${Math.round(sp.final).toLocaleString('en')} $, скидка ${disc}%`)
   if (c.show) redirect(`/show/unit/${unit.id}?booked=1`)
+  if (cookies().get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units&created=${b!.id}`) // внутри Bitrix24 — назад во вкладку Units
   redirect(`/bookings?created=${b!.id}`)
 }
 export async function bookingAction(f: FormData) {
@@ -533,6 +537,8 @@ export async function bookingAction(f: FormData) {
   }
   await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
+  const NOTE: Record<string, string> = { confirm: 'бронь подтверждена у застройщика', reject: 'бронь отклонена', release_confirm: 'бронь снята у застройщика', release_hold: 'холд снят', cancel: 'бронь снята', contract: 'договор подписан (SPA signed)', extend: 'бронь продлена', approve: 'скидка согласована', decline: 'скидка не согласована' }
+  if (NOTE[act]) await pushDeal(b.client_id, NOTE[act])
   revalidatePath('/bookings')
   revalidatePath(`/clients/${b.client_id}`); revalidatePath('/clients'); revalidatePath('/')
 }
@@ -549,6 +555,8 @@ export async function addToSelection(f: FormData) {
   }
   await q(`insert into portal.selection_items (selection_id, unit_id, sort) values ($1,$2,(select coalesce(max(sort),0)+1 from portal.selection_items where selection_id = $1)) on conflict do nothing`, [sel!.id, unitId])
   await q(`update portal.clients set stage = case when stage in ('lead','contact','qualify','fixation') then 'selection' else stage end, last_activity_at = now() where id = $1`, [clientId])
+  await pushDeal(clientId, 'квартира добавлена в квартиры клиента')
+  if (cookies().get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units`)
   redirect(`/selections/${sel!.id}`)
 }
 // Несколько квартир из шахматки в подборку клиента разом (без перехода в подборку — шахматка остаётся открытой)
@@ -578,6 +586,7 @@ export async function addManyToSelection(f: FormData) {
   await q(`update portal.clients set stage = case when stage in ('lead','contact','qualify','fixation') then 'selection' else stage end, last_activity_at = now() where id = $1`, [clientId])
   await notify(c.user.id, 'selection', 'В подборку добавлено квартир: {n}', `/selections/${sel!.id}`, { n: list.length })
   await audit(c.real.id, 'selection.add_many', 'client', clientId, { n: list.length }, c.impersonating ? c.user.id : null)
+  await pushDeal(clientId, `в квартиры клиента добавлено: ${list.length}`)
   revalidatePath(`/selections/${sel!.id}`)
 }
 export async function selectionUpdate(f: FormData) {
