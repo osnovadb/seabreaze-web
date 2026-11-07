@@ -6,6 +6,7 @@ import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
 import { bestOffer } from '../lib/promoMatch.mjs'
 import { notifyOut } from './notify-out.mjs'
 import { pbSync, pbFlush } from '../lib/pb.mjs'
+import { enqueueSync } from '../lib/b24x.mjs'
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -244,6 +245,7 @@ const bySilence = await q(`update portal.registrations r set status = 'confirmed
   where x.id = r.id and r.status = 'sent' and r.answer_due < current_date and k.silence_rule = 'confirm'
   returning r.id, r.client_id`)
 for (const r of bySilence) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Застройщик промолчал — регистрация подтверждена по договору', '{}')`, [r.client_id])
+for (const id of new Set(bySilence.map((r) => r.client_id))) await enqueueSync(q, id, 'застройщик промолчал — регистрация подтверждена по договору') // §13 п.7
 const quiet = await q(`select r.id, cl.name client, p.name dev from portal.registrations r join portal.clients cl on cl.id = r.client_id join public.projects p on p.id = r.project_id
   cross join lateral (select * from portal.cur_conditions(r.project_id)) k where r.status = 'sent' and r.answer_due < current_date and coalesce(k.silence_rule, 'remind') = 'remind'`)
 for (const r of quiet) for (const u of office) await notify(u.id, 'registration', 'Застройщик {d} молчит по регистрации {c} — напомните', '/registrations?f=silence', { d: r.dev, c: r.client }, `reg-quiet:${r.id}:${u.id}:${new Date().toISOString().slice(0, 10)}`)
@@ -260,22 +262,24 @@ for (const r of renew) {
   for (const u of to) await notify(u.id, 'registration', 'Регистрация {c} у {d} истекает {u} — продлите', '/registrations?f=expiring', { c: r.client, d: r.dev, u: r.until }, `reg-renew:${r.id}:${u.id}`)
 }
 // 11г. Регистрация истекла
-await q(`update portal.registrations set status = 'expired' where status in ('confirmed','confirmed_silence') and valid_until < current_date`)
+const regGone = await q(`update portal.registrations set status = 'expired' where status in ('confirmed','confirmed_silence') and valid_until < current_date returning client_id`)
+for (const id of new Set(regGone.map((r) => r.client_id))) await enqueueSync(q, id, 'регистрация у застройщика истекла')
 // 11д. Кандидат партнёра не квалифицирован за 14 дней — защиты не было, карточка остаётся у партнёра без приоритета; уведомление партнёру
 const cands = await q(`select id, owner_id, name from portal.clients where attach_status = 'candidate' and candidate_until < current_date`)
 for (const c of cands) await notify(c.owner_id, 'client', 'Кандидат {c}: 14 дней на квалификацию прошли — приоритет снят', `/clients/${c.id}`, { c: c.name }, `cand-over:${c.id}`)
 // 11е. Закрепление 6 месяцев: при брони или сделке — продлено; без них по истечении — клиента ведёт руководитель рынка, партнёр — Previous partner
-await q(`update portal.clients cl set attach_status = 'extended' where attach_status = 'protected' and protected_until < current_date
+const ext1 = await q(`update portal.clients cl set attach_status = 'extended' where attach_status = 'protected' and protected_until < current_date
   and (exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
-    or exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled'))`)
-await q(`update portal.clients cl set attach_status = 'protected' where attach_status = 'extended'
+    or exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled')) returning id`)
+const ext0 = await q(`update portal.clients cl set attach_status = 'protected' where attach_status = 'extended'
   and not exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
-  and not exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled')`)
+  and not exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled') returning id`)
 const gone = await q(`update portal.clients cl set attach_status = 'transferred',
     previous_partner_id = case when cl.owner_type = 'partner' then cl.owner_id end,
     owner_id = coalesce((select id from portal.users h where h.active and h.role = 'market_head' and h.market = cl.market order by h.created_at limit 1), cl.owner_id)
   where attach_status = 'protected' and protected_until < current_date returning id, previous_partner_id, name`)
 for (const g of gone) if (g.previous_partner_id) await notify(g.previous_partner_id, 'client', 'Закрепление {c} истекло: клиента ведёт офис; при покупке в течение 12 месяцев доля ваша', `/clients/${g.id}`, { c: g.name }, `transf:${g.id}`)
+for (const r of [...ext1, ...ext0, ...gone]) await enqueueSync(q, r.id) // контакт: закрепление, Previous partner (§13 п.23)
 out.registrations = { silence: bySilence.length, quiet: quiet.length, renew: renew.length, transferred: gone.length }
 
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)

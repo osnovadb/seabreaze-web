@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { q, one, audit } from './db'
 import { requireCtx } from './auth'
+import { pushDeal, queueSync } from './b24sync'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const BACKOFFICE = ['owner', 'office']
@@ -25,6 +26,7 @@ export async function sendRegistrations(f: FormData) {
     from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k
     where x.id = r.id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')`, [ids])
   await audit(c.real.id, 'registration.send', 'registration', ids[0], { n: ids.length })
+  await queueSync((await q<{ client_id: string }>('select client_id from portal.registrations where id = any($1::uuid[])', [ids])).map((r) => r.client_id), 'регистрация отправлена застройщику') // §13 п.7
   revalidatePath('/registrations')
 }
 
@@ -45,6 +47,7 @@ export async function decideRegistration(f: FormData) {
   if (r) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`,
     [r.client_id, c.user.id, verdict === 'confirmed' ? 'Регистрация у застройщика подтверждена' : 'Застройщик отказал в регистрации', {}])
   await audit(c.real.id, 'registration.' + verdict, 'registration', id)
+  if (r) await pushDeal(r.client_id, verdict === 'confirmed' ? 'регистрация у застройщика подтверждена' : 'застройщик отказал в регистрации')
   revalidatePath('/registrations')
 }
 
@@ -54,6 +57,8 @@ export async function renewRegistration(f: FormData) {
   const id = s(f, 'id')
   await q(`update portal.registrations set status = 'to_send', due_send = portal.add_workdays(current_date, 1), renew_task_at = null, sent_at = null, answer_due = null where id = $1`, [id])
   await audit(c.real.id, 'registration.renew', 'registration', id)
+  const rr = await one<{ client_id: string }>('select client_id from portal.registrations where id = $1', [id])
+  if (rr) await queueSync([rr.client_id], 'регистрация у застройщика — на продление')
   revalidatePath('/registrations')
 }
 

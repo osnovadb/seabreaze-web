@@ -4,6 +4,9 @@ import { redirect } from 'next/navigation'
 import { q, one, audit } from './db'
 import { requireCtx } from './auth'
 import { b24Person, COL, type Kind } from './b24link'
+import { pushDeal } from './b24sync'
+import { processJob, pull, runQueue } from './b24x.mjs'
+import { revalidatePath } from 'next/cache'
 
 
 // Клиент команды из карточки Bitrix24: закрепление сразу (§10), регистрации у застройщиков (§7)
@@ -22,5 +25,36 @@ export async function createFromB24(f: FormData) {
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент заведён из Bitrix24 ({r}), закреплён за командой',$3)`, [r!.id, c.user.id, { r: reg }])
   await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id])
   await audit(c.real.id, 'client.from_b24', 'client', r!.id, { kind, id })
+  await pushDeal(r!.id, `клиент заведён в портале (${reg}), регистрации у застройщиков — в очереди`)
   redirect(`/b24/ctx?client=${r!.id}`)
+}
+
+// Админка «Обмен с Bitrix24»: переотправить задачу, все недоставленные, забрать изменения сейчас
+async function ownerOnly() {
+  const c = await requireCtx()
+  if (c.user.role !== 'owner' || c.impersonating) throw new Error('forbidden')
+  return c
+}
+export async function b24Retry(f: FormData) {
+  const c = await ownerOnly()
+  const id = Number(f.get('id'))
+  if (id) {
+    await q(`update portal.b24_jobs set status = 'pending', next_at = now(), attempts = least(attempts, 9) where id = $1 and status in ('error','dead','sent')`, [id])
+    await processJob(q, id)
+    await audit(c.real.id, 'b24.retry', 'b24_job', String(id))
+  }
+  revalidatePath('/admin/b24')
+}
+export async function b24RetryDead() {
+  const c = await ownerOnly()
+  const r = await q<{ id: number }>(`update portal.b24_jobs set status = 'pending', next_at = now(), attempts = 0 where status in ('dead','error') returning id`)
+  await audit(c.real.id, 'b24.retry_all', 'b24_job', undefined, { n: r.length })
+  await runQueue(q, Date.now() + 20000)
+  revalidatePath('/admin/b24')
+}
+export async function b24PullNow() {
+  const c = await ownerOnly()
+  const out = await pull(q, {})
+  await audit(c.real.id, 'b24.pull', undefined, undefined, out)
+  revalidatePath('/admin/b24')
 }

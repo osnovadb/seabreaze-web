@@ -21,7 +21,7 @@ import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
-import { pushDeal } from './b24sync'
+import { pushDeal, queueSync } from './b24sync'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -137,9 +137,11 @@ async function qualifyIfReady(by: string, id: string) {
     where attach_status = 'candidate' and id <> $1 and (other_claimant_of = $1 or id = (select other_claimant_of from portal.clients where id = $1)
       or other_claimant_of = (select other_claimant_of from portal.clients where id = $1)) returning id, owner_id`, [id])
   for (const r of rivals) await notify(r.owner_id, 'client', 'Кандидат уже закреплён за другим партнёром — карточка закрыта', `/clients/${r.id}`, {})
+  await queueSync(rivals.map((r) => r.id)) // §13: лиды соперников — Duplicate
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент квалифицирован и закреплён до {d}',$3)`, [id, by, { d: won.until }])
   await q('select portal.enqueue_registrations($1, null, false, $2)', [id, by])
   await audit(by, 'client.qualified', 'client', id, { rivals: rivals.length })
+  await pushDeal(id, `клиент квалифицирован и закреплён до ${won.until}`) // §13 п.5: контакт, сделка в Partner clients, задача на регистрацию
   return true
 }
 
@@ -185,6 +187,7 @@ export async function registerClient(_: unknown, f: FormData) {
   }
   if (c.user.curator_id) await notify(c.user.curator_id, 'client', 'Новый клиент агента {a}: {c}', `/clients/${r!.id}`, { a: c.user.name, c: name })
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
+  await pushDeal(r!.id, ext ? `кандидат от партнёра ${c.user.name} (${reg})` : `клиент заведён в портале (${reg})`) // §13 п.4
   return { ok: true, id: r!.id, reg, until: (r!.protected_until || r!.candidate_until)!, candidate: ext }
 }
 
@@ -268,6 +271,7 @@ export async function addActivity(f: FormData) {
     const internal = !isExternal(c.user.role) && !!f.get('internal')
     await q(`insert into portal.activities (client_id, user_id, kind, text, internal) values ($1,$2,$3,$4,$5)`, [id, c.user.id, s(f, 'kind') || 'note', text, internal])
     await q('update portal.clients set last_activity_at = now() where id = $1', [id])
+    if (!internal) await pushDeal(id, `комментарий ${c.user.name}: ${text.slice(0, 900)}`) // §13 п.17: карточка портала → лента сделки
   }
   revalidatePath(`/clients/${id}`)
 }
@@ -278,6 +282,7 @@ export async function saveQualification(f: FormData) {
   await q(`update portal.clients set goal = $2, budget = $3, timeline = $4, payment = $5, interest = $6, country = coalesce(nullif($7, ''), country), language = coalesce(nullif($8, ''), language),
     segment = coalesce(nullif($9, ''), segment), last_activity_at = now() where id = $1`, [id, s(f, 'goal'), s(f, 'budget'), s(f, 'timeline'), s(f, 'payment'), s(f, 'interest'), s(f, 'country'), langCode(s(f, 'language')), s(f, 'segment')])
   if (!(await qualifyIfReady(c.user.id, id))) await q('select portal.enqueue_registrations($1, null, false, $2)', [id, c.user.id]) // страна стала известна — к застройщикам без продаж в АЗ
+  await pushDeal(id) // сегмент и регистрации — в контакт и сделку
   revalidatePath(`/clients/${id}`)
 }
 export async function addTask(f: FormData) {
