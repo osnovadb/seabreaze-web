@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useFormState } from 'react-dom'
 import { t, type Lang } from '@/lib/i18n'
 
-type State = { ok?: boolean; error?: string; made?: number } | null | undefined
+type State = { ok?: boolean; error?: string; made?: number; warning?: string } | null | undefined
 // Форма серверного действия с ответом «сохранено / ошибка» на месте — для админки объектов
 export function ActionForm({ action, lang, children, className, style, okText, reset }: {
   action: (s: any, f: FormData) => Promise<State>; lang: Lang; children: React.ReactNode; className?: string; style?: React.CSSProperties; okText?: string; reset?: boolean
@@ -17,6 +17,7 @@ export function ActionForm({ action, lang, children, className, style, okText, r
       {children}
       {st?.error && <div className="err tiny" style={{ gridColumn: '1 / -1' }}>{st.error}</div>}
       {st?.ok && <div className="tiny okc" style={{ gridColumn: '1 / -1' }}>{okText || t(lang, 'Сохранено')}{st.made != null ? ` · ${st.made}` : ''}</div>}
+      {st?.warning && <div className="tiny warnc" style={{ gridColumn: '1 / -1' }}>{st.warning}</div>}
     </form>
   )
 }

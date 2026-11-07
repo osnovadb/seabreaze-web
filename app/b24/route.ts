@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
   const go = url.searchParams.get('go') || ''
   if (go && MENU[go] && !MENU[go][2].includes(u.role)) return page('Нет доступа', `Раздел «${MENU[go][0]}» не для вашей роли.`)
   const landing = u.role === 'office' ? '/registrations' : u.role === 'finance' ? '/finance' : u.role === 'content' ? '/news' : '/catalog'
-  const target = placement === 'CRM_DEAL_DETAIL_TAB' ? `/b24/deal/${id}` : placement === 'CRM_CONTACT_DETAIL_TAB' ? `/b24/contact/${id}` : placement === 'CRM_LEAD_DETAIL_TAB' ? `/b24/lead/${id}`
+  // список сделок: выбранные ID — в параметрах встройки (ids / IDS / ID)
+  const listIds = [opts.ids, opts.IDS, (opts as Record<string, unknown>).ID].flat().filter(Boolean).join(',')
+  const target = placement === 'CRM_DEAL_LIST_MENU' ? `/b24/deals?ids=${encodeURIComponent(listIds)}` : placement === 'CRM_DEAL_DETAIL_TAB' ? `/b24/deal/${id}` : placement === 'CRM_CONTACT_DETAIL_TAB' ? `/b24/contact/${id}` : placement === 'CRM_LEAD_DETAIL_TAB' ? `/b24/lead/${id}`
     : go && MENU[go] ? MENU[go][1] : landing
   await audit(u.id, 'b24.open', 'b24', placement, { id })
   const res = NextResponse.redirect(new URL(target + (target.includes('?') ? '&' : '?') + 'embed=1', base(req)), 303)

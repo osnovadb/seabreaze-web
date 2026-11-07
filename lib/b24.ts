@@ -33,7 +33,7 @@ export function contactKeys(c: { PHONE?: { VALUE: string }[]; EMAIL?: { VALUE: s
 }
 
 // Вкладки модуля (§12): Units в сделке и контакте, Selection в лиде; привязываем только недостающие
-const TABS: [string, string][] = [['CRM_DEAL_DETAIL_TAB', 'Units'], ['CRM_CONTACT_DETAIL_TAB', 'Units'], ['CRM_LEAD_DETAIL_TAB', 'Selection']]
+const TABS: [string, string][] = [['CRM_DEAL_DETAIL_TAB', 'Units'], ['CRM_CONTACT_DETAIL_TAB', 'Units'], ['CRM_LEAD_DETAIL_TAB', 'Selection'], ['CRM_DEAL_LIST_MENU', 'GetsEstate: send selection']]
 // 2.2 · Пункты GetsEstate в левом меню Bitrix24 (решение 242): набор по роли проверяет портал при открытии
 export const MENU: Record<string, [string, string, string[]]> = {
   catalog: ['Catalog', '/catalog', ['owner', 'market_head', 'seller', 'office', 'finance', 'content']],

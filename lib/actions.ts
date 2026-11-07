@@ -25,6 +25,7 @@ import { pushDeal, queueSync, queueApp, queueTask } from './b24sync'
 import { grantAccess, invite, noPassword } from './partnerAccess'
 import { computeShares, buildTranches } from './money22'
 import { requestConsent } from './consent'
+import { priceNegotiation } from './dict'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -445,6 +446,10 @@ export async function createBooking(_: unknown, f: FormData) {
   const cond = await conditionsFor(unit.project_id, isExternal(c.user.role) ? c.user : null)
   if (!cond) return { error: 'Для проекта не заведены условия' }
   const disc = Math.max(0, Number(s(f, 'discount') || 0))
+  // 270: на рынке клиента выключены переговоры о цене — скидку и бронь запрашивает руководитель Global (или админ)
+  const cMarket = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [clientId]))?.m || 'GLOBAL'
+  if (!(await priceNegotiation(cMarket)) && c.user.role !== 'owner' && !(c.user.role === 'market_head' && (c.user.market || 'GLOBAL') === 'GLOBAL'))
+    return { error: 'На рынке клиента переговоры о цене выключены — бронь и скидку запрашивает руководитель Global' }
   const cap = maxDiscount(c.user.role, cond), ceiling = discountCeiling(c.user.role, cond)
   if (disc > ceiling) return { error: t(c.lang, 'Скидка больше {p}% — только по запросу', { p: ceiling }) }
   // Сверх своего порога — бронь ставится, но ждёт согласования владельца или руководителя рынка (офис не подтверждает до решения)

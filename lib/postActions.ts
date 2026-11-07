@@ -1,4 +1,5 @@
 'use server'
+import { tabooHits } from './dict'
 // Действия ленты (М9): запись пишут контент, владелец и руководитель рынка (только на свой рынок)
 import { revalidatePath } from 'next/cache'
 import { q, one, audit } from './db'
@@ -28,7 +29,9 @@ export async function savePost(_: unknown, f: FormData) {
   else await q(`insert into portal.posts (kind, title, body, lang, markets, project_id, link, starts_on, ends_on, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [...vals, c.user.id])
   await audit(c.real.id, id ? 'post.update' : 'post.create', 'post', id || '', { title: s(f, 'title') })
   revalidatePath('/news'); revalidatePath('/')
-  return { ok: true }
+  // 271: слова-табу рынка — предупреждение после сохранения, не запрет
+  const hits = await tabooHits(`${s(f, 'title')} ${s(f, 'body')}`, markets)
+  return hits.length ? { ok: true, warning: t(c.lang, 'Сохранено, но есть слова из списка табу: {w} — проверьте текст', { w: hits.join(', ') }) } : { ok: true }
 }
 // Открыл ленту — всё показанное прочитано
 export async function readPosts() {
