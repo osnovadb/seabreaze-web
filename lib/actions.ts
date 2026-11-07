@@ -24,6 +24,7 @@ import { readXlsx } from './xlsx'
 import { pushDeal, queueSync, queueApp, queueTask } from './b24sync'
 import { grantAccess, invite, noPassword } from './partnerAccess'
 import { computeShares, buildTranches } from './money22'
+import { requestConsent } from './consent'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -190,7 +191,7 @@ export async function registerClient(_: unknown, f: FormData) {
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string; protected_until: string | null; candidate_until: string | null }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage,
       owner_type, attach_status, protected_until, candidate_until, attached_at, other_claimant_of, segment)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12,$13,$14,$15,$16,$17,'lead',
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, null, $12,$13,$14,$15,$16,$17,'lead',
       $19, $20, case when $20 = 'protected' then current_date + ($18 || ' months')::interval end, case when $20 = 'candidate' then current_date + 14 end,
       case when $20 = 'protected' then now() end, $21, $22) returning id, protected_until::text, candidate_until::text`,
     [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, ext ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months,
@@ -200,6 +201,9 @@ export async function registerClient(_: unknown, f: FormData) {
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент зарегистрирован ({r}), закреплён до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.protected_until! }])
     await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id]) // §7: клиента команды — в очередь регистрации у всех застройщиков
   }
+  // §15: согласиться за клиента нельзя — галочка в форме лишь подтверждает, что клиент в курсе; клиенту уходит ссылка (письмо, WhatsApp — кнопкой в карточке)
+  await q(`insert into portal.consents (client_id, kind, granted, source, by_user) values ($1, 'partner_confirm', true, $2, $3)`, [r!.id, ext ? 'partner' : 'office', c.user.id])
+  await requestConsent(r!.id, c.user.id)
   if (c.user.curator_id) await notify(c.user.curator_id, 'client', 'Новый клиент агента {a}: {c}', `/clients/${r!.id}`, { a: c.user.name, c: name })
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
   await pushDeal(r!.id, ext ? `кандидат от партнёра ${c.user.name} (${reg})` : `клиент заведён в портале (${reg})`) // §13 п.4

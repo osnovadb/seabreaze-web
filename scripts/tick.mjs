@@ -6,7 +6,10 @@ import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
 import { bestOffer } from '../lib/promoMatch.mjs'
 import { notifyOut } from './notify-out.mjs'
 import { pbSync, pbFlush } from '../lib/pb.mjs'
-import { enqueueSync, enqueueApp } from '../lib/b24x.mjs'
+import { enqueueSync, enqueueApp, enqueueTask } from '../lib/b24x.mjs'
+// тексты писем клиенту — словарь портала (русский ключ → язык клиента)
+const dict = Object.fromEntries(['en', 'de', 'he'].map((l) => [l, JSON.parse(fs.readFileSync(new URL(`../lib/dict/${l}.json`, import.meta.url), 'utf8'))]))
+const tr = (lang, ru, vars) => String((dict[lang] || {})[ru] || ru).replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null ? String(vars[k]) : `{${k}}`))
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -308,6 +311,33 @@ try {
     await notify(u.id, 'payout', 'Для выплаты нужен документ: укажите налоговый номер (или загрузите счёт) — иначе выплата перенесётся на следующий месяц', '/commission', {}, `doc-remind:${u.id}:${new Date().toISOString().slice(0, 10)}`)
   out.money = { late: late.length }
 } catch (e) { out.money_error = String(e.message || e).slice(0, 200) }
+
+// 13. 2.2 · §15 Согласие клиента (решение 250): напоминания через 3 и 7 дней; через 14 дней без ответа — задача бэк-офису и Do not contact
+try {
+  const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '')
+  const due = await q(`select id, name, email, language, owner_id, consent_token, consent_reminders r, (current_date - consent_requested_at::date) days from portal.clients
+    where consent_status = 'pending' and consent_requested_at is not null and anonymized_at is null and not do_not_contact
+      and ((consent_reminders = 0 and consent_requested_at < now() - interval '3 days') or (consent_reminders = 1 and consent_requested_at < now() - interval '7 days') or consent_requested_at < now() - interval '14 days')`)
+  let rem = 0, dnc = 0
+  for (const c of due) {
+    if (c.days >= 14) {
+      await q(`update portal.clients set do_not_contact = true, consent_reminders = 3 where id = $1`, [c.id])
+      await q(`insert into portal.activities (client_id, kind, text) values ($1, 'system', 'Нет согласия 14 дней — Do not contact, бэк-офису задача')`, [c.id])
+      for (const u of office) await task(c.id, u.id, 'Нет согласия клиента {c} 14 дней — решите с застройщиками по регистрациям', { c: c.name }, `consent14:${c.id}:${u.id}`)
+      await enqueueTask(q, c.id, `No consent 14 days · ${c.name}`, 'Клиент не подтвердил согласие за 14 дней: Do not contact. Решите с застройщиками по регистрациям.', 'office')
+      await enqueueSync(q, c.id, 'нет согласия 14 дней — Do not contact')
+      dnc++
+      continue
+    }
+    const L = ['ru', 'en', 'de', 'he'].includes(c.language) ? c.language : 'en'
+    if (c.email) await q(`insert into portal.outbox_messages (channel, to_addr, subject, body, kind) values ('email',$1,$2,$3,'consent')`,
+      [c.email, tr(L, 'Напоминание: подтвердите согласие — GetsEstate'), [tr(L, 'Здравствуйте, {n}!', { n: c.name }), '', tr(L, 'Чтобы мы могли подобрать для вас квартиры и зарегистрировать вас у застройщиков, подтвердите согласие по ссылке:'), `${base}/c/${c.consent_token}`, '', 'GetsEstate'].join('\n')])
+    await q(`update portal.clients set consent_reminders = consent_reminders + 1 where id = $1`, [c.id])
+    await notify(c.owner_id, 'client', 'Клиент {c} ещё не подтвердил согласие — напомните в WhatsApp', `/clients/${c.id}`, { c: c.name }, `consent-rem:${c.id}:${c.r}`)
+    rem++
+  }
+  out.consent = { reminders: rem, dnc }
+} catch (e) { out.consent_error = String(e.message || e).slice(0, 200) }
 
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }

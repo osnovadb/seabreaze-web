@@ -8,6 +8,7 @@ import { clientScope } from '@/lib/scope'
 import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
 import { partnerCol } from '@/lib/stages'
 import { StageStepper } from '@/components/StageStepper'
+import { ConsentBox } from '@/components/ConsentBox'
 import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { MakeDoc, DocStatus } from './docs'
@@ -88,7 +89,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
               <div className="kv"><span>E-mail</span><span className="small">{cl.email || '—'}</span></div>
               <div className="kv"><span>{T('Страна, язык')}</span><span>{[cl.country, (cl.language || '').toUpperCase()].filter(Boolean).join(' · ')}</span></div>
               <div className="kv"><span>{T('Источник')}</span><span>{cl.source ? T(SRC_NAME[cl.source] || (cl.source.startsWith('site') ? 'Сайт' : cl.source)) : '—'}</span></div>
-              <div className="kv"><span>{T('Согласие')}</span><span>{date(L, cl.consent_at)}</span></div>
+              <div className="kv" style={{ alignItems: 'flex-start' }}><span>{T('Согласие')}</span><ConsentBox lang={L} cl={cl} /></div>
               <EditContacts lang={L} cl={{ id: cl.id, name: cl.name, phone: cl.phone, email: cl.email, country: cl.country, language: cl.language }} />
             </div>
             <form action={saveQualification} className="card stack" style={{ gap: 10 }}>

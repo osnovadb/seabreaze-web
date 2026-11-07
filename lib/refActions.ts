@@ -8,6 +8,7 @@ import { issueLink, mailLink, loginBlocked, noteLogin, clientIp } from './access
 const norm = { phone: (p: string) => p.replace(/\D/g, '').replace(/^00/, ''), email: (e: string) => e.trim().toLowerCase() }
 import { bakuYear, type Lang } from './i18n'
 import { pushDeal } from './b24sync'
+import { requestConsent } from './consent'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 
@@ -43,6 +44,7 @@ export async function referClient(_: unknown, f: FormData) {
   await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id])
   await notify(owner!.id, 'client', 'Новая рекомендация от {p}: {c}', `/clients/${r!.id}`, { p: c.user.name, c: name })
   await audit(c.real.id, 'client.referral', 'client', r!.id, { reg })
+  await requestConsent(r!.id, null) // §15: клиенту — ссылка на согласие
   await pushDeal(r!.id, `рекомендация от ${c.user.name} (${reg})`) // лид в воронку команды с полем Referrer
   revalidatePath('/refer')
   return { ok: true }

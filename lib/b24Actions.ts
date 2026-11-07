@@ -5,6 +5,7 @@ import { q, one, audit } from './db'
 import { requireCtx } from './auth'
 import { b24Person, COL, type Kind } from './b24link'
 import { pushDeal } from './b24sync'
+import { requestConsent } from './consent'
 import { processJob, pull, runQueue } from './b24x.mjs'
 import { revalidatePath } from 'next/cache'
 
@@ -20,11 +21,12 @@ export async function createFromB24(f: FormData) {
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
   const reg = `R-${new Date().getFullYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string }>(`insert into portal.clients (reg_no, owner_id, name, phone, phone_norm, email, email_norm, market, consent_at, source, stage, owner_type, attach_status, protected_until, attached_at, ${COL[kind]}, b24_contact_id)
-    values ($1,$2,$3,$4,$5,$6,$7,$8, now(), 'bitrix24', 'lead', 'team', 'protected', current_date + interval '6 months', now(), $9, $10) returning id`,
+    values ($1,$2,$3,$4,$5,$6,$7,$8, null, 'bitrix24', 'lead', 'team', 'protected', current_date + interval '6 months', now(), $9, $10) returning id`,
     [reg, c.user.id, p!.name, p!.phone, p!.phoneNorm, p!.email, p!.emailNorm, p!.market || c.user.market, id, p!.contactId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент заведён из Bitrix24 ({r}), закреплён за командой',$3)`, [r!.id, c.user.id, { r: reg }])
   await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id])
   await audit(c.real.id, 'client.from_b24', 'client', r!.id, { kind, id })
+  await requestConsent(r!.id, null, { mail: false }) // §15: ссылку на согласие сейлз отправляет при первом контакте (WhatsApp или письмом)
   await pushDeal(r!.id, `клиент заведён в портале (${reg}), регистрации у застройщиков — в очереди`)
   redirect(`/b24/ctx?client=${r!.id}`)
 }

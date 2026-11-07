@@ -8,6 +8,7 @@ import { Top, Pill } from '@/components/ui'
 import { bookingAction, dealPaid } from '@/lib/actions'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 import { setEscort } from '@/lib/moneyActions'
+import { ConsentBox } from '@/components/ConsentBox'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
 type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
@@ -17,8 +18,10 @@ export default async function Units({ params, searchParams }: { params: { id: st
   if (!/^[0-9a-f-]{36}$/.test(params.id)) notFound()
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
-  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string }>(
-    'select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status from portal.clients where id = $1', [params.id])
+  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string
+    consent_status: string; consent_token: string | null; consent_at: string | null; marketing_consent_at: string | null; phone_norm: string | null; email: string | null; language: string | null; do_not_contact: boolean }>(
+    `select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status, consent_status, consent_token, consent_at, marketing_consent_at, phone_norm, email, language, do_not_contact
+     from portal.clients where id = $1`, [params.id])
   if (!cl) notFound()
   const units = await q<U>(`with b as (select distinct on (unit_id) * from portal.bookings where client_id = $1 and status in ('hold','queued','requested','confirmed','release_pending','converted') order by unit_id, created_at desc),
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
@@ -42,6 +45,7 @@ export default async function Units({ params, searchParams }: { params: { id: st
       <Top title={cl.name} sub={[cl.attach_status === 'candidate' ? T('кандидат партнёра') : cl.protected_until ? T('закреплён до {d}', { d: date(L, cl.protected_until) }) : '', regs?.all ? T('регистрации у застройщиков: {a} из {b}', { a: regs.ok, b: regs.all }) : '', cl.b24_deal_id ? T('сделка Bitrix24 № {n}', { n: cl.b24_deal_id }) : ''].filter(Boolean).join(' · ')}
         right={<Link className="btn" href={`/clients/${cl.id}`}>{T('Карточка клиента')}</Link>} />
       <div className="page">
+        {cl.consent_status !== 'given' && <div className="card card--tight" style={{ marginBottom: 12 }}><div className="small" style={{ marginBottom: 6 }}><b>{T('Согласие клиента')}</b> · {T('отправьте ссылку при первом контакте — без согласия клиент не попадает в рекламу')}</div><ConsentBox lang={L} cl={cl} /></div>}
         {searchParams.created && <div className="okbox" style={{ marginBottom: 12 }}>{T('Запрос брони отправлен бэк-офису — статус появится в сделке Bitrix24')}</div>}
         <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`]].map(([k, l]) => <a key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</a>)}</div>
         {tab === 'pick' && <div className="grid g3 mt16">{blds.map(({ p, bs }) => (

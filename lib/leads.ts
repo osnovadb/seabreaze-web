@@ -64,6 +64,12 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'lead', current_date + ($13 || ' months')::interval) returning id, protected_until::text`,
       [reg, ownerId, name || phone || email, phone || null, pn, email || null, email, lang, market, consent ? new Date() : null, source, clip(raw.comment, 1000) || null, months])
     clientId = r!.id; result = 'new_client'
+    // §15: галочки на сайте поставил сам клиент — журнал согласий; маркетинг — только по второй галочке
+    if (consent) {
+      const mk = typeof consent === 'object' && 'marketing' in consent && !!consent.marketing
+      await q(`update portal.clients set consent_status = 'given', marketing_consent_at = case when $2 then now() end where id = $1`, [clientId, mk])
+      await q(`insert into portal.consents (client_id, kind, granted, source, lang) values ($1,'data',true,$3,$4), ($1,'marketing',$2,$3,$4)`, [clientId, mk, source, lang || null])
+    }
     await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Заявка с сайта ({s}) — клиент зарегистрирован ({r}), закреплён до {d}',$2)`, [clientId, { s: source, r: reg, d: r!.protected_until }])
     await notify(ownerId, 'client', 'Новая заявка с сайта: {c}', `/clients/${clientId}`, { c: name || phone || email })
   }

@@ -65,6 +65,9 @@ export async function linkLead(_: unknown, f: FormData) {
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), case when $12 then now() end, 'partner_link', $13, 'lead', 'partner', 'candidate', current_date + 14) returning id`,
     [reg, l.user_id, l.agency_id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'lang') || null, l.market, !!f.get('marketing'), [s(f, 'project'), s(f, 'comment')].filter(Boolean).join(' · ') || null])
   await q(`update portal.inbound_leads set result = 'partner_client', client_id = $2 where id = $1`, [lead!.id, cl!.id])
+  // галочки поставил сам клиент — журнал согласий
+  await q(`update portal.clients set consent_status = 'given' where id = $1`, [cl!.id])
+  await q(`insert into portal.consents (client_id, kind, granted, source, lang, ip) values ($1,'data',true,'partner_link',$3,$4), ($1,'marketing',$2,'partner_link',$3,$4)`, [cl!.id, !!f.get('marketing'), s(f, 'lang') || null, ip])
   await q(`update portal.partner_links set leads = leads + 1 where id = $1`, [l.id])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Заявка по личной ссылке партнёра ({r}): квалифицируйте до 14 дней', $2)`, [cl!.id, { r: reg }])
   await notify(l.user_id, 'client', 'Новая заявка по вашей ссылке: {n} — квалифицируйте за 14 дней', `/clients/${cl!.id}`, { n: name })
