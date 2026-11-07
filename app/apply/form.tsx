@@ -12,6 +12,7 @@ export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
   const [st, act] = useFormState(applyAgent, null)
   const T = (s: string) => t(lang, s)
   if (st?.ok) return (
+    st.referrer ? <div className="okbox mt24"><b>{T('Доступ открыт')}</b><div className="mt8">{T('Ссылка для входа в кабинет рекомендателя отправлена на ваш e-mail.')}</div></div> :
     <div className="okbox mt24"><b>{T('Заявка отправлена')}</b><div className="mt8">{T('Продавец рынка свяжется с вами в течение 2 рабочих дней. Статус: проверка.')}</div>{st.token && <div className="mt8"><Link className="bronze" href={`/apply/status/${st.token}`}>{T('Статус заявки — сохраните эту ссылку')} →</Link></div>}</div>
   )
   const F = (name: string, label: string, ph = '', req = false) => <label className="field"><span>{T(label)}{req ? ' *' : ''}</span><input className="in" name={name} placeholder={ph ? T(ph) : ''} required={req} /></label>
@@ -21,6 +22,9 @@ export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
       <div className="chips">
         <label className="chip"><input type="radio" name="kind" value="agent" defaultChecked /> {T('Частный агент')}</label>
         <label className="chip"><input type="radio" name="kind" value="agency" /> {T('Агентство')}</label>
+        <label className="chip"><input type="radio" name="kind" value="referrer" /> {T('Рекомендатель (Tippgeber)')}</label>
+      </div>
+      <div className="tiny muted">{T('Рекомендатель передаёт нам контакты знакомых и получает 2% от цены договора. Лицензия не нужна, доступ — сразу; ссылка для входа придёт на почту.')}
       </div>
       <div className="grid g2">
         {F('name', 'Имя и фамилия', '', true)}{F('company', 'Компания')}

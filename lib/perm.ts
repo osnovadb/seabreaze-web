@@ -1,9 +1,9 @@
 // Роли и права портала (матрица из ТЗ). Проверяется на сервере.
-export type Role = 'owner' | 'market_head' | 'seller' | 'office' | 'finance' | 'content' | 'agency_head' | 'agent'
+export type Role = 'owner' | 'market_head' | 'seller' | 'office' | 'finance' | 'content' | 'agency_head' | 'agent' | 'referrer'
 
 export const ROLE_NAMES: Record<Role, string> = {
   owner: 'Владелец', market_head: 'Руководитель рынка', seller: 'Продавец', office: 'Офис в Баку',
-  finance: 'Финансы', content: 'Контент', agency_head: 'Руководитель агентства', agent: 'Саб-агент',
+  finance: 'Финансы', content: 'Контент', agency_head: 'Руководитель агентства', agent: 'Саб-агент', referrer: 'Рекомендатель',
 }
 
 export const isExternal = (r: Role) => r === 'agent' || r === 'agency_head'
@@ -32,7 +32,7 @@ export const discountCeiling = (r: Role, c: { seller_max_disc: number; pool_pct:
 export const canApproveDiscount = (r: Role) => r === 'owner' || r === 'market_head'
 
 // Матрица для экрана «Роли и права» (значения как в ТЗ)
-export const MATRIX: [string, Record<Role, string>][] = [
+export const MATRIX: [string, Record<Exclude<Role, 'referrer'>, string>][] = [
   ['Шахматка: все статусы и источник', { owner: 'да', market_head: 'да', seller: 'да', office: 'да', finance: 'чтение', content: 'чтение', agency_head: '—', agent: '—' }],
   ['Шахматка: свободное и цена', { owner: 'да', market_head: 'да', seller: 'да', office: 'да', finance: 'да', content: 'да', agency_head: 'да', agent: 'да' }],
   ['Условия застройщика и пул скидки', { owner: 'да', market_head: 'свои', seller: '—', office: '—', finance: 'да', content: '—', agency_head: '—', agent: '—' }],

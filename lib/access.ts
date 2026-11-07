@@ -12,22 +12,22 @@ export function baseUrl() {
   return `${h.get('x-forwarded-proto') || 'https'}://${h.get('x-forwarded-host') || h.get('host')}`
 }
 // Новая ссылка гасит прежние неиспользованные ссылки того же вида
-export async function issueLink(userId: string, kind: 'invite' | 'reset', by: string | null, hours = kind === 'invite' ? 168 : 2) {
+export async function issueLink(userId: string, kind: 'invite' | 'reset' | 'login', by: string | null, hours = kind === 'reset' ? 2 : 168) {
   const raw = crypto.randomBytes(24).toString('base64url')
   await q(`update portal.auth_tokens set used_at = now() where user_id = $1 and kind = $2 and used_at is null`, [userId, kind])
   await q(`insert into portal.auth_tokens (token_hash, user_id, kind, expires_at, created_by) values ($1,$2,$3, now() + ($4 || ' hours')::interval, $5)`,
     [sha(raw), userId, kind, hours, by])
-  return `${baseUrl()}/set-password/${raw}`
+  return kind === 'login' ? `${baseUrl()}/l/${raw}` : `${baseUrl()}/set-password/${raw}`
 }
 export const tokenUser = (raw: string) => one<{ id: string; user_id: string; kind: string; email: string; name: string; locale: Lang }>(`select t.id, t.user_id, t.kind, u.email, u.name, u.locale from portal.auth_tokens t join portal.users u on u.id = t.user_id
   where t.token_hash = $1 and t.used_at is null and t.expires_at > now() and u.active`, [sha(raw)])
 
 // Письмо со ссылкой — в очередь на языке пользователя
-export async function mailLink(u: { id: string; email: string; name: string; locale: Lang }, kind: 'invite' | 'reset', link: string) {
+export async function mailLink(u: { id: string; email: string; name: string; locale: Lang }, kind: 'invite' | 'reset' | 'login', link: string) {
   const L = u.locale || 'en'
-  const subject = kind === 'invite' ? t(L, 'Доступ к порталу партнёров GetsEstate') : t(L, 'Сброс пароля в портале GetsEstate')
+  const subject = kind === 'invite' ? t(L, 'Доступ к порталу партнёров GetsEstate') : kind === 'login' ? t(L, 'Вход в кабинет рекомендателя GetsEstate') : t(L, 'Сброс пароля в портале GetsEstate')
   const body = [t(L, 'Здравствуйте, {n}!', { n: u.name }), '',
-    kind === 'invite' ? t(L, 'Для вас открыт доступ к порталу партнёров GetsEstate. Задайте пароль по ссылке (действует 7 дней):') : t(L, 'Чтобы задать новый пароль, перейдите по ссылке:'),
+    kind === 'invite' ? t(L, 'Для вас открыт доступ к порталу партнёров GetsEstate. Задайте пароль по ссылке (действует 7 дней):') : kind === 'login' ? t(L, 'Ваша ссылка для входа в кабинет рекомендателя (одноразовая, действует 7 дней; пароль не нужен):') : t(L, 'Чтобы задать новый пароль, перейдите по ссылке:'),
     link, '', t(L, 'Если вы не ждали этого письма, просто проигнорируйте его.'), '', 'GetsEstate'].join('\n')
   await q(`insert into portal.outbox_messages (channel, to_addr, user_id, subject, body, kind) values ('email',$1,$2,$3,$4,$5)`, [u.email, u.id, subject, body, kind])
 }

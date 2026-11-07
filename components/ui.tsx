@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Lang } from '@/lib/i18n'
 import { t } from '@/lib/i18n'
-import { STAGES, AGENT_STAGES, LOST_REASONS } from '@/lib/stages'
+import { STAGES, AGENT_STAGES, PARTNER_STAGES, LOST_REASONS } from '@/lib/stages'
 
 export function Top({ crumbs, title, sub, right }: { crumbs?: [string, string?][]; title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }) {
   return (
@@ -17,7 +17,7 @@ export function Top({ crumbs, title, sub, right }: { crumbs?: [string, string?][
 }
 
 // Стадии и правила переходов — в lib/stages.ts (нужны и серверу, и браузеру)
-export { STAGES, AGENT_STAGES, LOST_REASONS }
+export { STAGES, AGENT_STAGES, PARTNER_STAGES, LOST_REASONS }
 // Статус продаж проекта в портале (видимость для партнёров)
 export const SALES: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { draft: ['черновик', 'off'], sales: ['в продаже', 'ok'], stop: ['стоп-продажи', 'warn'], closed: ['закрыт', 'bad'] }
 export const stageName = (lang: Lang, st: string) => t(lang, st === 'lost' ? 'Отказ' : (STAGES.find((x) => x[0] === st) || [st, st])[1])

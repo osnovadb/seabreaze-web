@@ -7,11 +7,14 @@ import { Nav } from '@/components/Nav'
 import { feed } from '@/lib/posts'
 import { LangSwitch } from '@/components/LangSwitch'
 import { impersonate, logout } from '@/lib/actions'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const c = await requireCtx()
   const u = c.user, T = (s: string) => t(c.lang, s)
+  // 2.2 · рекомендателю — только его кабинет (§6 П9): рекомендации, уведомления, профиль
+  if (u.role === 'referrer' && !['/refer', '/notifications', '/profile'].some((x) => (headers().get('x-path') || '').startsWith(x))) redirect('/refer')
   const cnt = await one<{ notif: number; req: number; apps: number; kyc: number; regs: number }>(`select
     (select count(*)::int from portal.notifications where user_id = $1 and not read) notif,
     (select count(*)::int from portal.bookings where status = 'requested') req,
@@ -42,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (u.role === 'owner' || u.role === 'content') items.push({ href: '/admin/templates', label: T('Шаблоны') })
   if (canManageUsers(u.role) || u.role === 'market_head' || u.role === 'finance') items.push({ href: '/admin', label: T('Админка') })
   else if (canSeeJournal(u.role)) items.push({ href: '/admin/journal', label: T('Журнал') })
+  if (u.role === 'referrer') items.splice(0, items.length, { href: '/refer', label: T('Рекомендации') }, { href: '/notifications', label: T('Уведомления'), cnt: cnt!.notif })
   const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []
   const initials = u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase()
   // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24

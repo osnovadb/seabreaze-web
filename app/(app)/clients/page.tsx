@@ -6,11 +6,11 @@ import { q } from '@/lib/db'
 import { t, date } from '@/lib/i18n'
 import { isExternal, canRegisterClient, canSeeClients } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
-import { Top, AGENT_STAGES, STAGES, stageName } from '@/components/ui'
+import { Top, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
 import { Kanban, type KCard, type KCol } from '@/components/Kanban'
-import { agentGroup } from '@/lib/stages'
+import { partnerCol } from '@/lib/stages'
 
-type Row = { has_deal: boolean; qualified: boolean; id: string; name: string; reg_no: string; stage: string; country: string | null; budget: string | null; interest: string | null; protected_until: string; pause_until: string | null; lost_reason: string | null; last_activity_at: string; owner: string; opened: number | null; booking: string | null; booking_ends: string | null; fix: string | null }
+type Row = { has_deal: boolean; qualified: boolean; id: string; name: string; reg_no: string; stage: string; country: string | null; budget: string | null; interest: string | null; protected_until: string; pause_until: string | null; lost_reason: string | null; last_activity_at: string; owner: string; opened: number | null; booking: string | null; booking_ends: string | null; fix: string | null; b24_stage: string | null; attach_status: string; bstatus: string | null; paid: boolean; regs_sent: boolean }
 
 export default async function Clients({ searchParams }: { searchParams: { v?: string; q?: string } }) {
   const c = await requireCtx()
@@ -21,7 +21,11 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
   const rows = await q<Row>(`select cl.id, cl.name, cl.reg_no, cl.stage, cl.country, cl.budget, cl.interest, cl.protected_until, cl.pause_until, cl.lost_reason, cl.last_activity_at, us.name as owner,
       (select max(opened) from portal.selections s where s.client_id = cl.id) as opened,
       exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled') as has_deal,
-      (coalesce(cl.goal, '') <> '' and coalesce(cl.budget, '') <> '' and coalesce(cl.timeline, '') <> '') as qualified,
+      (coalesce(cl.goal, '') <> '' and coalesce(cl.budget, '') <> '' and coalesce(cl.timeline, '') <> '' and coalesce(cl.country, '') <> '' and coalesce(cl.language, '') <> '') as qualified,
+      cl.b24_stage, cl.attach_status,
+      (select b.status from portal.bookings b where b.client_id = cl.id and b.status in ('queued','requested','confirmed','release_pending','converted') order by array_position(array['converted','release_pending','confirmed','requested','queued'], b.status) limit 1) as bstatus,
+      exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled' and d.paid_pct > 0) as paid,
+      exists (select 1 from portal.registrations r where r.client_id = cl.id and r.status <> 'to_send') as regs_sent,
       (select portal.unit_no(bl.external_id, un.number) from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking,
       (select ends_at from portal.bookings b where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking_ends,
       (select status from portal.fixations f where f.client_id = cl.id limit 1) as fix
@@ -54,13 +58,13 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
         {view === 'kanban' ? (
           <Kanban role={c.user.role} lang={L}
             cols={ext
-              ? AGENT_STAGES.map(([k, l, sts, who]): KCol => ({ key: k, label: T(l), who: T(who), target: sts[0], empty: k === 'fee' ? T('Появится после оплаты застройщика') : undefined }))
+              ? PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: l, who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))
               : STAGES.map(([k, l]): KCol => ({ key: k, label: T(l), target: k }))}
             cards={rows.map((r): KCard => ({
               id: r.id, name: r.name,
               sub: r.pause_until ? T('вернуться') + ' ' + date(L, r.pause_until) : r.stage === 'lost' ? (r.lost_reason ? T(r.lost_reason) : '') : [r.country, r.budget, r.booking].filter(Boolean).join(' · '),
               owner: ext ? undefined : r.owner, signal: r.pause_until || r.stage === 'lost' ? null : signal(r),
-              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : ext ? agentGroup(r.stage) : r.stage,
+              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : ext ? partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent }) : r.stage,
               ctx: { stage: r.stage, paused: !!r.pause_until, hasBooking: !!r.booking, hasDeal: r.has_deal, qualified: r.qualified },
             }))} />
         ) : (
@@ -72,7 +76,7 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/clients/${r.id}`}><b>{r.name}</b></Link><div className="tiny muted">{r.reg_no}</div></td>
-                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? T((AGENT_STAGES.find(([, , s]) => s.includes(r.stage)) || ['', r.stage])[1]) : stageName(L, r.stage)}</td>
+                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] : stageName(L, r.stage)}</td>
                     <td>{ext ? r.country : r.owner}</td><td className="small">{r.budget || '—'}</td><td>{r.booking || '—'}</td>
                     <td className="small">{date(L, r.protected_until)}</td><td className="small muted">{date(L, r.last_activity_at)}</td>
                     <td className="small">{sg && <span className={sg[0]}>{sg[1]}</span>}</td>

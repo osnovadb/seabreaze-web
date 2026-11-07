@@ -6,7 +6,7 @@ import { normFilter, matchUnit } from '../lib/unitMatch.mjs'
 import { bestOffer } from '../lib/promoMatch.mjs'
 import { notifyOut } from './notify-out.mjs'
 import { pbSync, pbFlush } from '../lib/pb.mjs'
-import { enqueueSync } from '../lib/b24x.mjs'
+import { enqueueSync, enqueueApp } from '../lib/b24x.mjs'
 
 const url = process.env.DATABASE_URL || (() => {
   const env = Object.fromEntries(fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -280,7 +280,19 @@ const gone = await q(`update portal.clients cl set attach_status = 'transferred'
   where attach_status = 'protected' and protected_until < current_date returning id, previous_partner_id, name`)
 for (const g of gone) if (g.previous_partner_id) await notify(g.previous_partner_id, 'client', 'Закрепление {c} истекло: клиента ведёт офис; при покупке в течение 12 месяцев доля ваша', `/clients/${g.id}`, { c: g.name }, `transf:${g.id}`)
 for (const r of [...ext1, ...ext0, ...gone]) await enqueueSync(q, r.id) // контакт: закрепление, Previous partner (§13 п.23)
-out.registrations = { silence: bySilence.length, quiet: quiet.length, renew: renew.length, transferred: gone.length }
+// 11ж. §6 П10: партнёр 6 месяцев без новых квалифицированных клиентов — Inactive (доступ остаётся); стадия заявки в Bitrix24
+const inactive = await q(`update portal.users u set partner_status = 'inactive', partner_status_at = now()
+  where u.active and u.partner_status = 'active' and u.role in ('agent','agency_head') and u.created_at < now() - interval '6 months'
+    and not exists (select 1 from portal.clients c where (c.owner_id = u.id or (u.role = 'agency_head' and u.agency_id is not null and c.agency_id = u.agency_id))
+      and c.attached_at > now() - interval '6 months' and c.owner_type <> 'team')
+  returning u.id, u.name, u.market`)
+for (const p of inactive) {
+  const app = (await q(`select id from portal.agent_applications where user_id = $1`, [p.id]))[0]
+  if (app) await enqueueApp(q, app.id, 'партнёр 6 месяцев без новых квалифицированных клиентов — Inactive')
+  for (const h of await q(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [p.market]))
+    await notify(h.id, 'access', 'Партнёр {p} — Inactive: 6 месяцев без новых квалифицированных клиентов', '/admin/agents', { p: p.name }, `p-inactive:${p.id}:${h.id}:${new Date().toISOString().slice(0, 7)}`)
+}
+out.registrations = { inactive: inactive.length, silence: bySilence.length, quiet: quiet.length, renew: renew.length, transferred: gone.length }
 
 // 9. Уведомления вне портала: e-mail и Telegram (scripts/notify-out.mjs)
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }

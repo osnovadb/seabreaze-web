@@ -7,7 +7,7 @@ import { AdminTabs } from '@/components/AdminTabs'
 export default async function Roles() {
   const c = await requireCtx()
   const L = c.lang, T = (s: string) => t(L, s)
-  const roles = Object.keys(ROLE_NAMES) as Role[]
+  const roles = (Object.keys(ROLE_NAMES) as Role[]).filter((r): r is Exclude<Role, 'referrer'> => r !== 'referrer')
   const kind = (v: string) => (v === 'да' ? 'pill--ok' : v === '—' ? 'pill--off' : 'pill--warn')
   return (
     <>

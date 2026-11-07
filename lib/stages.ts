@@ -11,6 +11,23 @@ export const AGENT_STAGES: [string, string, string[], string][] = [
   ['sel', 'Подборка', ['selection'], 'агент'], ['view', 'Показ', ['viewing'], 'агент + офис'], ['book', 'Бронь', ['booking', 'kyc'], 'агент'],
   ['contract', 'Договор', ['contract', 'payments'], 'команда'], ['fee', 'Комиссия', ['fee', 'support', 'handed'], 'команда'],
 ]
+// 2.2 · Стадии клиента партнёра = стадии сделки Bitrix24 (§6 П8): партнёр сам двигает только Selection (после квалификации),
+// пауза и отказ — тоже его; остальное двигает офис в Bitrix24, при конфликте побеждает Bitrix24. [ключ, название, цель перехода]
+export const PARTNER_STAGES: [string, string, string][] = [
+  ['candidate', 'Candidate', 'p:candidate'], ['selection', 'Selection', 'selection'], ['registration', 'Developer registration', 'p:registration'],
+  ['request', 'Reservation request', 'booking'], ['reserved', 'Reserved', 'p:reserved'], ['kyc', 'KYC', 'p:kyc'], ['spa', 'SPA signed', 'p:spa'], ['won', 'Won', 'p:won'],
+]
+const B24_TO_P: Record<string, string> = { Selection: 'selection', 'Developer registration': 'registration', 'Reservation request': 'request', Reserved: 'reserved', KYC: 'kyc', 'SPA approval': 'spa', 'SPA signed': 'spa', Payments: 'won', Won: 'won' }
+// Колонка клиента партнёра: стадия сделки Bitrix24, если сделка есть; иначе — по фактам портала
+export function partnerCol(c: { b24_stage?: string | null; attach_status?: string | null; booking?: string | null; paid?: boolean; regs_sent?: boolean }) {
+  if (c.b24_stage && B24_TO_P[c.b24_stage]) return B24_TO_P[c.b24_stage]
+  if (c.attach_status === 'candidate') return 'candidate'
+  if (c.paid) return 'won'
+  if (c.booking === 'converted') return 'spa'
+  if (c.booking === 'confirmed' || c.booking === 'release_pending') return 'reserved'
+  if (c.booking === 'requested' || c.booking === 'queued') return 'request'
+  return c.regs_sent ? 'registration' : 'selection'
+}
 // Причины отказа (ТЗ, «Воронка клиента саб-агента») — из них отчёт по проектам и рынкам
 export const LOST_REASONS = ['дорого', 'не то место', 'купил другое', 'не выходит на связь', 'сроки сдачи', 'другое']
 
@@ -27,7 +44,9 @@ export function stageBlock(role: Role, c: StageCtx, target: string): string | nu
   if (target === 'lost' || target === 'pause') return c.stage === 'lost' && target === 'lost' ? 'Клиент уже в отказе' : null
   if (!STAGES.some(([k]) => k === target)) return 'Нет такой стадии'
   const ext = role === 'agent' || role === 'agency_head'
-  if (c.qualified === false && AFTER_QUAL.includes(target) && !AFTER_QUAL.includes(c.stage)) return 'Сначала заполните квалификацию: цель, бюджет и срок покупки'
+  // 2.2: стадии, которые ведёт офис в Bitrix24 — у партнёра только просмотр
+  if (target.startsWith('p:')) return target === 'p:candidate' ? 'Кандидат становится клиентом после квалификации' : 'Эту стадию ведёт офис в Bitrix24 — она обновится сама'
+  if (c.qualified === false && AFTER_QUAL.includes(target) && !AFTER_QUAL.includes(c.stage)) return 'Сначала заполните квалификацию: цель, бюджет, срок, страна и язык'
   if (ext) {
     if (TEAM_ONLY.includes(c.stage)) return 'Этот этап ведёт команда'
     if (TEAM_ONLY.includes(target)) return 'Фиксацию, договор и комиссию переводит команда.'

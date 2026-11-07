@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC = ['/api/leads/', '/api/internal/', '/dev/', '/login', '/forgot', '/set-password/', '/apply', '/s/', '/legal', '/plan/', '/img/', '/brand/', '/_next', '/favicon']
+const PUBLIC = ['/api/leads/', '/api/internal/', '/l/', '/r/', '/dev/', '/login', '/forgot', '/set-password/', '/apply', '/s/', '/legal', '/plan/', '/img/', '/brand/', '/_next', '/favicon']
 // За nginx/Cloudflare req.url указывает на 127.0.0.1:3040 — адрес для редиректа берём из заголовков прокси
 const to = (req: NextRequest, path: string) => {
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
@@ -15,6 +15,9 @@ export function middleware(req: NextRequest) {
   if (!req.cookies.get('ge_s')) return NextResponse.redirect(to(req, '/login'))
   // В режиме показа клиенту рабочие разделы недоступны
   if (req.cookies.get('ge_show') && !p.startsWith('/show')) return NextResponse.redirect(to(req, '/show'))
-  return NextResponse.next()
+  // путь — в заголовке запроса: макет закрывает рекомендателю всё, кроме его кабинета
+  const h = new Headers(req.headers)
+  h.set('x-path', p)
+  return NextResponse.next({ request: { headers: h } })
 }
 export const config = { matcher: ['/((?!_next/static|_next/image).*)'] }

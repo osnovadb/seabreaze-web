@@ -5,7 +5,8 @@ import { q, one } from '@/lib/db'
 import { t, date, dateTime, usd, fmtVars } from '@/lib/i18n'
 import { isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
-import { Top, Pill, AGENT_STAGES, STAGES, stageName } from '@/components/ui'
+import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
+import { partnerCol } from '@/lib/stages'
 import { StageStepper } from '@/components/StageStepper'
 import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
@@ -41,7 +42,12 @@ export default async function ClientCard({ params }: { params: { id: string } })
       (case when $2 then d.agent_amount else d.our_amount end)::float amount from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id where d.client_id = $1 order by d.created_at`, [cl.id, ext])
   const pkgNo = (g: string | null, list: { group_id: string | null }[]) => { if (!g) return 0; const gs = Array.from(new Set(list.map((x) => x.group_id).filter(Boolean))); return gs.indexOf(g) + 1 }
   const owners = c.user.role === 'owner' || c.user.role === 'market_head' ? await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','agent','agency_head','market_head') order by name`) : []
-  const agentIdx = AGENT_STAGES.findIndex(([, , s]) => s.includes(cl.stage))
+  // 2.2: у партнёра стадии — как в Bitrix24 (сделка есть — её стадия; иначе по фактам портала)
+  const bst = books.find((b) => b.status === 'converted') || books.find((b) => ['confirmed', 'release_pending'].includes(b.status)) || books.find((b) => ['requested', 'queued'].includes(b.status))
+  const regs = await q<{ dev: string; project: string; status: string }>(`select d.name dev, p.name project, r.status from portal.registrations r join portal.developers d on d.id = r.developer_id
+    join public.projects p on p.id = r.project_id where r.client_id = $1 order by d.name, p.name`, [cl.id])
+  const pcol = partnerCol({ b24_stage: cl.b24_stage, attach_status: cl.attach_status, booking: bst?.status, paid: deals.some((d) => d.paid_pct > 0 && d.stage !== 'cancelled'), regs_sent: regs.some((r) => r.status !== 'to_send') })
+  const agentIdx = PARTNER_STAGES.findIndex(([k]) => k === pcol)
   const teamIdx = STAGES.findIndex(([k]) => k === cl.stage)
   const fixMain = fixes[0]
   const docs = await q<{ id: string; file_id: string; kind: string; note: string | null; internal: boolean; created_by: string; created_at: string; filename: string }>(`select d.id, d.file_id, d.kind, d.note, d.internal, d.created_by, d.created_at, f.filename from portal.client_documents d join portal.files f on f.id = d.file_id where d.client_id = $1 ${ext ? 'and not d.internal' : ''} order by d.created_at desc`, [cl.id])
@@ -61,8 +67,10 @@ export default async function ClientCard({ params }: { params: { id: string } })
     <>
       <Top crumbs={[[ext ? T('Клиенты') : T('CRM · клиенты'), '/clients'], [cl.name]]} title={cl.name}
         sub={<span className="row" style={{ gap: 8, marginTop: 6 }}>
-          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((AGENT_STAGES[agentIdx] || ['', cl.stage])[1]) : stageName(L, cl.stage)}</Pill>
-          <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>
+          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES[agentIdx] || ['', cl.stage])[1] : stageName(L, cl.stage)}</Pill>
+          {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
+          {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат: квалифицируйте до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
+          {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
           {fixMain && <Pill kind={fixMain.status === 'approved' ? 'ok' : fixMain.status === 'rejected' ? 'bad' : 'warn'}>{T('Фиксация у застройщика')}: {T(fixMain.status === 'approved' ? 'одобрена' : fixMain.status === 'rejected' ? 'отклонена' : 'ждём ответ')}</Pill>}
           <Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill>
           <span className="small muted">{cl.reg_no}{!ext ? ` · ${T('владелец')}: ${cl.owner_name}` : ''}</span>
@@ -74,9 +82,9 @@ export default async function ClientCard({ params }: { params: { id: string } })
         </>} />
       <div className="page">
         <StageStepper clientId={cl.id} name={cl.name} role={c.user.role} lang={L}
-          steps={ext ? AGENT_STAGES.map(([k, l, sts]) => ({ key: k, label: T(l), target: sts[0] })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
+          steps={ext ? PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: l, target })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
           current={ext ? agentIdx : teamIdx}
-          ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline) }} />
+          ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) }} />
         <div style={{ display: 'grid', gridTemplateColumns: '360px minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }} className="mt16">
           <div className="stack">
             <div className="card">
@@ -91,11 +99,18 @@ export default async function ClientCard({ params }: { params: { id: string } })
             <form action={saveQualification} className="card stack" style={{ gap: 10 }}>
               <div className="h3" style={{ margin: 0 }}>{T('Квалификация')}</div>
               <input type="hidden" name="client" value={cl.id} />
-              {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span><input className="in" name={k} defaultValue={cl[k] || ''} /></label>)}
+              {cl.attach_status === 'candidate' && <div className="tiny muted">{T('Обязательно для закрепления: цель, бюджет, срок, страна проживания, язык')}</div>}
+              {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['country', 'Страна проживания'], ['language', 'Язык'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span><input className="in" name={k} defaultValue={cl[k] || ''} /></label>)}
               <button className="btn">{T('Сохранить')}</button>
             </form>
           </div>
           <div className="stack">
+            {regs.length > 0 && <div className="card">
+              <div className="h3">{T('Регистрации у застройщиков')}</div>
+              {/* 244: партнёру — «готово / в работе» по каждому застройщику, без дат и ответов */}
+              {ext ? Array.from(new Set(regs.map((r) => r.dev))).map((dv) => { const rs = regs.filter((r) => r.dev === dv); const ok = rs.every((r) => ['confirmed', 'confirmed_silence'].includes(r.status)); return <div key={dv} className="kv"><span>{dv}</span><Pill kind={ok ? 'ok' : 'warn'}>{T(ok ? 'готово' : 'в работе')}</Pill></div> })
+                : regs.map((r) => <div key={r.dev + r.project} className="kv"><span>{r.dev} · {r.project}</span><span className="small">{r.status}</span></div>)}
+            </div>}
             <div className="card">
               <div className="h3">{T('Задачи')}</div>
               {tasks.map((x) => <form key={x.id} action={toggleTask.bind(null, x.id)} className="kv"><button className="check" style={{ textAlign: 'start' }}><input type="checkbox" readOnly checked={x.done} /> <span style={{ textDecoration: x.done ? 'line-through' : 'none' }}>{T(x.title, fmtVars(L, x.vars))}</span></button><span className="small muted">{date(L, x.due)}</span></form>)}

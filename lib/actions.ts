@@ -149,6 +149,13 @@ async function qualifyIfReady(by: string, id: string) {
   await q('select portal.enqueue_registrations($1, null, false, $2)', [id, by])
   await audit(by, 'client.qualified', 'client', id, { rivals: rivals.length })
   await pushDeal(id, `клиент квалифицирован и закреплён до ${won.until}`) // §13 п.5: контакт, сделка в Partner clients, задача на регистрацию
+  // §6 П10: новый квалифицированный клиент возвращает партнёра (и его агентство) из Inactive в Active
+  const own = await one<{ owner_id: string }>('select owner_id from portal.clients where id = $1', [id])
+  if (own) {
+    await q(`update portal.users set partner_status = 'active', partner_status_at = now() where partner_status = 'inactive'
+      and (id = $1 or (agency_id is not null and agency_id = (select agency_id from portal.users where id = $1) and role = 'agency_head'))`, [own.owner_id])
+    await partnerProgress(own.owner_id)
+  }
   return true
 }
 
@@ -213,6 +220,7 @@ export async function requestDispute(_: unknown, f: FormData) {
     const d = await one<{ id: string }>(`insert into portal.disputes (client_id, requester_id, name, phone, email, comment) values ($1,$2,$3,$4,$5,$6) returning id`, [dup.id, c.user.id, name, phone || null, email || null, s(f, 'comment') || null])
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [dup.market])) await notify(o.id, 'dispute', 'Запрос проверки «чей клиент»: {c}', '/admin/disputes', { c: dup.name })
     await audit(c.real.id, 'dispute.open', 'client', dup.id, { dispute: d!.id }, c.impersonating ? c.user.id : null)
+    await pushDeal(dup.id, 'открыт спор «чей клиент» — выплата спорной доли заморожена до решения')
   }
   return { ok: true }
 }
@@ -232,6 +240,7 @@ export async function resolveDispute(f: FormData) {
   await notify(d.requester_id, 'dispute', act === 'transferred' ? 'Спор решён в вашу пользу: {c}' : 'Спор решён: клиент остаётся за первым зарегистрировавшим', act === 'transferred' ? `/clients/${d.client_id}` : '/clients', { c: d.cname })
   if (act === 'transferred') await notify(d.owner_id, 'dispute', 'Клиент {c} передан по решению спора', '/clients', { c: d.cname })
   await audit(c.real.id, 'dispute.' + act, 'client', d.client_id, { dispute: d.id }, c.impersonating ? c.user.id : null)
+  await pushDeal(d.client_id, act === 'transferred' ? 'спор решён: клиент передан другому владельцу' : 'спор решён: клиент остаётся за первым владельцем')
   revalidatePath('/admin/disputes')
 }
 
@@ -645,9 +654,15 @@ export async function applyAgent(_: unknown, f: FormData) {
   if (docs.some((d) => d.size > DOC.max)) return { error: 'Файл больше 10 МБ' }
   const token = crypto.randomBytes(12).toString('hex')
   const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market, status_token) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
-    [s(f, 'kind') === 'agency' ? 'agency' : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market, token])
+    [['agency', 'referrer'].includes(s(f, 'kind')) ? s(f, 'kind') : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market, token])
   for (const d of docs) await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [app!.id, await storeFile(d, null, DOC)])
   await queueApp(app!.id, `заявка подана в портале, документов: ${docs.length}`) // §13 п.18
+  // §6 П9: рекомендатель — короткая оферта и соглашение о данных в форме, доступ сразу (Access granted), вход по ссылке из письма
+  if (s(f, 'kind') === 'referrer') {
+    const g = await grantAccess(app!.id, null)
+    if ('error' in g) return { error: g.error === 'Такой e-mail уже есть' ? 'Этот e-mail уже зарегистрирован — войдите по ссылке из письма' : g.error }
+    return { ok: true, token, referrer: true }
+  }
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
   for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
   return { ok: true, token }
