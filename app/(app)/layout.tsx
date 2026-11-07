@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []
   const initials = u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase()
   // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24
-  if (cookies().get('ge_embed')?.value === '1') return <div className="app app--embed"><div className="main" style={{ marginLeft: 0 }}>{children}</div></div>
+  if (cookies().get('ge_embed')?.value === '1') return <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>{children}</div></div>
   return (
     <div className="app">
       <aside className="side">
