@@ -5,7 +5,7 @@ import { updateUser, resetPassword, resetPin } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 import { ROLE_NAMES, type Role } from '@/lib/perm'
 
-type U = { id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null }
+type U = { id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; languages?: string[]; b24_user_id?: string | null }
 function Btn({ label, primary }: { label: string; primary?: boolean }) {
   const { pending } = useFormStatus()
   return <button className={'btn' + (primary ? ' btn--p' : '')} disabled={pending}>{label}</button>
@@ -31,6 +31,8 @@ export function EditUser({ lang, u, owner, agencies, curators }: { lang: Lang; u
         <label className="field"><span>{T('Язык')}</span><select className="in" name="locale" defaultValue={u.locale}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
         {ext && <label className="field"><span>{T('Договор подписан')}</span><input className="in" type="date" name="contract" defaultValue={u.contract_signed_at?.slice(0, 10) || ''} /></label>}
       </div>
+      {!ext && <label className="field"><span>{T('Языки (для распределения лидов): RU, EN, DE, HE, AZ')}</span><input className="in" name="languages" defaultValue={(u.languages || []).join(', ')} placeholder="RU, DE" /></label>}
+      {!ext && <div className="tiny muted">{T('Сотрудник Bitrix24')}: {u.b24_user_id ? '№ ' + u.b24_user_id : T('не связан — свяжется по e-mail при обмене')}</div>}
       {ext && <label className="field"><span>{T('Лицензия маклера')}</span><input className="in" name="license" defaultValue={u.license_note || ''} /></label>}
       {!owner && <div className="tiny muted">{T('Роль и рынок меняет владелец.')}</div>}
       <div><Btn label={T('Сохранить')} primary /></div>

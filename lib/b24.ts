@@ -34,6 +34,16 @@ export function contactKeys(c: { PHONE?: { VALUE: string }[]; EMAIL?: { VALUE: s
 
 // Вкладки модуля (§12): Units в сделке и контакте, Selection в лиде; привязываем только недостающие
 const TABS: [string, string][] = [['CRM_DEAL_DETAIL_TAB', 'Units'], ['CRM_CONTACT_DETAIL_TAB', 'Units'], ['CRM_LEAD_DETAIL_TAB', 'Selection']]
+// 2.2 · Пункты GetsEstate в левом меню Bitrix24 (решение 242): набор по роли проверяет портал при открытии
+export const MENU: Record<string, [string, string, string[]]> = {
+  catalog: ['Catalog', '/catalog', ['owner', 'market_head', 'seller', 'office', 'finance', 'content']],
+  backoffice: ['Back office', '/registrations', ['owner', 'office', 'market_head']],
+  partners: ['Partners', '/admin/agents', ['owner', 'market_head']],
+  reports: ['Reports', '/reports', ['owner', 'market_head']],
+  money: ['Money', '/finance', ['owner', 'finance', 'market_head']],
+  content: ['Content', '/news', ['owner', 'content']],
+  settings: ['Settings', '/admin', ['owner', 'market_head', 'finance']],
+}
 export async function ensurePlacements(domain: string, auth: string, handler: string) {
   const have = (await restApp<{ placement: string; handler: string }[]>(domain, auth, 'placement.get')) || []
   const done: string[] = []
@@ -42,5 +52,29 @@ export async function ensurePlacements(domain: string, auth: string, handler: st
     await restApp(domain, auth, 'placement.bind', { PLACEMENT: p, HANDLER: handler, TITLE: title, LANG_ALL: { en: { TITLE: title }, ru: { TITLE: title }, de: { TITLE: title } } })
     done.push(p)
   }
+  // левое меню: по пункту на раздел; Bitrix24 показывает их всем с доступом к приложению, раздел проверяет роль
+  for (const [k, [title]] of Object.entries(MENU)) {
+    const h = `${handler}?go=${k}`
+    if (have.some((x) => x.placement === 'LEFT_MENU' && x.handler === h)) continue
+    try { await restApp(domain, auth, 'placement.bind', { PLACEMENT: 'LEFT_MENU', HANDLER: h, TITLE: title, LANG_ALL: { en: { TITLE: title }, ru: { TITLE: title }, de: { TITLE: title } } }); done.push('LEFT_MENU:' + k) } catch { /* встройка недоступна на тарифе */ }
+  }
+  // роботы приложения (§12): «Запросить бронь», «Снять бронь», «Отправить подборку», «Проверить квартиру» — в сделках
+  const bots = ((await restApp<{ [k: string]: string } | string[]>(domain, auth, 'bizproc.robot.list').catch(() => [])) as string[]) || []
+  for (const r of ROBOTS) {
+    if (Array.isArray(bots) && bots.includes(r.CODE)) continue
+    try { await restApp(domain, auth, 'bizproc.robot.add', { ...r, HANDLER: handler.replace(/\/b24$/, '/api/b24/robot'), AUTH_USER_ID: 1, USE_SUBSCRIPTION: 'Y', DOCUMENT_TYPE: ['crm', 'CCrmDocumentDeal', 'DEAL'] }); done.push('robot:' + r.CODE) } catch { /* нет права bizproc */ }
+  }
   return done
 }
+const P = (name: string, req = false) => ({ Name: { en: name, ru: name, de: name }, Type: 'string', Required: req ? 'Y' : 'N', Multiple: 'N' })
+const ROBOTS = [
+  { CODE: 'ge_check_unit', NAME: { en: 'GetsEstate: check unit', ru: 'GetsEstate: проверить квартиру', de: 'GetsEstate: Wohnung prüfen' }, PROPERTIES: { UNIT: P('Unit No. (e.g. A-705)', true) },
+    RETURN_PROPERTIES: { AVAILABLE: { ...P('Available (Y/N)'), Type: 'bool' }, STATUS: P('Status'), PRICE: { ...P('List price, USD'), Type: 'double' } } },
+  { CODE: 'ge_request_booking', NAME: { en: 'GetsEstate: request reservation', ru: 'GetsEstate: запросить бронь', de: 'GetsEstate: Reservierung anfragen' }, PROPERTIES: { UNIT: P('Unit No.', true), DISCOUNT: { ...P('Discount %'), Type: 'double' } },
+    RETURN_PROPERTIES: { RESULT: P('Result') } },
+  { CODE: 'ge_release_booking', NAME: { en: 'GetsEstate: release reservation', ru: 'GetsEstate: снять бронь', de: 'GetsEstate: Reservierung freigeben' }, PROPERTIES: { UNIT: P('Unit No. (empty — all holds and requests)') },
+    RETURN_PROPERTIES: { RESULT: P('Result') } },
+  { CODE: 'ge_send_selection', NAME: { en: 'GetsEstate: send selection', ru: 'GetsEstate: отправить подборку', de: 'GetsEstate: Auswahl senden' }, PROPERTIES: { UNITS: P('Units, comma-separated', true) },
+    RETURN_PROPERTIES: { LINK: P('Selection link') } },
+]
+

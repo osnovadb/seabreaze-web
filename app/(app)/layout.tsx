@@ -54,7 +54,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // «Текущий клиент» вкладки Bitrix24: полоса сверху на всех экранах — подбор, шахматка, бронь идут для него
     const cid = cookies().get('ge_client')?.value
     const cur = cid && /^[0-9a-f-]{36}$/.test(cid) ? await one<{ id: string; name: string }>('select id, name from portal.clients where id = $1', [cid]) : null
+    // меню раздела внутри фрейма — по роли (пункты левого меню Bitrix24 ведут в те же разделы)
+    const R = u.role
+    const em: [string, string, boolean][] = [['/catalog', 'Каталог', true], ['/registrations', 'Регистрации', ['owner', 'office', 'market_head'].includes(R)], ['/bookings', 'Брони', R !== 'finance' && R !== 'content'],
+      ['/kyc', 'KYC', ['owner', 'office'].includes(R)], ['/admin/privacy', 'Согласия и данные', ['owner', 'office'].includes(R)], ['/admin/agents', 'Партнёры', ['owner', 'market_head'].includes(R)],
+      ['/finance', 'Финансы', ['owner', 'finance', 'market_head'].includes(R)], ['/reports', 'Отчёты', ['owner', 'market_head'].includes(R)], ['/news', 'Новости', true], ['/admin', 'Админка', ['owner', 'market_head', 'finance'].includes(R)]]
     return <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>
+      <nav className="row small" style={{ gap: 14, padding: '6px 24px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>{em.filter((x) => x[2]).map(([h, l]) => <Link key={h} href={h} style={{ color: 'var(--ink-2)' }}>{T(l)}</Link>)}</nav>
       {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
         <span className="small">{T('Клиент')}: <b>{cur.name}</b></span>
         <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>

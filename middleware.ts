@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC = ['/c/', '/api/leads/', '/api/internal/', '/api/feed/', '/l/', '/r/', '/dev/', '/login', '/forgot', '/set-password/', '/apply', '/s/', '/legal', '/plan/', '/img/', '/brand/', '/_next', '/favicon']
+const PUBLIC = ['/c/', '/api/b24/robot', '/api/leads/', '/api/internal/', '/api/feed/', '/l/', '/r/', '/dev/', '/login', '/forgot', '/set-password/', '/apply', '/s/', '/legal', '/plan/', '/img/', '/brand/', '/_next', '/favicon']
 // За nginx/Cloudflare req.url указывает на 127.0.0.1:3040 — адрес для редиректа берём из заголовков прокси
 const to = (req: NextRequest, path: string) => {
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host')

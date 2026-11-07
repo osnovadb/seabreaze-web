@@ -817,6 +817,7 @@ export async function updateUser(_: unknown, f: FormData) {
   } catch {
     return { error: 'Такой e-mail уже есть' }
   }
+  if (f.has('languages')) await q(`update portal.users set languages = $2 where id = $1`, [u.id, s(f, 'languages').toUpperCase().split(/[\s,;]+/).filter((x) => ['RU', 'EN', 'DE', 'HE', 'AZ', 'TR'].includes(x))])
   await audit(c.real.id, 'user.update', 'user', u.id, { role, market, from: { role: u.role, market: u.market } }, c.impersonating ? c.user.id : null)
   revalidatePath('/admin/users'); revalidatePath(`/admin/users/${u.id}`); revalidatePath('/admin/agents')
   return { ok: true }

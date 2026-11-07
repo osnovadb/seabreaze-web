@@ -3,7 +3,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { q, one, audit } from '@/lib/db'
 import { signSession } from '@/lib/auth'
-import { restApp, domainOk, ensurePlacements } from '@/lib/b24'
+import { restApp, domainOk, ensurePlacements, MENU } from '@/lib/b24'
 
 export const dynamic = 'force-dynamic'
 const TEAM = ['owner', 'market_head', 'seller', 'office', 'finance', 'content']
@@ -26,10 +26,18 @@ export async function POST(req: NextRequest) {
   await q('update portal.users set b24_user_id = $2, last_login_at = now() where id = $1 and (b24_user_id is distinct from $2)', [u.id, Number(me.ID)])
   await signSession(u.id)
   // Админ открыл приложение — проверить и при нужде зарегистрировать вкладки (Bitrix24 не всегда вызывает адрес установки)
-  if (u.role === 'owner') await ensurePlacements(domain, auth, base(req) + '/b24').catch(() => null)
+  if (u.role === 'owner') {
+    const done = await ensurePlacements(domain, auth, base(req) + '/b24').catch((e) => ['error: ' + String((e as Error).message).slice(0, 120)])
+    if (done?.length) await audit(u.id, 'b24.placements', 'b24', undefined, { done })
+  }
   const lang = String(url.searchParams.get('LANG') || '').slice(0, 2)
   const id = String(opts.ID || '')
-  const target = placement === 'CRM_DEAL_DETAIL_TAB' ? `/b24/deal/${id}` : placement === 'CRM_CONTACT_DETAIL_TAB' ? `/b24/contact/${id}` : placement === 'CRM_LEAD_DETAIL_TAB' ? `/b24/lead/${id}` : '/catalog'
+  // пункт левого меню (?go=) — раздел по роли; нет права — сообщение, а не чужой экран
+  const go = url.searchParams.get('go') || ''
+  if (go && MENU[go] && !MENU[go][2].includes(u.role)) return page('Нет доступа', `Раздел «${MENU[go][0]}» не для вашей роли.`)
+  const landing = u.role === 'office' ? '/registrations' : u.role === 'finance' ? '/finance' : u.role === 'content' ? '/news' : '/catalog'
+  const target = placement === 'CRM_DEAL_DETAIL_TAB' ? `/b24/deal/${id}` : placement === 'CRM_CONTACT_DETAIL_TAB' ? `/b24/contact/${id}` : placement === 'CRM_LEAD_DETAIL_TAB' ? `/b24/lead/${id}`
+    : go && MENU[go] ? MENU[go][1] : landing
   await audit(u.id, 'b24.open', 'b24', placement, { id })
   const res = NextResponse.redirect(new URL(target + (target.includes('?') ? '&' : '?') + 'embed=1', base(req)), 303)
   // Partitioned: признак «внутри Bitrix24» живёт только во фрейме и не прячет меню в обычной вкладке портала

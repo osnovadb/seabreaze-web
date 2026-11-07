@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { SignJWT, jwtVerify } from 'jose'
@@ -42,7 +43,15 @@ async function readSession(): Promise<{ uid: string; as: string | null; ver: num
 const userById = (id: string) =>
   one<User & { session_ver: number }>('select id, email, name, role, market, agency_id, curator_id, locale, active, session_ver from portal.users where id = $1 and active', [id])
 
+// 2.2 · Робот Bitrix24 действует от имени ответственного по сделке (без cookie): те же права и проверки, что у кнопки
+export const actingAs = new AsyncLocalStorage<string>()
+
 export async function getCtx(): Promise<Ctx | null> {
+  const as = actingAs.getStore()
+  if (as) {
+    const u = await userById(as)
+    return u ? { user: u, real: u, impersonating: false, lang: u.locale, show: null } : null
+  }
   const s = await readSession()
   if (!s) return null
   const real = await userById(s.uid)

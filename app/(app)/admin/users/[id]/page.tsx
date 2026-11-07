@@ -15,8 +15,8 @@ export default async function UserCard({ params }: { params: { id: string } }) {
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
-  const u = await one<{ id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; active: boolean; last_login_at: string | null; created_at: string }>(
-    'select id, name, email, role, market, agency_id, curator_id, locale, license_note, contract_signed_at::text, active, last_login_at, created_at from portal.users where id = $1', [params.id])
+  const u = await one<{ id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; active: boolean; last_login_at: string | null; created_at: string; languages: string[]; b24_user_id: string | null }>(
+    'select id, name, email, role, market, agency_id, curator_id, locale, license_note, contract_signed_at::text, active, last_login_at, created_at, languages, b24_user_id::text from portal.users where id = $1', [params.id])
   if (!u) notFound()
   const owner = c.user.role === 'owner'
   if (!owner && !(['agent', 'agency_head'].includes(u.role) && u.market === c.user.market)) redirect('/admin/agents')
