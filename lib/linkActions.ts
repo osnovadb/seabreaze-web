@@ -3,7 +3,7 @@
 import crypto from 'node:crypto'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { q, one, audit, notify } from './db'
+import { q, one, audit, notify, withKeyLock, personKeys } from './db'
 import { requireCtx } from './auth'
 import { isExternal } from './perm'
 import { listProjects } from './catalog'
@@ -35,6 +35,10 @@ export async function toggleLink(f: FormData) {
 
 // Публичная форма страницы ссылки: две галочки согласия (обязательная — данные и застройщики, необязательная — реклама)
 export async function linkLead(_: unknown, f: FormData) {
+  // QA 09.11: «чей клиент» + создание — под блокировкой по телефону и e-mail
+  return withKeyLock(personKeys(norm.phone(s(f, 'phone')), norm.email(s(f, 'email'))), () => linkLeadLocked(f))
+}
+async function linkLeadLocked(f: FormData) {
   if (s(f, 'website')) return { ok: true } // поле-ловушка для ботов
   const code = s(f, 'code')
   const l = await one<{ id: string; user_id: string; active: boolean; uactive: boolean; name: string; agency_id: string | null; market: string | null }>(

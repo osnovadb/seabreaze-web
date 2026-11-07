@@ -2,7 +2,7 @@
 // 2.2 · §6 П9 Рекомендатель: ссылка для входа и передача контакта. Клиент рекомендателя — клиент команды: лид в воронку команды,
 // в лиде и сделке поле Referrer; ведёт наш сейлз; вознаграждение — 2% от итоговой цены договора после получения нашей комиссии.
 import { revalidatePath } from 'next/cache'
-import { q, one, audit, notify } from './db'
+import { q, one, audit, notify, withKeyLock, personKeys } from './db'
 import { requireCtx } from './auth'
 import { issueLink, mailLink, loginBlocked, noteLogin, clientIp } from './access'
 const norm = { phone: (p: string) => p.replace(/\D/g, '').replace(/^00/, ''), email: (e: string) => e.trim().toLowerCase() }
@@ -24,6 +24,10 @@ export async function requestLoginLink(_: unknown, f: FormData) {
 }
 
 export async function referClient(_: unknown, f: FormData) {
+  // QA 09.11: «чей клиент» + создание — под блокировкой по телефону и e-mail
+  return withKeyLock(personKeys(norm.phone(s(f, 'phone')), norm.email(s(f, 'email'))), () => referClientLocked(f))
+}
+async function referClientLocked(f: FormData) {
   const c = await requireCtx()
   if (c.user.role !== 'referrer' || c.impersonating) return { error: 'Нет прав' }
   const name = s(f, 'name'), phone = s(f, 'phone'), email = s(f, 'email')

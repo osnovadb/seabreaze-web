@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { q, one, tx, audit, notify } from './db'
+import { q, one, tx, audit, notify, withKeyLock, personKeys } from './db'
 import { getCtx, requireCtx, signSession, clearSession, setShow, clearShow, Ctx } from './auth'
 import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegisterClient, canReviewAgents, isExternal, maxDiscount, discountCeiling, canApproveDiscount, type Role } from './perm'
 import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
@@ -162,7 +162,11 @@ async function qualifyIfReady(by: string, id: string) {
   return true
 }
 
+// QA 09.11: проверка «чей клиент» и создание — под блокировкой по телефону и e-mail (два одновременных запроса давали двух клиентов)
 export async function registerClient(_: unknown, f: FormData) {
+  return withKeyLock(personKeys(norm.phone(s(f, 'phone')), norm.email(s(f, 'email'))), () => registerClientLocked(f))
+}
+async function registerClientLocked(f: FormData) {
   const c = await writeCtx()
   if (!canRegisterClient(c.user.role)) return { error: 'Нет прав на регистрацию клиента' }
   const name = s(f, 'name'), phone = s(f, 'phone'), email = s(f, 'email')
@@ -416,8 +420,11 @@ export async function holdUnit(f: FormData) {
   // повторно тот же человек — не раньше чем через 24 часа после прошлого холда; до этого — только запрос брони
   if (await one(`select 1 from portal.bookings where unit_id = $1 and agent_id = $2 and snapshot->>'kind' = 'hold' and ends_at > now() - interval '24 hours'`, [unit.id, c.user.id]))
     return err('Повторно придержать можно через 24 часа после прошлого холда — сейчас только запрос брони')
+  // одна активная бронь на квартиру — уникальный индекс; одновременный второй холд получает понятный отказ
   const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, snapshot, ends_at, status)
     values ($1,$2,$3,$4,$5,0,$5,'{"kind":"hold"}', now() + interval '24 hours', 'hold') returning id`, [unit.id, unit.project_id, clientId, c.user.id, Math.round(unit.usd || 0)])
+    .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e })
+  if (!b) return err('Квартира уже придержана или в брони')
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Квартира {u} придержана на 24 часа',$3)`, [clientId, c.user.id, { u: unitNo(unit) }])
   await audit(c.real.id, 'booking.hold', 'booking', b!.id, { unit: unit.id }, c.impersonating ? c.user.id : null)
   await pushDeal(clientId, `квартира ${unitNo(unit)} придержана на 24 часа`)
@@ -490,12 +497,14 @@ export async function createBooking(_: unknown, f: FormData) {
   const fee = cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency, usd: Math.round(await toUsd(cond.booking_fee, cond.booking_fee_currency)) } : null
   if (pkg && !pkg.group_id) await q('update portal.bookings set group_id = $1 where id = $1', [pkg.id])
   if (myHold) await q(`update portal.bookings set status = 'cancelled' where id = $1 and status = 'hold'`, [unit.booking_id])
-  const b = await one<{ id: string }>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd, group_id, fee_amount, fee_currency, fee_usd, fee_status,
+  const b = await one<{ id: string } | null>(`insert into portal.bookings (unit_id, project_id, client_id, agent_id, price_list, discount_pct, final_price, conditions_id, snapshot, ends_at, approval, options, options_usd, group_id, fee_amount, fee_currency, fee_usd, fee_status,
       status, queued_at, queue_until, developer_id, tour_from, tour_to, signing, comment)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18,
       $19, case when $19 = 'queued' then now() end, case when $19 = 'queued' then now() + interval '7 days' end, $20, $21, $22, $23, $24) returning id`,
     [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
       queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
+    .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e }) // одновременный второй запрос на ту же квартиру
+  if (!b) return { error: 'Квартира уже недоступна — встаньте в лист ожидания' }
   if (queued) await notify(c.user.id, 'booking', 'Лимит броней застройщика занят — запрос {u} в очереди (до 7 дней)', '/bookings', { u: unitNo(unit) })
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
