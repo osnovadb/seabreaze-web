@@ -277,7 +277,7 @@ export async function saveQualification(f: FormData) {
   await stageGuard(c, id)
   await q(`update portal.clients set goal = $2, budget = $3, timeline = $4, payment = $5, interest = $6, country = coalesce(nullif($7, ''), country), language = coalesce(nullif($8, ''), language),
     segment = coalesce(nullif($9, ''), segment), last_activity_at = now() where id = $1`, [id, s(f, 'goal'), s(f, 'budget'), s(f, 'timeline'), s(f, 'payment'), s(f, 'interest'), s(f, 'country'), langCode(s(f, 'language')), s(f, 'segment')])
-  await qualifyIfReady(c.user.id, id)
+  if (!(await qualifyIfReady(c.user.id, id))) await q('select portal.enqueue_registrations($1, null, false, $2)', [id, c.user.id]) // страна стала известна — к застройщикам без продаж в АЗ
   revalidatePath(`/clients/${id}`)
 }
 export async function addTask(f: FormData) {
