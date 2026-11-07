@@ -95,7 +95,7 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
               <thead><tr>{['Получатель', 'Роль', 'Рынок', 'Начислено', 'Удержание налога', 'К выплате', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
               <tbody>{lines.length === 0 ? <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr> : lines.map((l, i) => (
                 <tr key={i} style={{ opacity: l.carried ? 0.6 : 1 }}><td>{l.who || '—'}</td><td className="small">{T(ROLE_LABEL[l.role] || l.role)}</td><td className="small">{l.market || '—'}</td><td>{usd(L, l.gross)}</td><td>{l.withheld ? '−' + usd(L, l.withheld) : '—'}</td><td><b>{usd(L, l.net)}</b></td>
-                  <td className="tiny">{l.carried ? <span className="warnc">{T('перенос')}: {T(l.note || '')}</span> : ''}</td></tr>))}</tbody></table></div>
+                  <td className="tiny">{l.carried ? <span className="warnc">{T('перенос')}: {(l.note || '').split('; ').map((x) => T(x)).join('; ')}</span> : ''}</td></tr>))}</tbody></table></div>
             <div className="small muted">{T('Итого к выплате')}: <b>{usd(L, lines.filter((l) => !l.carried).reduce((a, l) => a + l.net, 0))}</b></div>
           </div>}
         </>}
