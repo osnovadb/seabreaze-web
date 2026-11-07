@@ -33,13 +33,13 @@ $$;
 
 -- Регистрации — по проекту (у каждого проекта свои сроки и правило молчания); застройщик остаётся для пакетной отправки
 alter table portal.registrations add column if not exists project_id uuid;
+alter table portal.registrations drop constraint if exists registrations_client_id_developer_id_key;
 insert into portal.registrations (client_id, developer_id, project_id, status, reject_reason, mass, priority, due_send, sent_at, answer_due, decided_at, valid_until, renew_task_at, note, created_by, created_at)
   select r.client_id, r.developer_id, p.id, r.status, r.reject_reason, r.mass, r.priority, r.due_send, r.sent_at, r.answer_due, r.decided_at, r.valid_until, r.renew_task_at, r.note, r.created_by, r.created_at
   from portal.registrations r join portal.developers d on d.id = r.developer_id join public.projects p on p.developer_id = d.catalog_id
   where r.project_id is null;
 delete from portal.registrations where project_id is null;
 alter table portal.registrations alter column project_id set not null;
-alter table portal.registrations drop constraint if exists registrations_client_id_developer_id_key;
 create unique index if not exists registrations_client_project on portal.registrations (client_id, project_id);
 
 -- Поставить клиента в очередь регистрации по всем проектам в продаже (условия опубликованы); правило АЗ — из условий проекта
