@@ -40,7 +40,7 @@ export async function pushDeal(clientId: string, note?: string) {
       UF_CRM_GE_MAIN_UNIT: main?.no || '',
       UF_CRM_GE_LIST_PRICE: main?.list ?? '', UF_CRM_GE_FINAL_PRICE: main?.final ?? '', UF_CRM_GE_DISCOUNT: main?.disc ?? '',
       UF_CRM_GE_RES_UNTIL: main?.ends_at || '', UF_CRM_GE_DEV_RES_NO: main?.dev_no || '',
-      UF_CRM_GE_PORTAL_LINK: `${process.env.PUBLIC_URL || ''}/clients/${clientId}`,
+      UF_CRM_GE_PORTAL_LINK: `${process.env.PUBLIC_URL || ''}/b24/units/${clientId}`,
       OPPORTUNITY: main?.final ?? 0, CURRENCY_ID: 'USD',
     }
     // поле-список: значение — по тексту варианта
