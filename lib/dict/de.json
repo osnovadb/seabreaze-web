@@ -2097,5 +2097,6 @@
 "в работе у менеджера": "beim Manager in Arbeit",
 "сделка — ждём оплату застройщика": "Deal — warten auf Zahlung des Bauträgers",
 "комиссия получена — готовим выплату": "Provision erhalten — Auszahlung in Vorbereitung",
-"вознаграждение выплачено": "Vergütung ausgezahlt"
+"вознаграждение выплачено": "Vergütung ausgezahlt",
+"Агентство {a} пригласило сотрудника: {n}": "Agentur {a} hat einen Mitarbeiter eingeladen: {n}"
 }

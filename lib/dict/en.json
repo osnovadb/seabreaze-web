@@ -2097,5 +2097,6 @@
 "в работе у менеджера": "with a manager",
 "сделка — ждём оплату застройщика": "deal — waiting for developer payment",
 "комиссия получена — готовим выплату": "commission received — preparing payout",
-"вознаграждение выплачено": "reward paid"
+"вознаграждение выплачено": "reward paid",
+"Агентство {a} пригласило сотрудника: {n}": "Agency {a} invited an employee: {n}"
 }

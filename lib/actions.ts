@@ -768,6 +768,9 @@ export async function createAgencyAgent(_: unknown, f: FormData) {
     return { error: 'Такой e-mail уже есть' }
   }
   await audit(c.real.id, 'user.create', 'user', uid, { by: 'agency_head', email: s(f, 'email') }, c.impersonating ? c.user.id : null)
+  // 248: доступ сразу, менеджеру по партнёрам (на старте — руководитель рынка) — уведомление
+  for (const h of await q<{ id: string }>(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [c.user.market]))
+    await notify(h.id, 'access', 'Агентство {a} пригласило сотрудника: {n}', '/admin/agents', { a: c.user.name, n: s(f, 'name') })
   revalidatePath('/team')
   return { ok: true, ...(await invite(uid, c.real.id)) }
 }

@@ -12,8 +12,10 @@ import { DESIGN } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 export default async function PublicSelection({ params, searchParams }: { params: { token: string }; searchParams: { preview?: string } }) {
-  const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string; market: string | null }>(
-    `select s.id, s.lang, cl.name client, cl.market, u.name agent, u.email agent_email, s.title from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id where s.token = $1`, [params.token])
+  // 2.2 · подборка партнёра — под его брендом (агентство или имя) и с его контактами, без наших (§11 П5)
+  const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string; market: string | null; partner: boolean; agency: string | null }>(
+    `select s.id, s.lang, cl.name client, cl.market, u.name agent, u.email agent_email, s.title, u.role in ('agent','agency_head') partner, a.name agency
+     from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id left join portal.agencies a on a.id = u.agency_id where s.token = $1`, [params.token])
   if (!s) notFound()
   if (!searchParams.preview) await openedSelection(params.token)
   const L = s.lang, T = (x: string, v?: Record<string, string | number>) => t(L, x, v)
@@ -32,7 +34,7 @@ export default async function PublicSelection({ params, searchParams }: { params
   return (
     <div dir={isRtl(L) ? 'rtl' : 'ltr'} style={{ background: 'var(--sand)', minHeight: '100vh' }}>
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 20px 64px' }}>
-        <div className="between"><img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 24 }} /><PrintButton label={T('Скачать PDF')} /></div>
+        <div className="between">{s.partner ? <span className="h3" style={{ margin: 0 }}>{s.agency || s.agent}</span> : <img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 24 }} />}<PrintButton label={T('Скачать PDF')} /></div>
         <h1 className="h2" style={{ fontSize: 30, marginTop: 28 }}>{T('Подборка для {c}', { c: s.client.split(' · ').pop()! })}</h1>
         <p className="muted">{T('{n} кв. · {p} · цены по прайсу застройщика в долларах США, расходы на сделку отдельно', { n: items.filter((i) => units.has(i.unit_id)).length, p: Array.from(projs.values()).map((p) => p.name + (p.city ? ', ' + p.city : '')).join(' · ') })}</p>
         <div className="stack mt24" style={{ gap: 20 }}>
