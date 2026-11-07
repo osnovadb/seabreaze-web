@@ -12,11 +12,10 @@ import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { MakeDoc, DocStatus } from './docs'
 import { split, type SplitCond } from '@/lib/money'
-import { listProjects } from '@/lib/catalog'
 import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc } from '@/lib/kyc'
 
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
-import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
+import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 import { needUuid } from '@/lib/ids'
 
 const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
@@ -33,8 +32,6 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const acts = await q<{ id: string; kind: string; text: string; vars: Record<string, string | number> | null; internal: boolean; created_at: string; who: string | null }>(`select a.id, a.kind, a.text, a.vars, a.internal, a.created_at, u.name as who from portal.activities a left join portal.users u on u.id = a.user_id where a.client_id = $1 ${ext ? 'and not a.internal' : ''} order by a.created_at desc`, [cl.id])
   const tasks = await q<{ id: string; title: string; vars: Record<string, string | number> | null; due: string | null; done: boolean }>('select id, title, vars, due, done from portal.tasks where client_id = $1 order by done, due nulls last', [cl.id])
   const fixes = await q<{ project_id: string; name: string; status: string; protected_until: string | null }>(`select f.project_id, p.name, f.status, f.protected_until from portal.fixations f join projects p on p.id = f.project_id where f.client_id = $1`, [cl.id])
-  // Регистрация у застройщика — только по проектам, открытым пользователю (партнёру не видны черновики)
-  const projects = await listProjects(c.user)
   const sels = await q<{ id: string; title: string; opened: number; last_opened_at: string | null; n: number; lang: string }>(`select s.id, s.title, s.opened, s.last_opened_at, s.lang, (select count(*)::int from portal.selection_items i where i.selection_id = s.id) n from portal.selections s where s.client_id = $1 order by s.created_at desc`, [cl.id])
   const books = await q<{ id: string; unit: string; status: string; ends_at: string; final_price: number; group_id: string | null; options_usd: number }>(`select b.id, portal.unit_no(bl.external_id, un.number) unit, b.status, b.ends_at, b.final_price::float, b.group_id, b.options_usd::float from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = $1 order by b.created_at desc`, [cl.id])
   // Сделки клиента: у клиента может быть несколько квартир — по сделке на каждую, пакеты связаны group_id
@@ -49,7 +46,6 @@ export default async function ClientCard({ params }: { params: { id: string } })
   const pcol = partnerCol({ b24_stage: cl.b24_stage, attach_status: cl.attach_status, booking: bst?.status, paid: deals.some((d) => d.paid_pct > 0 && d.stage !== 'cancelled'), regs_sent: regs.some((r) => r.status !== 'to_send') })
   const agentIdx = PARTNER_STAGES.findIndex(([k]) => k === pcol)
   const teamIdx = STAGES.findIndex(([k]) => k === cl.stage)
-  const fixMain = fixes[0]
   const docs = await q<{ id: string; file_id: string; kind: string; note: string | null; internal: boolean; created_by: string; created_at: string; filename: string }>(`select d.id, d.file_id, d.kind, d.note, d.internal, d.created_by, d.created_at, f.filename from portal.client_documents d join portal.files f on f.id = d.file_id where d.client_id = $1 ${ext ? 'and not d.internal' : ''} order by d.created_at desc`, [cl.id])
   const tours = acts.filter((a) => a.text.startsWith('Заявка на тур')).slice(0, 5)
   const docKinds = Array.from(new Set(docs.map((d) => d.kind)))
@@ -71,7 +67,6 @@ export default async function ClientCard({ params }: { params: { id: string } })
           {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
           {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат: квалифицируйте до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
           {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
-          {fixMain && <Pill kind={fixMain.status === 'approved' ? 'ok' : fixMain.status === 'rejected' ? 'bad' : 'warn'}>{T('Фиксация у застройщика')}: {T(fixMain.status === 'approved' ? 'одобрена' : fixMain.status === 'rejected' ? 'отклонена' : 'ждём ответ')}</Pill>}
           <Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill>
           <span className="small muted">{cl.reg_no}{!ext ? ` · ${T('владелец')}: ${cl.owner_name}` : ''}</span>
         </span>}
@@ -182,24 +177,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
               ))}
               <MakeDoc lang={L} clientId={cl.id} clientLang={cl.language || ''} bookings={books.filter((b) => b.status !== 'cancelled').map((b) => ({ id: b.id, unit: b.unit }))} fixations={fixes.map((f) => ({ project_id: f.project_id, name: f.name }))} commission={['owner', 'finance', 'office'].includes(c.user.role)} />
             </div>
-            <div className="card">
-              <div className="h3">{T('Фиксация у застройщиков')}</div>
-              {projects.map((p) => {
-                const f = fixes.find((x) => x.project_id === p.id)
-                return (
-                  <div key={p.id} className="kv">
-                    <span style={{ color: 'var(--ink)' }}>{p.name}<div className="tiny muted">{f ? T(f.status === 'approved' ? 'одобрена · до {d}' : f.status === 'rejected' ? 'отклонена' : 'отправлена, ждём ответ', { d: date(L, f.protected_until) }) : T('не отправлена')}</div></span>
-                    <span className="row" style={{ gap: 4 }}>
-                      {!f && <form action={fixation}><input type="hidden" name="client" value={cl.id} /><input type="hidden" name="project" value={p.id} /><input type="hidden" name="act" value="send" /><button className="btn btn--sm">{T('Отправить')}</button></form>}
-                      {f && f.status === 'sent' && !ext && <>
-                        <form action={fixation}><input type="hidden" name="client" value={cl.id} /><input type="hidden" name="project" value={p.id} /><input type="hidden" name="act" value="approved" /><button className="btn btn--sm">✓</button></form>
-                        <form action={fixation}><input type="hidden" name="client" value={cl.id} /><input type="hidden" name="project" value={p.id} /><input type="hidden" name="act" value="rejected" /><button className="btn btn--sm">✕</button></form>
-                      </>}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+            {/* 2.2: регистрации у застройщиков ведёт бэк-офис через очередь (/registrations) — блок «Регистрации у застройщиков» выше */}
             <div className="card stack" style={{ gap: 8 }}>
               <div className="between"><div className="h3" style={{ margin: 0 }}>KYC</div><Pill kind={cl.kyc_status === 'passed' ? 'ok' : cl.kyc_status === 'rejected' ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>{T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : cl.kyc_status === 'rejected' ? 'отказ' : 'не начат')}</Pill></div>
               {KYC_DOCS.map((k) => <div key={k} className="kv"><span>{T(KYC_DOC_NAMES[k])}</span><span className={docKinds.includes(k) ? 'okc' : 'muted'}>{docKinds.includes(k) ? '✓' : T('нет')}</span></div>)}
