@@ -8,6 +8,7 @@ import { canEditConditions } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
 import { CondForm } from './form'
+import { developerOfProject } from '@/lib/developers'
 import { saveAgentRate } from '@/lib/actions'
 
 // Первая версия условий нового проекта: значения по умолчанию как у Premium (5% + пул 20%, партнёру 2% + 10%), правятся перед публикацией
@@ -23,6 +24,12 @@ export default async function Conditions({ searchParams }: { searchParams: { p?:
   const p = ps.find((x) => x.slug === searchParams.p) || ps.find((x) => x.slug === 'premium-residence') || ps[0]
   const vers = await conditionVersions(p.id)
   const cur = vers.find((v) => v.status === 'draft') || vers.find((v) => v.status === 'published')
+  // Первая версия нового проекта — значения из карточки застройщика
+  const dv = cur ? null : await developerOfProject(p.id)
+  const fresh = (): Conditions => ({ ...defaults(p.id), ...(dv ? { reg_method: dv.reg_method, reg_response_days: dv.reg_response_days, silence_rule: dv.silence_rule, silence_extra_days: dv.silence_extra_days,
+    reg_protect_months: dv.protect_months, reg_protect_months_sub: dv.protect_months_sub, renew_remind_days: dv.renew_remind_days, booking_days: dv.booking_days, booking_ext_days: dv.booking_ext_days,
+    max_bookings_total: dv.max_bookings_total, booking_write_api: dv.booking_write_api, rates_by_market: dv.rates_by_market, vat_mode: dv.vat_mode, options_in_base: dv.options_in_base, fx_rule: dv.fx_rule,
+    clawback_months: dv.clawback_months, clawback_offset: dv.clawback_offset, payment_wait_days: dv.payment_wait_days, sells_to_az: dv.sells_to_az, fix_pct: dv.commission_pct ?? 5 } : {}) })
   const rates = await q<{ id: string; who: string; agent_fix_pct: number; agent_pool_pct: number; note: string | null }>(`select r.id, coalesce(a.name, u.name, r.market, '—') who, r.agent_fix_pct::float, r.agent_pool_pct::float, r.note from portal.agent_rates r left join portal.agencies a on a.id = r.agency_id left join portal.users u on u.id = r.agent_id where r.project_id = $1`, [p.id])
   const edit = canEditConditions(c.user.role)
   const whoList = edit ? await q<{ v: string; l: string }>(`select 'agency:' || id v, name l from portal.agencies union all select 'user:' || id, name from portal.users where active and role in ('agent','agency_head') order by 2`) : []
@@ -30,7 +37,7 @@ export default async function Conditions({ searchParams }: { searchParams: { p?:
   const ex = units.find((u) => u.block === 'D' && u.number === '806') || units.find((u) => u.status === 'available' && u.usd)
   return (
     <>
-      <Top title={T('Админка')} sub={T('Коммерческие условия проекта: версии с датой вступления, брони запоминают условия на дату брони')} />
+      <Top title={T('Админка')} sub={T('Условия договора по проекту: версии с датой вступления; до SPA signed действует последняя версия, после — условия сделки фиксируются')} />
       <div className="page">
         <AdminTabs lang={L} on="conditions" role={c.user.role} />
         <div className="chips">{ps.map((x) => <Link key={x.id} href={`?p=${x.slug}`} className={'chip' + (x.id === p.id ? ' on' : '')}>{x.name}</Link>)}</div>
@@ -53,7 +60,7 @@ export default async function Conditions({ searchParams }: { searchParams: { p?:
             <div className="label mt16">{T('Уровни')}</div>
             <div className="tiny muted">{T('Договор застройщика → проект → блок → квартира. В MVP условия задаются на проект; блоки и квартиры — следующий шаг.')}</div>
           </div>
-          {(cur || canEditConditions(c.user.role)) && <CondForm lang={L} projectId={p.id} cur={cur || defaults(p.id)} canEdit={canEditConditions(c.user.role)} example={ex ? { no: `${ex.block}-${ex.number}`, usd: ex.usd! } : null} />}
+          {(cur || canEditConditions(c.user.role)) && <CondForm lang={L} projectId={p.id} cur={cur || fresh()} canEdit={canEditConditions(c.user.role)} example={ex ? { no: `${ex.block}-${ex.number}`, usd: ex.usd! } : null} />}
         </div>
       </div>
     </>

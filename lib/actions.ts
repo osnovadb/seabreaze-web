@@ -21,7 +21,6 @@ import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
-import { developerOfProject } from './developers'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -413,12 +412,11 @@ export async function createBooking(_: unknown, f: FormData) {
     from portal.bookings where project_id = $3 and status in ('requested','confirmed')`, [clientId, c.user.id, unit.project_id])
   if (active!.cl >= cond.max_bookings_client) return { error: t(c.lang, 'У клиента уже {n} активных брони — это максимум', { n: active!.cl }) }
   if (isExternal(c.user.role) && active!.ag >= cond.max_bookings_agent) return { error: t(c.lang, 'Лимит броней агента: {n}', { n: cond.max_bookings_agent }) }
-  // §7 п.4: лимит одновременных броней — на всю GetsEstate у застройщика; занят — запрос встаёт в очередь (Queued) на 7 дней
-  const dev = await developerOfProject(unit.project_id)
-  const limit = dev?.max_bookings_total ?? cond.max_bookings_total
-  const used = dev ? (await one<{ n: number }>(`select count(*)::int n from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = $1 and b.status in ('requested','confirmed','release_pending')`, [dev.catalog_id]))!.n : active!.tot
+  // §7 п.4: лимит одновременных броней — из условий проекта (решение 08.11: условия на проект); занят — запрос в очередь (Queued) на 7 дней
+  const limit = cond.max_bookings_total
+  const used = (await one<{ n: number }>(`select count(*)::int n from portal.bookings where project_id = $1 and status in ('requested','confirmed','release_pending')`, [unit.project_id]))!.n
   const queued = used >= limit
-  const days = dev?.booking_days ?? cond.booking_days
+  const days = cond.booking_days
   const tour = { from: s(f, 'tour_from') || null, to: s(f, 'tour_to') || null }
   const signing = ['in_person', 'remote', 'power_of_attorney'].includes(s(f, 'signing')) ? s(f, 'signing') : null
   // План оплаты: «100% сразу» со скидкой застройщика снижает цену до раздела денег
@@ -449,8 +447,8 @@ export async function createBooking(_: unknown, f: FormData) {
       status, queued_at, queue_until, developer_id, tour_from, tour_to, signing, comment)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18,
       $19, case when $19 = 'queued' then now() end, case when $19 = 'queued' then now() + interval '7 days' end, $20, $21, $22, $23, $24) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, booking_ext_days: dev?.booking_ext_days ?? cond.booking_ext_days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
-      queued ? 'queued' : 'requested', dev?.id || null, tour.from, tour.to, signing, s(f, 'comment') || null])
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
+      queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
   if (queued) await notify(c.user.id, 'booking', 'Лимит броней застройщика занят — запрос {u} в очереди (до 7 дней)', '/bookings', { u: unitNo(unit) })
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
@@ -669,6 +667,17 @@ export async function saveConditions(_: unknown, f: FormData) {
     await q(`insert into portal.conditions (project_id, version, status, valid_from, ${fields.join(', ')}, pay_timing, note, payment_plans, created_by, booking_fee_currency) values ($1,$2,'draft',$3, ${fields.map((_, i) => '$' + (i + 4)).join(', ')}, $${fields.length + 4}, $${fields.length + 5},
       coalesce((select payment_plans from portal.conditions where project_id = $1 order by version desc limit 1), '[]'), $${fields.length + 6}, $${fields.length + 7})`, [pid, v!.v, s(f, 'valid_from'), ...vals, s(f, 'pay_timing'), s(f, 'note') || null, c.user.id, feeCur])
   }
+  // 2.2: условия договора на проект (регистрация, молчание, защита, комиссия, клаубэк, НДС, опции, АЗ)
+  const ints = ['reg_response_days', 'silence_extra_days', 'reg_protect_months', 'renew_remind_days', 'clawback_months', 'payment_wait_days'].map((k) => { const v = Number(s(f, k)); return Number.isInteger(v) && v >= 0 ? v : null })
+  if (ints.some((v) => v === null)) return { error: 'Проверьте сроки регистрации и клаубэка' }
+  const rates: Record<string, number> = {}
+  for (const m of ['DE', 'IL', 'GLOBAL']) { const v = s(f, 'rate_' + m).replace(',', '.'); if (v) { if (Number.isNaN(Number(v))) return { error: 'Ставка рынка ' + m }; rates[m] = Number(v) } }
+  const pick = (k: string, ok: string[], d: string) => (ok.includes(s(f, k)) ? s(f, k) : d)
+  await q(`update portal.conditions set reg_method = $2, silence_rule = $3, vat_mode = $4, clawback_offset = $5, fx_rule = $6, booking_write_api = $7, options_in_base = $8, sells_to_az = $9,
+      rates_by_market = $10, reg_protect_months_sub = $11, reg_response_days = $12, silence_extra_days = $13, reg_protect_months = $14, renew_remind_days = $15, clawback_months = $16, payment_wait_days = $17
+    where project_id = $1 and status = 'draft'`, [pid, pick('reg_method', ['crm', 'email', 'api', 'file'], 'email'), pick('silence_rule', ['confirm', 'remind'], 'remind'), pick('vat_mode', ['over', 'incl'], 'over'),
+      pick('clawback_offset', ['any', 'same_client'], 'any'), s(f, 'fx_rule') || null, f.get('booking_write_api') === 'on', f.get('options_in_base') === 'on', f.get('sells_to_az') === 'on',
+      JSON.stringify(rates), s(f, 'reg_protect_months_sub') ? Number(s(f, 'reg_protect_months_sub')) : null, ...ints])
   await audit(c.real.id, 'conditions.save', 'project', pid)
   if (s(f, 'publish')) {
     const pub = await one<{ version: number }>(`update portal.conditions set status = 'published' where project_id = $1 and status = 'draft' returning version`, [pid])

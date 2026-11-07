@@ -22,7 +22,7 @@ export default async function Developers({ searchParams }: { searchParams: { d?:
   const edit = c.user.role === 'owner'
   return (
     <>
-      <Top title={T('Застройщики')} sub={T('Карточка условий по договору: регистрация, молчание, защита, бронь, комиссия, клаубэк')} />
+      <Top title={T('Застройщики')} sub={T('Справочник застройщиков и значения по умолчанию для первой версии условий нового проекта. Действующие условия — на проект: «Коммерческие условия».')} />
       <div className="page">
         <AdminTabs lang={L} on="developers" role={c.user.role} />
         <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 16, alignItems: 'start' }} className="mt16">

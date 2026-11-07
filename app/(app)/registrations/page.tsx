@@ -20,8 +20,9 @@ export default async function Registrations({ searchParams }: { searchParams: { 
   if (!['owner', 'office', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const rows = await q<R>(`select r.id, r.status, r.reject_reason, r.mass, r.priority, r.due_send::text, r.sent_at, r.answer_due::text, r.valid_until::text,
-      cl.name client, cl.id client_id, cl.owner_type, u.name owner, cl.market, d.name developer, d.id developer_id, d.silence_rule
+      cl.name client, cl.id client_id, cl.owner_type, u.name owner, cl.market, d.name || ' · ' || p.name developer, d.id developer_id, coalesce(k.silence_rule, 'remind') silence_rule
     from portal.registrations r join portal.clients cl on cl.id = r.client_id join portal.users u on u.id = cl.owner_id join portal.developers d on d.id = r.developer_id
+      join public.projects p on p.id = r.project_id cross join lateral (select * from portal.cur_conditions(r.project_id)) k
     where ($1 = '' or r.developer_id::text = $1) and ($2 <> 'market_head' or cl.market = $3)
     order by r.priority desc, r.due_send nulls last, r.created_at`, [searchParams.d || '', c.user.role, c.user.market || ''])
   const devs = await q<{ id: string; name: string }>('select id, name from portal.developers where active order by name')
@@ -47,7 +48,7 @@ export default async function Registrations({ searchParams }: { searchParams: { 
         <form action={sendRegistrations} id="sendform" />
           <div className="tbl-wrap mt16">
             <table className="tbl">
-              <thead><tr>{['', 'Клиент', 'Застройщик', 'Источник', 'Статус', 'Срок', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
+              <thead><tr>{['', 'Клиент', 'Застройщик · проект', 'Источник', 'Статус', 'Срок', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
               <tbody>
                 {shown.length === 0 && <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr>}
                 {shown.map((r) => {

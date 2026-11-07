@@ -33,14 +33,14 @@ const expired = await q(`update portal.bookings b set status = 'expired' from un
 // §7 п.4: очередь лимита застройщика — по времени запроса; освободилось место — следующий запрос сам переходит в Requested; в очереди живёт 7 дней
 const qOut = await q(`update portal.bookings set status = 'cancelled' where status = 'queued' and queue_until < now() returning id, agent_id`)
 for (const b of qOut) await notify(b.agent_id, 'booking', 'Запрос в очереди застройщика снят через 7 дней — запросите снова, если нужно', '/bookings', {}, 'qout:' + b.id)
-const devs = await q(`select d.id, d.catalog_id, d.max_bookings_total lim,
-    (select count(*)::int from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = d.catalog_id and b.status in ('requested','confirmed','release_pending')) used
-  from portal.developers d where d.active`)
+const devs = await q(`select p.id, coalesce(k.max_bookings_total, 10) lim,
+    (select count(*)::int from portal.bookings b where b.project_id = p.id and b.status in ('requested','confirmed','release_pending')) used
+  from public.projects p cross join lateral (select * from portal.cur_conditions(p.id)) k where k.id is not null`)
 for (const d of devs) {
   if (d.used >= d.lim) continue
   const moved = await q(`update portal.bookings set status = 'requested', ends_at = now() + ((snapshot->>'booking_days') || ' days')::interval
-    where id in (select b.id from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = $1 and b.status = 'queued' order by b.queued_at limit $2)
-    returning id, agent_id`, [d.catalog_id, d.lim - d.used])
+    where id in (select b.id from portal.bookings b where b.project_id = $1 and b.status = 'queued' order by b.queued_at limit $2)
+    returning id, agent_id`, [d.id, d.lim - d.used])
   for (const b of moved) {
     await notify(b.agent_id, 'booking', 'Место у застройщика освободилось — запрос брони передан бэк-офису', '/bookings', {}, 'qin:' + b.id)
     for (const o of await q(`select id from portal.users where active and role = 'office'`)) await notify(o.id, 'booking', 'Запрос из очереди ждёт подтверждения у застройщика', '/bookings', {}, `qin:${b.id}:${o.id}`)
@@ -239,21 +239,22 @@ if (pbSources.length) out.pb_sent = await pbFlush(q, pbSources, { task })
 // 11а. Срок ответа вышел: по договору молчание = подтверждение — Confirmed by silence; иначе напоминание бэк-офису
 const office = await q(`select id from portal.users where active and role in ('office','owner')`)
 const bySilence = await q(`update portal.registrations r set status = 'confirmed_silence', decided_at = now(),
-    valid_until = current_date + (d.protect_months || ' months')::interval
-  from portal.developers d where d.id = r.developer_id and r.status = 'sent' and r.answer_due < current_date and d.silence_rule = 'confirm'
+    valid_until = current_date + (coalesce(k.reg_protect_months, 6) || ' months')::interval
+  from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k
+  where x.id = r.id and r.status = 'sent' and r.answer_due < current_date and k.silence_rule = 'confirm'
   returning r.id, r.client_id`)
 for (const r of bySilence) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Застройщик промолчал — регистрация подтверждена по договору', '{}')`, [r.client_id])
-const quiet = await q(`select r.id, cl.name client, d.name dev from portal.registrations r join portal.clients cl on cl.id = r.client_id join portal.developers d on d.id = r.developer_id
-  where r.status = 'sent' and r.answer_due < current_date and d.silence_rule = 'remind'`)
+const quiet = await q(`select r.id, cl.name client, p.name dev from portal.registrations r join portal.clients cl on cl.id = r.client_id join public.projects p on p.id = r.project_id
+  cross join lateral (select * from portal.cur_conditions(r.project_id)) k where r.status = 'sent' and r.answer_due < current_date and coalesce(k.silence_rule, 'remind') = 'remind'`)
 for (const r of quiet) for (const u of office) await notify(u.id, 'registration', 'Застройщик {d} молчит по регистрации {c} — напомните', '/registrations?f=silence', { d: r.dev, c: r.client }, `reg-quiet:${r.id}:${u.id}:${new Date().toISOString().slice(0, 10)}`)
 // 11б. SLA передачи: не отправили к сроку — бэк-офису
 const late = await q(`select count(*)::int n from portal.registrations where status = 'to_send' and due_send < current_date`)
 if (late[0].n) for (const u of office) await notify(u.id, 'registration', 'Регистрации просрочены по SLA: {n}', '/registrations', { n: late[0].n }, `reg-late:${u.id}:${new Date().toISOString().slice(0, 10)}`)
 // 11в. За N дней до окончания — «продлить»: клиент команды — бэк-офису, клиент партнёра — менеджеру по партнёрам (руководителю рынка)
-const renew = await q(`update portal.registrations r set renew_task_at = current_date from portal.developers d, portal.clients cl
-  where d.id = r.developer_id and cl.id = r.client_id and r.status in ('confirmed','confirmed_silence') and r.renew_task_at is null
-    and r.valid_until <= current_date + d.renew_remind_days
-  returning r.id, r.client_id, cl.owner_type, cl.market, cl.name client, d.name dev, r.valid_until::text until`)
+const renew = await q(`update portal.registrations r set renew_task_at = current_date from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k, portal.clients cl, public.projects p
+  where x.id = r.id and cl.id = r.client_id and p.id = r.project_id and r.status in ('confirmed','confirmed_silence') and r.renew_task_at is null
+    and r.valid_until <= current_date + coalesce(k.renew_remind_days, 7)
+  returning r.id, r.client_id, cl.owner_type, cl.market, cl.name client, p.name dev, r.valid_until::text until`)
 for (const r of renew) {
   const to = r.owner_type === 'partner' ? await q(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [r.market]) : office
   for (const u of to) await notify(u.id, 'registration', 'Регистрация {c} у {d} истекает {u} — продлите', '/registrations?f=expiring', { c: r.client, d: r.dev, u: r.until }, `reg-renew:${r.id}:${u.id}`)

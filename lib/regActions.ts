@@ -19,9 +19,11 @@ export async function sendRegistrations(f: FormData) {
   const c = await office()
   const ids = f.getAll('id').map(String).filter(Boolean)
   if (!ids.length) return
+  // срок ответа — по условиям проекта (рабочие дни + запас «3 + 2»)
   await q(`update portal.registrations r set status = 'sent', sent_at = now(),
-      answer_due = portal.add_workdays(current_date, d.reg_response_days + d.silence_extra_days)
-    from portal.developers d where d.id = r.developer_id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')`, [ids])
+      answer_due = portal.add_workdays(current_date, coalesce(k.reg_response_days, 3) + coalesce(k.silence_extra_days, 0))
+    from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k
+    where x.id = r.id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')`, [ids])
   await audit(c.real.id, 'registration.send', 'registration', ids[0], { n: ids.length })
   revalidatePath('/registrations')
 }
@@ -32,9 +34,9 @@ export async function decideRegistration(f: FormData) {
   const id = s(f, 'id'), verdict = s(f, 'verdict')
   if (verdict === 'confirmed') {
     await q(`update portal.registrations r set status = 'confirmed', decided_at = now(), reject_reason = null,
-        valid_until = current_date + (case when cl.owner_type = 'partner' and u.agency_id is null and d.protect_months_sub is not null then d.protect_months_sub else d.protect_months end || ' months')::interval
-      from portal.developers d, portal.clients cl left join portal.users u on u.id = cl.owner_id
-      where r.id = $1 and d.id = r.developer_id and cl.id = r.client_id`, [id])
+        valid_until = current_date + (case when cl.owner_type = 'partner' and u.agency_id is null and k.reg_protect_months_sub is not null then k.reg_protect_months_sub else coalesce(k.reg_protect_months, 6) end || ' months')::interval
+      from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k, portal.clients cl left join portal.users u on u.id = cl.owner_id
+      where r.id = $1 and x.id = r.id and cl.id = r.client_id`, [id])
   } else if (verdict === 'rejected') {
     const reason = ['developer_client', 'other_agency', 'other'].includes(s(f, 'reason')) ? s(f, 'reason') : 'other'
     await q(`update portal.registrations set status = 'rejected', decided_at = now(), reject_reason = $2, valid_until = null where id = $1`, [id, reason])

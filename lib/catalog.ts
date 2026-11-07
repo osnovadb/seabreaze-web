@@ -121,9 +121,15 @@ export type Conditions = {
   agent_fix_pct: number; agent_pool_pct: number; agent_our_pool_share: number; seller_share_pct: number; seller_self_disc: number; seller_max_disc: number
   booking_days: number; booking_ext_days: number; protect_months: number; max_bookings_client: number; max_bookings_agent: number; max_bookings_total: number
   pay_timing: string; payment_plans: { name: string; note: string }[]; note: string | null; created_at: string; booking_fee: number; booking_fee_currency: string
+  // 2.2 · условия договора на проект
+  reg_method?: string; reg_response_days?: number; silence_rule?: string; silence_extra_days?: number; reg_protect_months?: number; reg_protect_months_sub?: number | null
+  renew_remind_days?: number; booking_write_api?: boolean; rates_by_market?: Record<string, number>; vat_mode?: string; options_in_base?: boolean; fx_rule?: string | null
+  clawback_months?: number; clawback_offset?: string; payment_wait_days?: number; sells_to_az?: boolean
 }
 const COND = `id, project_id, version, status, valid_from::text valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float,
-  seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at, booking_fee::float, booking_fee_currency`
+  seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at, booking_fee::float, booking_fee_currency,
+  reg_method, reg_response_days, silence_rule, silence_extra_days, reg_protect_months, reg_protect_months_sub, renew_remind_days, booking_write_api, rates_by_market, vat_mode,
+  options_in_base, fx_rule, clawback_months, clawback_offset, payment_wait_days, sells_to_az`
 export async function conditionsFor(projectId: string, agent?: User | null): Promise<Conditions | undefined> {
   const c = await one<Conditions>(`select ${COND} from portal.conditions where project_id = $1 and status = 'published' and valid_from <= current_date order by valid_from desc, version desc limit 1`, [projectId])
   if (!c || !agent) return c
