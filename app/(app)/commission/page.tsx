@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, date, pct } from '@/lib/i18n'
@@ -12,6 +13,8 @@ import { savePayoutProfile } from '@/lib/moneyActions'
 
 export default async function Commission() {
   const c = await requireCtx()
+  // «Комиссия» — кабинет партнёра; команде — «Финансы» (QA 09.11)
+  if (!['agent', 'agency_head'].includes(c.user.role)) redirect(['owner', 'market_head', 'finance'].includes(c.user.role) ? '/finance' : '/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
   const deals = await q<{ id: string; unit: string; client: string; stage: string; final_price: number; agent_amount: number; paid_pct: number; paid_out_at: string | null; created_at: string }>(

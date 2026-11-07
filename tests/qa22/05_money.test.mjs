@@ -1,0 +1,179 @@
+// QA 2.2 · 05 Деньги (§8): «Договор подписан» → доли по ролям и транши; оплата → Expected; Received → начисления; реестр → акт → согласие → оплата; клаубэк
+import { test, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { user, agency, register, qualify, freeUnit, q, one, close, act, lastBooking, tick } from './h.mjs'
+
+after(close)
+let OW, OF, FI, MH, HEAD_AG, AG, S
+const month = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 7) // Баку
+async function sale(owner, unitSlug = 'premium-residence', disc = 0) {
+  const r = await register(owner)
+  const cl = r.result.id
+  if (r.client.attach_status === 'candidate') await qualify(owner, cl)
+  const u = await freeUnit(unitSlug)
+  await act(owner, 'createBooking', { unit: u.id, client: cl, discount: disc })
+  const b = await lastBooking(cl)
+  if (b.approval === 'pending') await act(MH, 'bookingAction', { id: b.id, act: 'approve' })
+  await act(OF, 'bookingAction', { id: b.id, act: 'confirm', dev_no: 'QA-M' })
+  await q(`update portal.clients set kyc_status = 'passed', kyc_checked_at = now() where id = $1`, [cl])
+  await act(OF, 'bookingAction', { id: b.id, act: 'contract' })
+  const d = await one('select * from portal.deals where client_id = $1 order by created_at desc limit 1', [cl])
+  return { cl, u, b, d }
+}
+const shares = async (dealId) => Object.fromEntries((await q('select role, amount::float a, user_id from portal.deal_shares where deal_id = $1', [dealId])).map((s) => [s.role, s]))
+test('setup', async () => {
+  OW = await user('owner', { market: null }); OF = await user('office'); FI = await user('finance'); MH = await user('market_head', { market: 'DE' })
+  const ag = await agency('DE')
+  HEAD_AG = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-TAX' }); AG = await user('agent', { agency_id: ag.id })
+  S = await user('seller')
+})
+test('«Договор подписан» только после KYC и только бэк-офисом', async () => {
+  const cl = (await register(S)).result.id
+  await act(S, 'createBooking', { unit: (await freeUnit()).id, client: cl, discount: 0 })
+  const b = await lastBooking(cl)
+  await act(OF, 'bookingAction', { id: b.id, act: 'confirm', dev_no: 'QA' })
+  await act(OF, 'bookingAction', { id: b.id, act: 'contract' })
+  assert.equal((await one('select count(*)::int n from portal.deals where client_id = $1', [cl])).n, 0, 'договор без KYC')
+  await q(`update portal.clients set kyc_status = 'passed' where id = $1`, [cl])
+  await act(S, 'bookingAction', { id: b.id, act: 'contract' })
+  assert.equal((await one('select count(*)::int n from portal.deals where client_id = $1', [cl])).n, 0, 'сейлз поставил «Договор подписан»')
+})
+test('доли партнёрской продажи: партнёр (руководителю агентства), консультант 1% без НДС, Caspian = остаток; сумма = комиссия застройщика', async () => {
+  const { d, u } = await sale(AG)
+  const sh = await shares(d.id)
+  assert.ok(sh.partner, 'нет доли партнёра'); assert.equal(sh.partner.user_id, HEAD_AG.id, 'агентству платим целиком — руководителю агентства')
+  assert.ok(!sh.seller, 'у партнёрской продажи бонус сейлза')
+  const total = (await one('select commission_total::float t from portal.deals where id = $1', [d.id])).t
+  const sum = Object.values(sh).reduce((a, s) => a + s.a, 0)
+  assert.ok(Math.abs(sum - total) < 0.05, `сумма долей ${sum} ≠ комиссии ${total}`)
+  const c = await one('select * from portal.cur_conditions($1)', [u.project_id])
+  assert.ok(Math.abs(sh.consultant.a - d.final_price / (1 + Number(c.vat_rate) / 100) * Number(c.consultant_pct) / 100) < 0.05, 'консультант не 1% от цены без НДС')
+  // формула партнёра: фикс партнёра от итоговой + неотданная часть его пула
+  const exp = d.final_price * c.agent_fix_pct / 100 + Math.max(0, c.agent_pool_pct - 0) * u.price / 100
+  assert.ok(Math.abs(sh.partner.a - exp) < 1, `доля партнёра ${sh.partner.a} ≠ ${exp}`)
+})
+test('доли продажи команды: бонус сейлза % от нашей выручки, без партнёра', async () => {
+  const { d } = await sale(S)
+  const sh = await shares(d.id)
+  assert.ok(!sh.partner, 'у продажи команды доля партнёра'); assert.ok(sh.seller?.a > 0, 'нет бонуса сейлза')
+})
+test('скидка партнёра съедает его часть пула (доход после скидки)', async () => {
+  const a = await sale(AG, 'premium-residence', 0), b = await sale(AG, 'premium-residence', 6)
+  const pa = (await shares(a.d.id)).partner.a / a.u.price, pb = (await shares(b.d.id)).partner.a / b.u.price
+  assert.ok(pb < pa - 0.04, `скидка 6% не уменьшила долю партнёра: ${pa} → ${pb}`)
+})
+test('транши: после первого взноса — Expected; Received → начисления по долям', async () => {
+  const { d } = await sale(AG)
+  let t = await one('select * from portal.tranches where deal_id = $1', [d.id])
+  assert.equal(t.status, 'scheduled')
+  await act(FI, 'dealPaid', { id: d.id, paid: 10 })
+  t = await one('select * from portal.tranches where deal_id = $1', [d.id])
+  assert.equal(t.status, 'expected'); assert.ok(t.expected_at, 'нет даты ожидания')
+  await act(FI, 'trancheReceived', { id: t.id })
+  const acc = await q(`select role, amount::float a from portal.accruals where tranche_id = $1`, [t.id])
+  const sh = await shares(d.id)
+  assert.ok(acc.find((x) => x.role === 'partner')?.a === sh.partner.a, 'начисление партнёру ≠ доле')
+  assert.ok(!acc.find((x) => x.role === 'caspian'), 'Caspian не начисляется')
+})
+test('сейлз и партнёр не могут отметить транш полученным', async () => {
+  const { d } = await sale(AG)
+  await act(FI, 'dealPaid', { id: d.id, paid: 10 })
+  const t = await one('select id from portal.tranches where deal_id = $1', [d.id])
+  const r = await act(S, 'trancheReceived', { id: t.id })
+  assert.ok(r.thrown); assert.equal((await one('select status from portal.tranches where id = $1', [t.id])).status, 'expected')
+})
+test('застройщик «при задатке 35%»: 10% — транш ещё ждёт, 35% — Expected', async () => {
+  const { d } = await sale(S, 'brabus-island-baku')
+  await act(FI, 'dealPaid', { id: d.id, paid: 10 })
+  assert.equal((await one('select status from portal.tranches where deal_id = $1', [d.id])).status, 'scheduled')
+  await act(FI, 'dealPaid', { id: d.id, paid: 35 })
+  assert.equal((await one('select status from portal.tranches where deal_id = $1 order by no limit 1', [d.id])).status, 'expected')
+})
+test('«пропорционально платежам»: транш на каждый внесённый процент', async () => {
+  const { d, u } = await sale(S)
+  await q(`update portal.tranches set trigger = 'paid:rest' where deal_id = $1`, [d.id])
+  await act(FI, 'dealPaid', { id: d.id, paid: 30 })
+  await act(FI, 'dealPaid', { id: d.id, paid: 50 })
+  const ts = await q('select pct::float, status from portal.tranches where deal_id = $1 order by no', [d.id])
+  const exp = ts.filter((x) => x.status === 'expected').reduce((a, x) => a + x.pct, 0)
+  assert.ok(Math.abs(exp - 50) < 0.01, 'транши не следуют оплате: ' + JSON.stringify(ts))
+  assert.ok(Math.abs(ts.reduce((a, x) => a + x.pct, 0) - 100) < 0.01, 'сумма долей траншей ≠ 100%')
+  void u
+})
+test('реестр: собрать → руководитель рынка подтверждает → админ утверждает → акт → без согласия выплата переносится', async () => {
+  const m = '2031-01'
+  await q(`delete from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const { d } = await sale(AG)
+  await act(FI, 'dealPaid', { id: d.id, paid: 10 })
+  const t = await one('select id from portal.tranches where deal_id = $1', [d.id])
+  await act(FI, 'trancheReceived', { id: t.id })
+  await act(FI, 'registerCollect', { month: m })
+  const reg = await one(`select * from portal.payout_registers where month = $1::date`, [m + '-01'])
+  assert.ok(reg, 'реестр не собран')
+  const line = await one(`select * from portal.payout_lines where register_id = $1 and user_id = $2`, [reg.id, HEAD_AG.id])
+  assert.ok(line && !line.carried, 'строка партнёра перенесена: ' + JSON.stringify(line))
+  await act(MH, 'registerConfirm', { id: reg.id })
+  await act(OW, 'registerApprove', { id: reg.id })
+  const l2 = await one('select * from portal.payout_lines where id = $1', [line.id])
+  assert.match(l2.act_no || '', /^A-\d{4}-\d{4}$/, 'нет номера акта'); assert.equal(l2.currency, 'EUR'); assert.ok(Number(l2.amount_cur) > 0)
+  await act(FI, 'registerPaid', { id: reg.id })
+  const l3 = await one('select carried, note from portal.payout_lines where id = $1', [line.id])
+  assert.ok(l3.carried, 'без «Согласен с актом» выплата ушла')
+  assert.ok(await one(`select 1 from portal.accruals where register_id is null and status = 'open' and user_id = $1 and deal_id = $2`, [HEAD_AG.id, d.id]), 'начисление не вернулось в открытые')
+})
+test('реестр: меньше 100 $ и без налогового номера — перенос', async () => {
+  const m = '2031-02'
+  await q(`delete from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id })
+  await q(`insert into portal.accruals (role, user_id, amount, month) values ('partner', $1, 50, $2::date), ('referrer', $1, 0.01, $2::date)`, [H.id, m + '-01'])
+  await act(FI, 'registerCollect', { month: m })
+  const reg = await one(`select id from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const lines = await q('select role, carried, note from portal.payout_lines where register_id = $1 and user_id = $2', [reg.id, H.id])
+  assert.ok(lines.length && lines.every((l) => l.carried), 'малые суммы или без документа не перенесены: ' + JSON.stringify(lines))
+})
+test('согласие с актом: только сам партнёр; после согласия выплата проходит', async () => {
+  const m = '2031-03'
+  await q(`delete from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-T' })
+  await q(`insert into portal.accruals (role, user_id, amount, month) values ('partner', $1, 500, $2::date)`, [H.id, m + '-01'])
+  await act(FI, 'registerCollect', { month: m })
+  const reg = await one(`select id from portal.payout_registers where month = $1::date`, [m + '-01'])
+  await act(MH, 'registerConfirm', { id: reg.id }); await act(OW, 'registerApprove', { id: reg.id })
+  const line = await one('select id from portal.payout_lines where register_id = $1 and user_id = $2', [reg.id, H.id])
+  await act(AG, 'agreeAct', { id: line.id })
+  assert.equal((await one('select agreed_at from portal.payout_lines where id = $1', [line.id])).agreed_at, null, 'чужой партнёр согласовал акт')
+  await act(H, 'agreeAct', { id: line.id })
+  await act(FI, 'registerPaid', { id: reg.id })
+  const l = await one('select carried from portal.payout_lines where id = $1', [line.id])
+  assert.equal(l.carried, false, 'согласованный акт перенесён')
+  assert.ok(await one(`select 1 from portal.accruals where register_id = $1 and status = 'paid' and user_id = $2`, [reg.id, H.id]), 'начисления не выплачены')
+})
+test('клаубэк: расторжение после выплаты → минус партнёру, неполученные транши отменены', async () => {
+  const { d, cl } = await sale(AG)
+  await act(FI, 'dealPaid', { id: d.id, paid: 10 })
+  const t = await one('select id from portal.tranches where deal_id = $1', [d.id])
+  await act(FI, 'trancheReceived', { id: t.id })
+  await q(`update portal.accruals set status = 'paid' where deal_id = $1`, [d.id])
+  const crypto = await import('node:crypto')
+  const sig = crypto.createHmac('sha256', process.env.SESSION_SECRET).update('b24-internal:clawback').digest('hex')
+  const r = await fetch('http://127.0.0.1:3043/api/internal/b24', { method: 'POST', headers: { 'content-type': 'application/json', 'x-internal': sig }, body: JSON.stringify({ action: 'clawback', client: cl }) }).then((x) => x.json())
+  assert.ok(r.ok, JSON.stringify(r))
+  const claw = await one(`select sum(amount)::float s from portal.accruals where deal_id = $1 and kind = 'clawback' and role = 'partner'`, [d.id])
+  const paid = await one(`select sum(amount)::float s from portal.accruals where deal_id = $1 and kind = 'share' and role = 'partner'`, [d.id])
+  assert.ok(Math.abs(claw.s + paid.s) < 0.01, `клаубэк ${claw.s} ≠ −${paid.s}`)
+  assert.equal((await one(`select stage from portal.deals where id = $1`, [d.id])).stage, 'cancelled')
+})
+test('корректировка строкой и списание долга — только админ', async () => {
+  const { d } = await sale(AG)
+  const r1 = await act(S, 'adjustment', { deal: d.id, role: 'partner', amount: 100, note: 'QA' })
+  assert.ok(r1.thrown, 'сейлз сделал корректировку')
+  await act(FI, 'adjustment', { deal: d.id, role: 'partner', amount: -100, note: 'QA' })
+  assert.ok(await one(`select 1 from portal.accruals where deal_id = $1 and kind = 'adjustment' and amount = -100`, [d.id]))
+  const r2 = await act(FI, 'writeOff', { user: HEAD_AG.id, role: 'partner' })
+  assert.ok(r2.thrown, 'финансы списали долг (только админ)')
+})
+test('партнёр видит свою долю по траншам, сотрудник агентства — ориентир без актов', async () => {
+  const { page } = await import('./h.mjs')
+  const p = await page(HEAD_AG, '/commission'); assert.equal(p.status, 200)
+  const p2 = await page(AG, '/commission'); assert.equal(p2.status, 200)
+})

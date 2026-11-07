@@ -9,6 +9,7 @@ import { bookingAction, dealPaid } from '@/lib/actions'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 import { setEscort } from '@/lib/moneyActions'
 import { ConsentBox } from '@/components/ConsentBox'
+import { clientScope } from '@/lib/scope'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
 type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
@@ -18,6 +19,11 @@ export default async function Units({ params, searchParams }: { params: { id: st
   if (!/^[0-9a-f-]{36}$/.test(params.id)) notFound()
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  // QA 09.11: только команда и только клиенты в её видимости (партнёр по прямой ссылке открывал Units чужого клиента)
+  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) notFound()
+  const cs = clientScope(c.user)
+  const visible = await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
+  if (!visible) notFound()
   const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string
     consent_status: string; consent_token: string | null; consent_at: string | null; marketing_consent_at: string | null; phone_norm: string | null; email: string | null; language: string | null; do_not_contact: boolean }>(
     `select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status, consent_status, consent_token, consent_at, marketing_consent_at, phone_norm, email, language, do_not_contact
