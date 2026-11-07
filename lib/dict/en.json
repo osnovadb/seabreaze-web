@@ -2010,5 +2010,15 @@
 "файлом": "as a file",
 "холд 24 ч": "24 h hold",
 "через API": "via API",
-"№ брони застройщика": "Developer reservation No."
+"№ брони застройщика": "Developer reservation No.",
+"скидка {p}% ждёт согласования": "discount {p}% awaits approval",
+"Согласовать скидку": "Approve discount",
+"Не согласовать": "Decline",
+"Подтвердить бронь": "Confirm reservation",
+"«Договор подписан» — после пройденного KYC": "“SPA signed” is available after KYC is passed",
+"Снято у застройщика": "Released with developer",
+"Оплачено клиентом, %": "Paid by client, %",
+"Сохранить оплату": "Save payment",
+"Отметка": "Mark",
+"Холд / бронь": "Hold / reservation"
 }

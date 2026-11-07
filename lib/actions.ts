@@ -21,7 +21,8 @@ import { canReviewKyc, kycMissing, type KycFields } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
-import { pushDeal, queueSync } from './b24sync'
+import { pushDeal, queueSync, queueApp, queueTask } from './b24sync'
+import { grantAccess, invite, noPassword } from './partnerAccess'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -111,6 +112,12 @@ export async function likeInShow(unitId: string) {
 }
 
 /* ── Клиенты ── */
+// Заявка партнёра (или его агентства) — пересчитать стадию First client / Active в Bitrix24
+async function partnerProgress(userId: string) {
+  const a = await one<{ id: string }>(`select a.id from portal.agent_applications a join portal.users u on u.id = a.user_id
+    where a.user_id = $1 or (u.agency_id is not null and u.agency_id = (select agency_id from portal.users where id = $1)) order by (a.user_id = $1) desc limit 1`, [userId])
+  if (a) await queueApp(a.id)
+}
 async function stageGuard(c: Ctx, clientId: string) {
   const cl = await one<{ id: string; owner_id: string; agency_id: string | null; name: string }>('select id, owner_id, agency_id, name from portal.clients where id = $1', [clientId])
   if (!cl) throw new Error('client')
@@ -188,6 +195,7 @@ export async function registerClient(_: unknown, f: FormData) {
   if (c.user.curator_id) await notify(c.user.curator_id, 'client', 'Новый клиент агента {a}: {c}', `/clients/${r!.id}`, { a: c.user.name, c: name })
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
   await pushDeal(r!.id, ext ? `кандидат от партнёра ${c.user.name} (${reg})` : `клиент заведён в портале (${reg})`) // §13 п.4
+  if (ext) await partnerProgress(c.user.id) // §13 п.20: First client
   return { ok: true, id: r!.id, reg, until: (r!.protected_until || r!.candidate_until)!, candidate: ext }
 }
 
@@ -258,6 +266,11 @@ export async function moveStage(clientId: string, target: string, extra?: { reas
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Стадия: {stage}{r}',$3)`, [clientId, c.user.id, { stage: target, r: '' }])
   }
   await audit(c.real.id, 'client.stage', 'client', clientId, { from: cl.stage, to: target, ...extra }, c.impersonating ? c.user.id : null)
+  // §13 п.16: партнёр двинул раннюю стадию или просит отказ — запись в ленту или задача офису
+  if (isExternal(c.user.role)) {
+    if (target === 'lost') await queueTask(clientId, `Partner requests Lost · ${cl.name}`, `Партнёр ${c.user.name} просит закрыть сделку: ${extra?.reason || '—'}`, 'market_head')
+    else await pushDeal(clientId, target === 'pause' ? `партнёр поставил паузу до ${extra?.until}` : `партнёр: стадия ${target}`)
+  }
   revalidatePath('/clients'); revalidatePath(`/clients/${clientId}`); revalidatePath('/')
   return { ok: true }
 }
@@ -320,6 +333,7 @@ export async function submitKyc(f: FormData) {
   await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system','KYC отправлен на проверку')`, [cl.id, c.user.id])
   for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'kyc', 'KYC {c} ждёт проверки', `/clients/${cl.id}`, { c: cl.name })
   await audit(c.real.id, 'client.kyc_submit', 'client', cl.id, null, c.impersonating ? c.user.id : null)
+  await pushDeal(cl.id, 'KYC отправлен на проверку') // §13 п.10
   revalidatePath(`/clients/${cl.id}`)
 }
 export async function reviewKyc(f: FormData) {
@@ -338,6 +352,7 @@ export async function reviewKyc(f: FormData) {
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`, [id, c.user.id, text, { r: s(f, 'note') }])
   if (cl.owner_id !== c.user.id) await notify(cl.owner_id, 'kyc', decision === 'passed' ? 'KYC {c} пройден' : decision === 'rejected' ? 'KYC {c} отклонён — посмотрите причину' : 'KYC {c} нужно пройти заново', `/clients/${id}`, { c: cl.name })
   await audit(c.real.id, 'client.kyc_' + decision, 'client', id, { note: s(f, 'note') || null }, c.impersonating ? c.user.id : null)
+  await pushDeal(id, decision === 'passed' ? 'KYC пройден' : decision === 'rejected' ? `KYC отклонён: ${s(f, 'note').slice(0, 300)}` : 'KYC сброшен — нужна повторная проверка')
   revalidatePath(`/clients/${id}`)
   revalidatePath('/kyc'); revalidatePath('/', 'layout')
 }
@@ -464,6 +479,7 @@ export async function createBooking(_: unknown, f: FormData) {
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
+    await queueTask(clientId, `Discount approval · ${disc}% · ${u}`, `Скидка ${disc}% сверх порога автора (${c.user.name}). Согласовать или отклонить — во вкладке Units → Условия покупки.`, 'market_head') // §13 п.9
   } else if (!queued) for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
   await pushDeal(clientId, queued ? `запрос брони ${unitNo(unit)} в очереди лимита застройщика` : `запрос брони ${unitNo(unit)}: ${Math.round(sp.final).toLocaleString('en')} $, скидка ${disc}%`)
@@ -515,7 +531,7 @@ export async function bookingAction(f: FormData) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
     if (b.status === 'confirmed') await pbEnqueue(b.unit_id, 'release', id, c.user.id) // снять бронь и в Profitbase
     if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
-  } else if (act === 'contract' && ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && b.status === 'confirmed') {
+  } else if (act === 'contract' && canConfirmBooking(c.user.role) && b.status === 'confirmed') { // «Договор подписан» ставит бэк-офис (§14)
     // Договор — только после пройденного KYC (v2)
     if ((await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [b.client_id]))?.kyc_status !== 'passed') return
     // Пакет: подтверждённые брони того же клиента с тем же group_id оформляются одним договором — по сделке на квартиру
@@ -539,6 +555,7 @@ export async function bookingAction(f: FormData) {
     })
     if (made.length) await notify(b.agent_id, 'deal', made.length > 1 ? 'Договор подписан — сделок в работе: {n}' : 'Договор подписан — сделка в работе', '/commission', made.length > 1 ? { n: made.length } : undefined)
     for (const d of made) await syncAct(d)
+    if (made.length) await partnerProgress(b.agent_id) // §13 п.20: Active
   }
   await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
@@ -546,6 +563,7 @@ export async function bookingAction(f: FormData) {
   if (NOTE[act]) await pushDeal(b.client_id, NOTE[act])
   revalidatePath('/bookings')
   revalidatePath(`/clients/${b.client_id}`); revalidatePath('/clients'); revalidatePath('/')
+  revalidatePath(`/b24/units/${b.client_id}`)
 }
 
 /* ── Подборки ── */
@@ -629,6 +647,7 @@ export async function applyAgent(_: unknown, f: FormData) {
   const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market, status_token) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
     [s(f, 'kind') === 'agency' ? 'agency' : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market, token])
   for (const d of docs) await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [app!.id, await storeFile(d, null, DOC)])
+  await queueApp(app!.id, `заявка подана в портале, документов: ${docs.length}`) // §13 п.18
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
   for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
   return { ok: true, token }
@@ -656,6 +675,7 @@ export async function reviewApplication(f: FormData) {
   // Не владелец разбирает только заявки своего рынка
   await q(`update portal.agent_applications set status = $2, note = coalesce(nullif($3, ''), note), reviewed_by = $4 where id = $1 and ($5 = 'owner' or market = $6)`, [id, status, s(f, 'note'), c.user.id, c.user.role, c.user.market])
   await audit(c.real.id, 'application.' + status, 'application', id)
+  await queueApp(id, `статус заявки в портале: ${status}${s(f, 'note') ? ' — ' + s(f, 'note').slice(0, 300) : ''}`)
   revalidatePath('/admin/agents'); revalidatePath(`/admin/agents/app/${id}`)
 }
 
@@ -705,13 +725,6 @@ export async function saveConditions(_: unknown, f: FormData) {
 
 /* ── Пользователи ── */
 // Новый пользователь без пароля: случайный хеш, пароль задаёт сам по ссылке-приглашению
-const noPassword = () => bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10)
-async function invite(uid: string, by: string) {
-  const u = (await one<{ id: string; email: string; name: string; locale: Lang }>('select id, email, name, locale from portal.users where id = $1', [uid]))!
-  const link = await issueLink(uid, 'invite', by)
-  await mailLink(u, 'invite', link)
-  return { link, mailed: mailOn() }
-}
 export async function createUser(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canManageUsers(c.user.role)) return { error: 'Только владелец' }
@@ -871,25 +884,11 @@ export async function setOwnLocale(f: FormData) {
 export async function createFromApplication(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) return { error: 'Нет прав' }
-  const a = await one<{ id: string; kind: string; name: string; company: string | null; email: string; market: string; license: string | null; user_id: string | null; status: string }>('select * from portal.agent_applications where id = $1', [s(f, 'id')])
-  if (!a || a.user_id) return { error: 'Доступ уже создан' }
+  const a = await one<{ market: string }>('select market from portal.agent_applications where id = $1', [s(f, 'id')])
+  if (!a) return { error: 'Доступ уже создан' }
   if (c.user.role === 'market_head' && a.market !== c.user.market) return { error: 'Нет прав' }
-  let uid: string
-  try {
-    uid = await tx(async (t) => {
-      let agency: string | null = null
-      if (a.kind === 'agency') agency = (await t.query(`insert into portal.agencies (name, market) values ($1,$2) returning id`, [a.company || a.name, a.market])).rows[0].id
-      const u = await t.query(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id, curator_id, license_note, contract_signed_at) values ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10) returning id`,
-        [a.email.toLowerCase(), a.name, noPassword(), a.kind === 'agency' ? 'agency_head' : 'agent', a.market, a.market === 'IL' ? 'he' : 'de', agency, s(f, 'curator') || null, a.license, s(f, 'contract') || null])
-      await t.query(`update portal.agent_applications set status = 'approved', user_id = $2, reviewed_by = $3 where id = $1`, [a.id, u.rows[0].id, c.user.id])
-      return u.rows[0].id as string
-    })
-    await audit(c.real.id, 'application.access', 'user', uid, { application: a.id }, c.impersonating ? c.user.id : null)
-  } catch {
-    return { error: 'Такой e-mail уже есть' }
-  }
   // Без revalidatePath: иначе строка заявки перерисуется и ссылка-приглашение исчезнет с экрана
-  return { ok: true, email: a.email, ...(await invite(uid, c.real.id)) }
+  return grantAccess(s(f, 'id'), c.real.id, { curator: s(f, 'curator') || null, contract: s(f, 'contract') || null, asUser: c.impersonating ? c.user.id : null })
 }
 
 /* ── Исключения по ставкам агентов и агентств ── */
@@ -933,8 +932,10 @@ export async function dealPaid(f: FormData) {
   if (Number.isNaN(v)) return
   const d = await one<{ client_id: string }>('update portal.deals set paid_pct = $2 where id = $1 returning client_id', [s(f, 'id'), v])
   if (d) await q('select portal.sync_client_stage($1)', [d.client_id]) // первый платёж — стадия «Платежи»
+  if (d) await pushDeal(d.client_id, `оплата клиента по сделке: ${v}%`) // §13 п.13: Won, Installments, Aftercare
   await audit(c.real.id, 'deal.paid', 'deal', s(f, 'id'), { paid_pct: v }, c.impersonating ? c.user.id : null)
   revalidatePath('/finance')
+  if (d) revalidatePath(`/b24/units/${d.client_id}`)
 }
 
 /* ── Тур в Баку: заявка офису (даты, язык, сколько человек) ── */

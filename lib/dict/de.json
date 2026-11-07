@@ -2010,5 +2010,15 @@
 "файлом": "als Datei",
 "холд 24 ч": "24-h-Hold",
 "через API": "per API",
-"№ брони застройщика": "Reservierungsnr. des Bauträgers"
+"№ брони застройщика": "Reservierungsnr. des Bauträgers",
+"скидка {p}% ждёт согласования": "Rabatt {p} % wartet auf Freigabe",
+"Согласовать скидку": "Rabatt freigeben",
+"Не согласовать": "Ablehnen",
+"Подтвердить бронь": "Reservierung bestätigen",
+"«Договор подписан» — после пройденного KYC": "„SPA unterzeichnet“ erst nach bestandenem KYC",
+"Снято у застройщика": "Beim Bauträger freigegeben",
+"Оплачено клиентом, %": "Vom Kunden bezahlt, %",
+"Сохранить оплату": "Zahlung speichern",
+"Отметка": "Markierung",
+"Холд / бронь": "Hold / Reservierung"
 }

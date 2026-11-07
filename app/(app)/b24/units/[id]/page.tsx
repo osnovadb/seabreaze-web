@@ -5,24 +5,27 @@ import { q, one } from '@/lib/db'
 import { t, usd, date } from '@/lib/i18n'
 import { listProjects, buildingsOf } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
-import { bookingAction } from '@/lib/actions'
+import { bookingAction, dealPaid } from '@/lib/actions'
+import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean }
+type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 export default async function Units({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string; created?: string } }) {
   if (!/^[0-9a-f-]{36}$/.test(params.id)) notFound()
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
-  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null }>(
-    'select id, name, attach_status, protected_until::text, b24_deal_id, market from portal.clients where id = $1', [params.id])
+  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string }>(
+    'select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status from portal.clients where id = $1', [params.id])
   if (!cl) notFound()
   const units = await q<U>(`with b as (select distinct on (unit_id) * from portal.bookings where client_id = $1 and status in ('hold','queued','requested','confirmed','release_pending','converted') order by unit_id, created_at desc),
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
-      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine
+      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no,
+      d.id deal_id, d.paid_pct::float paid
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
+      left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
     where b.id is not null or s.unit_id is not null order by b.status is null, p.name, no`, [cl.id, c.user.id]).catch(async () =>
       q<U>(`select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final, false liked, true in_sel, u.price_list::float usd, b.agent_id = $2 mine
         from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id where b.client_id = $1 and b.status in ('hold','queued','requested','confirmed','release_pending','converted')`, [cl.id, c.user.id]))
@@ -63,10 +66,40 @@ export default async function Units({ params, searchParams }: { params: { id: st
           </tbody></table></div>}
         {tab === 'terms' && <div className="stack mt16">
           {active.length === 0 && <div className="muted">{T('Нет холдов и запросов брони')}</div>}
-          {active.map((u) => <div key={u.unit_id} className="card row" style={{ justifyContent: 'space-between' }}>
-            <span><b>{u.no}</b> · {u.project} · <Pill kind={ST[u.status!][1]}>{T(ST[u.status!][0])}</Pill>{u.ends_at && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}</span>
-            <span className="row" style={{ gap: 8 }}><b>{usd(L, u.final ?? 0)}</b>{u.status === 'hold' && u.mine ? <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Запросить бронь')}</Link> : <Link className="btn btn--sm" href="/bookings">{T('Брони')}</Link>}</span>
-          </div>)}
+          {active.map((u) => {
+            const h = (act: string) => <><input type="hidden" name="id" value={u.booking_id!} /><input type="hidden" name="act" value={act} /></>
+            const approve = u.status === 'requested' && u.approval === 'pending' && canApproveDiscount(c.user.role)
+            const confirm = u.status === 'requested' && u.approval !== 'pending' && canConfirmBooking(c.user.role)
+            const office = canConfirmBooking(c.user.role)
+            return <div key={u.unit_id} className="card stack" style={{ gap: 10 }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <span><b>{u.no}</b> · {u.project} · <Pill kind={ST[u.status!][1]}>{T(ST[u.status!][0])}</Pill>{u.ends_at && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}
+                  {u.dev_no && <span className="small muted"> · {T('№ брони застройщика')} {u.dev_no}</span>}
+                  {u.approval === 'pending' && <span className="small warnc"> · {T('скидка {p}% ждёт согласования', { p: u.disc || 0 })}</span>}</span>
+                <span className="row" style={{ gap: 8 }}><b>{usd(L, u.final ?? 0)}</b>{u.status === 'hold' && u.mine && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Запросить бронь')}</Link>}</span>
+              </div>
+              {approve && <div className="row" style={{ gap: 8 }}>
+                <form action={bookingAction}>{h('approve')}<button className="btn btn--sm btn--p">{T('Согласовать скидку')}</button></form>
+                <form action={bookingAction}>{h('decline')}<button className="btn btn--sm">{T('Не согласовать')}</button></form></div>}
+              {confirm && <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('confirm')}
+                  <label className="tiny">{T('№ брони застройщика')}<input name="dev_no" className="in" style={{ width: 120 }} /></label>
+                  <label className="tiny">{T('до какого числа у застройщика')}<input name="until" type="date" className="in" /></label>
+                  <button className="btn btn--sm btn--p">{T('Подтвердить бронь')}</button></form>
+                <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('reject')}
+                  <select name="reason" className="in">{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                  <button className="btn btn--sm">{T('Отклонить')}</button></form></div>}
+              {u.status === 'confirmed' && office && (cl.kyc_status === 'passed'
+                ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
+                : <div className="small muted">{T('«Договор подписан» — после пройденного KYC')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></div>)}
+              {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
+              {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)
+                ? <form action={dealPaid} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.deal_id} />
+                    <label className="tiny">{T('Оплачено клиентом, %')}<input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>
+                    <button className="btn btn--sm btn--p">{T('Сохранить оплату')}</button></form>
+                : <div className="small muted">{T('Оплачено клиентом')}: {u.paid ?? 0}%</div>)}
+            </div>
+          })}
         </div>}
       </div>
     </>
