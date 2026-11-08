@@ -45,6 +45,8 @@ export function StageStepper({ clientId, name, steps, current, ctx, role, lang }
           <button type="button" className="btn btn--sm" disabled={pending || ctx.stage === 'lost'} onClick={() => setDialog('lost')}>{T('Отказ')}</button>
         </div>
       </div>
+      {/* QA 09.11: на телефоне подписи этапов обрезаются до «C… S…» — текущий этап словами отдельной строкой */}
+      {!inactive && steps[cur] && <div className="steps__now small mt8">{T('Этап')}: <b>{steps[cur].label}</b>{steps[cur + 1] ? <span className="muted"> → {steps[cur + 1].label}</span> : null}</div>}
       <div className="tiny muted mt8">{inactive ? T('Клиент не в работе — нажмите этап, чтобы вернуть его в воронку.') : T('Нажмите на этап, чтобы перевести клиента. Серые этапы ведёт команда или система.')}</div>
       {dialog && <StageDialog lang={lang} target={dialog} name={name} onCancel={() => setDialog(null)} onOk={(extra) => { go(dialog, dialog === 'viewing' ? steps.findIndex((x) => x.target === 'viewing') : -1, extra); setDialog(null) }} />}
       {toast && <div className="toast" role="status">{toast}</div>}

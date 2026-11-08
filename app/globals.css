@@ -356,3 +356,5 @@ summary.btn::-webkit-details-marker { display: none; }
 @media (max-width: 1100px) { .nav { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); } }
 /* QA 09.11: кнопка отправленной формы, пока сервер отвечает (components/FormBusy) */
 .is-busy { opacity: .55; cursor: progress !important; pointer-events: none; }
+.steps__now { display: none; }
+@media (max-width: 700px) { .steps__now { display: block; } .steps .step__l { visibility: hidden; height: 0; } }

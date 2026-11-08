@@ -58,7 +58,7 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
         {view === 'kanban' ? (
           <Kanban role={c.user.role} lang={L}
             cols={ext
-              ? PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: l, who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))
+              ? PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: T(l), who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))
               : STAGES.map(([k, l]): KCol => ({ key: k, label: T(l), target: k }))}
             cards={rows.map((r): KCard => ({
               id: r.id, name: r.name,
@@ -76,7 +76,7 @@ export default async function Clients({ searchParams }: { searchParams: { v?: st
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/clients/${r.id}`}><b>{r.name}</b></Link><div className="tiny muted">{r.reg_no}</div></td>
-                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] : stageName(L, r.stage)}</td>
+                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] && T((PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1]) : stageName(L, r.stage)}</td>
                     <td>{ext ? r.country : r.owner}</td><td className="small">{r.budget || '—'}</td><td>{r.booking || '—'}</td>
                     <td className="small">{date(L, r.protected_until)}</td><td className="small muted">{date(L, r.last_activity_at)}</td>
                     <td className="small">{sg && <span className={sg[0]}>{sg[1]}</span>}</td>

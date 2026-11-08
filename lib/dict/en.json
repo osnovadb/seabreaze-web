@@ -2459,5 +2459,14 @@
 "Сначала клиент, потом подборка и бронь.": "Client first, then selection and booking.",
 "Загружаем…": "Uploading…",
 "Добавить ещё": "Add another",
-"Реестр": "Register"
+"Реестр": "Register",
+"Candidate": "Candidate",
+"Selection": "Selection",
+"Developer registration": "Developer registration",
+"Reservation request": "Reservation request",
+"Reserved": "Reserved",
+"KYC": "KYC",
+"SPA signed": "SPA signed",
+"Won": "Won",
+"Этап": "Stage"
 }

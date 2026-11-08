@@ -67,7 +67,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
     <>
       <Top crumbs={[[ext ? T('Клиенты') : T('CRM · клиенты'), '/clients'], [cl.name]]} title={cl.name}
         sub={<span className="row" style={{ gap: 8, marginTop: 6 }}>
-          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES[agentIdx] || ['', cl.stage])[1] : stageName(L, cl.stage)}</Pill>
+          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((PARTNER_STAGES[agentIdx] || ['', cl.stage])[1]) : stageName(L, cl.stage)}</Pill>
           {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
           {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат: квалифицируйте до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
           {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
@@ -81,7 +81,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
         </>} />
       <div className="page">
         <StageStepper clientId={cl.id} name={cl.name} role={c.user.role} lang={L}
-          steps={ext ? PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: l, target })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
+          steps={ext ? PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: T(l), target })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
           current={ext ? agentIdx : teamIdx}
           ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) }} />
         <div className="cgrid mt16">

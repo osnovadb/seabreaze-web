@@ -2459,5 +2459,14 @@
 "Сначала клиент, потом подборка и бронь.": "Erst der Kunde, dann Auswahl und Reservierung.",
 "Загружаем…": "Wird hochgeladen…",
 "Добавить ещё": "Weitere hinzufügen",
-"Реестр": "Register"
+"Реестр": "Register",
+"Candidate": "Kandidat",
+"Selection": "Auswahl",
+"Developer registration": "Registrierung beim Bauträger",
+"Reservation request": "Reservierungsanfrage",
+"Reserved": "Reserviert",
+"KYC": "KYC",
+"SPA signed": "Kaufvertrag unterzeichnet",
+"Won": "Abgeschlossen",
+"Этап": "Phase"
 }
