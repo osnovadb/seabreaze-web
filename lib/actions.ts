@@ -213,6 +213,11 @@ async function registerClientLocked(f: FormData) {
   await audit(c.real.id, 'client.register', 'client', r!.id, { reg }, c.impersonating ? c.user.id : null)
   await pushDeal(r!.id, ext ? `кандидат от партнёра ${c.user.name} (${reg})` : `клиент заведён в портале (${reg})`) // §13 п.4
   if (ext) await partnerProgress(c.user.id) // §13 п.20: First client
+  // QA 09.11: партнёр заполнил всю квалификацию прямо в форме — закрепляем сразу, а не ждём повторного «Сохранить» в карточке
+  if (ext && await qualifyIfReady(c.user.id, r!.id)) {
+    const u2 = await one<{ until: string }>('select protected_until::text until from portal.clients where id = $1', [r!.id])
+    return { ok: true, id: r!.id, reg, until: u2!.until, candidate: false }
+  }
   return { ok: true, id: r!.id, reg, until: (r!.protected_until || r!.candidate_until)!, candidate: ext }
 }
 
@@ -603,6 +608,8 @@ export async function bookingAction(f: FormData) {
   revalidatePath('/bookings')
   revalidatePath(`/clients/${b.client_id}`); revalidatePath('/clients'); revalidatePath('/')
   revalidatePath(`/b24/units/${b.client_id}`)
+  // QA 09.11: после «Договор подписан» строка пропадала из броней молча — возвращаемся с пояснением
+  if (act === 'contract' && s(f, 'back') === 'bookings') redirect(`/bookings?contract=${id}`)
 }
 
 /* ── Подборки ── */
@@ -695,6 +702,11 @@ export async function applyAgent(_: unknown, f: FormData) {
   }
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
   for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
+  // QA 09.11: ссылка на статус была только на экране — дублируем письмом, на языке формы
+  const al = (LANGS.includes(s(f, 'lang') as Lang) ? s(f, 'lang') : market === 'IL' ? 'he' : market === 'DE' ? 'de' : 'en') as Lang
+  const link = `${(process.env.PUBLIC_URL || '').replace(/\/$/, '')}/apply/status/${token}?lang=${al}`
+  await q(`insert into portal.outbox_messages (channel, to_addr, subject, body, kind) values ('email',$1,$2,$3,'application')`,
+    [s(f, 'email'), 'GetsEstate · ' + t(al, 'Заявка на партнёрство'), [t(al, 'Здравствуйте, {n}!', { n: s(f, 'name') }), t(al, 'Мы получили вашу заявку и ответим в течение 2 рабочих дней.'), t(al, 'Статус заявки') + ': ' + link].join('\n\n')])
   return { ok: true, token }
 }
 // Документ к заявке, полученный позже (по почте, у куратора) — добавляет проверяющий

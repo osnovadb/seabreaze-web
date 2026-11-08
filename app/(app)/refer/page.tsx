@@ -4,6 +4,7 @@ import { q } from '@/lib/db'
 import { t, date, usd } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { ReferForm } from './form'
+import { PayoutProfile } from '@/components/PayoutProfile'
 
 // 2.2 · §6 П9 Кабинет рекомендателя: передать контакт, статус своих рекомендаций и вознаграждения (2% после получения нашей комиссии)
 type R = { id: string; name: string; created_at: string; stage: string; attach_status: string; b24_semantic: string | null; deal: number | null; fee: boolean; paid_out: boolean }
@@ -33,6 +34,8 @@ export default async function Refer() {
               <tr key={r.id}><td>{r.name}</td><td className="small">{date(L, r.created_at)}</td><td><Pill kind={k}>{T(l)}</Pill></td><td className="num">{r.deal ? usd(L, r.deal * 0.02) : '—'}</td></tr>) })}</tbody>
           </table></div>
         </div>
+        {/* QA 09.11: данные для выплаты — как только по рекомендации есть сделка (раньше рекомендателю негде было их указать) */}
+        {rows.some((r) => r.deal) && <PayoutProfile userId={c.user.id} lang={L} />}
       </div>
     </>
   )

@@ -72,11 +72,15 @@ export async function savePayoutProfile(f: FormData) {
   const id = self ? c.user.id : s(f, 'user')
   if (!self && !['owner', 'office', 'finance'].includes(c.user.role)) throw new Error('forbidden')
   const form = ['company', 'sole', 'individual'].includes(s(f, 'partner_form')) ? s(f, 'partner_form') : null
+  // Реквизиты: смена IBAN/SWIFT (не первое заполнение) — выплата на новые не раньше чем через 3 дня
+  const iban = s(f, 'bank_iban').replace(/\s+/g, '').toUpperCase().slice(0, 34), swift = s(f, 'bank_swift').replace(/\s+/g, '').toUpperCase().slice(0, 11)
   await q(`update portal.users set partner_form = $2, vat_payer = $3, vat_no = nullif($4, ''), tax_country = nullif(upper($5), ''), tax_no = nullif($6, ''),
-      tax_cert_until = case when $7 = '' then null else $7::date end where id = $1`,
-    [id, form, f.get('vat_payer') === 'on', s(f, 'vat_no'), s(f, 'tax_country').slice(0, 2), s(f, 'tax_no'), s(f, 'tax_cert_until')])
+      tax_cert_until = case when $7 = '' then null else $7::date end,
+      bank_changed_at = case when bank_iban is not null and (bank_iban is distinct from nullif($9, '') or bank_swift is distinct from nullif($10, '')) then now() else bank_changed_at end,
+      bank_holder = nullif($8, ''), bank_iban = nullif($9, ''), bank_swift = nullif($10, ''), bank_name = nullif($11, '') where id = $1`,
+    [id, form, f.get('vat_payer') === 'on', s(f, 'vat_no'), s(f, 'tax_country').slice(0, 2), s(f, 'tax_no'), s(f, 'tax_cert_until'), s(f, 'bank_holder').slice(0, 120), iban, swift, s(f, 'bank_name').slice(0, 120)])
   await audit(c.real.id, 'user.payout_profile', 'user', id)
-  revalidatePath('/commission'); revalidatePath('/profile')
+  revalidatePath('/commission'); revalidatePath('/profile'); revalidatePath('/refer'); revalidatePath('/')
 }
 // Сопровождающий в Баку — назначает бэк-офис при Reserved (фикс за продажу — из условий проекта)
 export async function setEscort(f: FormData) {

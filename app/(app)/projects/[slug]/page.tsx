@@ -125,7 +125,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
             <div className="kv"><span>{T('Скидка продавца сам / с согласованием')}</span><span>{pct(L, cond.seller_self_disc)} / {pct(L, cond.seller_max_disc)}</span></div>
             <div className="kv"><span>{T('Агенту: фикс + часть пула')}</span><span>{pct(L, cond.agent_fix_pct)} + {pct(L, cond.agent_pool_pct)}</span></div>
           </>}
-          <div className="kv"><span>{T('Защита клиента')}</span><span>{T('{m} мес.', { m: cond.protect_months })}</span></div>
+          <div className="kv"><span>{T('Закрепление клиента')}</span><span>{T('6 мес. после квалификации')}</span></div>{/* 2.2 §10: срок закрепления единый (было protect_months условий v2 — 3 мес., расходилось с карточкой клиента; QA 09.11) */}
           <div className="kv"><span>{T('Бронь')}</span><span>{T('{a} + {b} дней', { a: cond.booking_days, b: cond.booking_ext_days })}</span></div>
           {!short && <div className="kv"><span>{T('Лимит броней')}</span><span>{T('клиент {c} · агент {a} · всего {t}', { c: cond.max_bookings_client, a: cond.max_bookings_agent, t: cond.max_bookings_total })}</span></div>}
           <div className="kv"><span>{T('Фиксация у застройщика')}</span><span>{T('через команду, 3–5 дней')}</span></div>

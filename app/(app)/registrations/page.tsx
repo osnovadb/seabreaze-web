@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { REG_ST } from '@/lib/stages'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
@@ -9,10 +10,7 @@ import { sendRegistrations, decideRegistration, renewRegistration, massEnqueue }
 // 2.2 · Регистрации у застройщиков (§7, экран Бэк-офис 01): пакет на сегодня, ждём ответа, молчание, истекают, все
 type R = { id: string; status: string; reject_reason: string | null; mass: boolean; priority: boolean; due_send: string | null; sent_at: string | null; answer_due: string | null
   valid_until: string | null; client: string; client_id: string; owner_type: string; owner: string; market: string | null; developer: string; developer_id: string; silence_rule: string }
-const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = {
-  to_send: ['К отправке', 'ink'], sent: ['Отправлено', 'warn'], confirmed: ['Подтверждено', 'ok'], confirmed_silence: ['Подтверждено молчанием', 'ok'],
-  rejected: ['Отказ', 'bad'], expired: ['Истекла', 'off'], withdrawn: ['Отозвана', 'off'],
-}
+const ST = REG_ST
 const WHY: Record<string, string> = { developer_client: 'клиент застройщика', other_agency: 'за другим агентством', other: 'другое' }
 
 export default async function Registrations({ searchParams }: { searchParams: { f?: string; d?: string } }) {

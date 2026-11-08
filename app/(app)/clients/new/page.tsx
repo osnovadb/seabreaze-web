@@ -11,7 +11,7 @@ export default async function NewClient() {
   const T = (s: string) => t(c.lang, s)
   return (
     <>
-      <Top crumbs={[[T('Клиенты'), '/clients'], [T('Новый клиент')]]} title={T('Новый клиент')} sub={T('Сначала регистрация, потом подборка и бронь. Клиент закрепляется за тем, кто зарегистрировал его раньше.')} />
+      <Top crumbs={[[T('Клиенты'), '/clients'], [T('Новый клиент')]]} title={T('Новый клиент')} sub={T(isExternal(c.user.role) ? 'Сначала клиент, потом подборка и бронь. Клиент закрепляется за тем, кто первым его квалифицировал.' : 'Сначала клиент, потом подборка и бронь.')} />
       <div className="page"><RegisterForm lang={c.lang} ext={isExternal(c.user.role)} /></div>
     </>
   )

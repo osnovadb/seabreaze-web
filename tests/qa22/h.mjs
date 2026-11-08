@@ -23,9 +23,9 @@ export async function agency(market = 'DE') {
 }
 export async function user(role, o = {}) {
   const email = `qa-${role}-${uniq()}@qa.test`
-  return one(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id, curator_id, created_at, partner_form, tax_no, languages)
-    values ($1,$2,'!',false,$3,$4,$5,$6,$7, coalesce($8, now()), $9, $10, $11) returning *`,
-    [email, o.name || `QA ${role} ${RUN}`, role, o.market === undefined ? 'DE' : o.market, o.locale || 'ru', o.agency_id || null, o.curator_id || null, o.created_at || null, o.partner_form || null, o.tax_no || null, o.languages || []])
+  return one(`insert into portal.users (email, name, password_hash, password_set, role, market, locale, agency_id, curator_id, created_at, partner_form, tax_no, languages, bank_iban)
+    values ($1,$2,'!',false,$3,$4,$5,$6,$7, coalesce($8, now()), $9, $10, $11, $12) returning *`,
+    [email, o.name || `QA ${role} ${RUN}`, role, o.market === undefined ? 'DE' : o.market, o.locale || 'ru', o.agency_id || null, o.curator_id || null, o.created_at || null, o.partner_form || null, o.tax_no || null, o.languages || [], o.bank_iban || null])
 }
 export async function cookie(u) {
   const r = await one('select session_ver from portal.users where id = $1', [u.id])

@@ -12,9 +12,9 @@ const ENTITY: Record<string, string> = { DE: 'GetsEstate GmbH (DE)', IL: 'GetsEs
 export default async function Act({ params }: { params: { id: string } }) {
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
-  const l = await one<{ id: string; register_id: string; user_id: string; role: string; market: string | null; gross: number; withheld: number; net: number; act_no: string | null; act_date: string | null; currency: string | null; fx_rate: number | null; fx_source: string | null; amount_cur: number | null; agreed_at: string | null; invoice_file_id: string | null; month: string; name: string; email: string; partner_form: string | null; tax_no: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null }>(
+  const l = await one<{ id: string; register_id: string; user_id: string; role: string; market: string | null; gross: number; withheld: number; net: number; act_no: string | null; act_date: string | null; currency: string | null; fx_rate: number | null; fx_source: string | null; amount_cur: number | null; agreed_at: string | null; invoice_file_id: string | null; month: string; name: string; email: string; partner_form: string | null; tax_no: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null; bank_holder: string | null; bank_iban: string | null; bank_swift: string | null; bank_name: string | null }>(
     `select l.id, l.register_id, l.user_id, l.role, l.market, l.gross::float, l.withheld::float, l.net::float, l.act_no, l.act_date::text, l.currency, l.fx_rate::float, l.fx_source, l.amount_cur::float, l.agreed_at, l.invoice_file_id,
-       r.month::text, u.name, u.email, u.partner_form, u.tax_no, u.vat_payer, u.vat_no, u.tax_country
+       r.month::text, u.name, u.email, u.partner_form, u.tax_no, u.vat_payer, u.vat_no, u.tax_country, u.bank_holder, u.bank_iban, u.bank_swift, u.bank_name
      from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id join portal.users u on u.id = l.user_id where l.id = $1`, [params.id])
   if (!l || !l.act_no || (l.user_id !== c.user.id && !['owner', 'finance'].includes(c.user.role))) notFound()
   const rows = await q<{ unit: string | null; project: string | null; kind: string; tranche: number | null; amount: number; note: string | null }>(
@@ -33,6 +33,7 @@ export default async function Act({ params }: { params: { id: string } }) {
           <div className="kv"><span>{T('Заказчик')}</span><b>{ENTITY[l.market || ''] || 'Caspian (AZ)'}</b></div>
           <div className="kv"><span>{T('Исполнитель')}</span><b>{l.name}</b></div>
           <div className="kv"><span>{T('Форма, налоговый номер')}</span><span>{[l.partner_form && T({ company: 'Компания', sole: 'ИП', individual: 'Физлицо' }[l.partner_form] || ''), l.tax_no, l.tax_country].filter(Boolean).join(' · ') || '—'}</span></div>
+          <div className="kv"><span>{T('Банковские реквизиты')}</span><span>{[l.bank_holder, l.bank_name, l.bank_iban, l.bank_swift].filter(Boolean).join(' · ') || '—'}</span></div>
           {l.vat_payer && <div className="kv"><span>{T('НДС')}</span><span>{T('исполнитель — плательщик НДС ({v}): НДС добавляется к сумме акта по его статусу', { v: l.vat_no || '—' })}</span></div>}
         </div>
         <div className="tbl-wrap"><table className="tbl">

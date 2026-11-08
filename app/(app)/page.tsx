@@ -9,6 +9,7 @@ import { expectedAgent, type SplitCond } from '@/lib/money'
 import { Top, AGENT_STAGES, STAGES } from '@/components/ui'
 import { readAll, toggleTask, startShow } from '@/lib/actions'
 import { feed } from '@/lib/posts'
+import { payoutGaps } from '@/lib/money22'
 
 export default async function Home() {
   const c = await requireCtx()
@@ -29,7 +30,8 @@ export default async function Home() {
   const sel = await one<{ n: number }>(`select count(*)::int n from portal.selections s join portal.clients cl on cl.id = s.client_id where ${cs.sql} and s.last_opened_at > now() - interval '7 days'`, cs.params)
   const projects = await listProjects(u)
   // Изменения в каталоге с прошлого входа (прототип 2): по видимым проектам; без прошлого входа — за неделю
-  const since = (await one<{ t: string }>(`select coalesce(prev_login_at, now() - interval '7 days')::text t from portal.users where id = $1`, [c.real.id]))!.t
+  const sinceRow = (await one<{ t: string; first: boolean }>(`select greatest(coalesce(prev_login_at, now() - interval '7 days'), created_at)::text t, prev_login_at is null first from portal.users where id = $1`, [c.real.id]))!
+  const since = sinceRow.t // QA 09.11: новичку «изменения с 01.11» — не с даты до его регистрации
   const pids = projects.map((p) => p.id)
   const changes = pids.length ? await one<{ prices: number; in_sel: number; freed: number; opened: number }>(`select
       (select count(distinct ph.unit_id)::int from price_history ph join units u on u.id = ph.unit_id where u.project_id = any($1) and ph.changed_at > $2 and exists (select 1 from price_history p0 where p0.unit_id = ph.unit_id and p0.changed_at < ph.changed_at and p0.price is not null)) prices,
@@ -60,6 +62,8 @@ export default async function Home() {
   if (!ext && apps!.n && ['owner', 'market_head', 'seller'].includes(u.role)) attention.push({ kind: 'warn', title: T('Заявки агентов на проверке: {n}', { n: apps!.n }), sub: T('Проверить и ответить за 2 рабочих дня'), href: '/admin/agents' })
   if (disp?.n) attention.push({ kind: 'bad', title: T('Споры «чей клиент»: {n}', { n: disp.n }), sub: T('Решение по журналу'), href: '/admin/disputes' })
   if (appr?.n) attention.push({ kind: 'warn', title: T('Скидки на согласовании: {n}', { n: appr.n }), sub: T('Бронь ждёт вашего решения'), href: '/bookings' })
+  // QA 09.11: начисление есть, а платить некуда — первым пунктом у партнёра
+  if (ext && (u.role === 'agency_head' || !u.agency_id)) { const g = await payoutGaps(u.id); if (g.waiting > 0 && g.missing.length) attention.unshift({ kind: 'bad', title: T('{a} ждут выплаты — укажите данные для выплаты', { a: usd(L, g.waiting) }), sub: g.missing.map((m) => T(m)).join(', '), href: '/commission#payout' }) }
 
   const funnel = ext
     ? AGENT_STAGES.map(([k, l, sts]) => [l, active.filter((x) => sts.includes(x.stage)).length] as [string, number])
@@ -88,6 +92,11 @@ export default async function Home() {
       <Top title={`${hello}, ${u.name.split(' ')[0]}`} sub={new Intl.DateTimeFormat(L === 'ru' ? 'ru-RU' : L === 'de' ? 'de-DE' : L === 'he' ? 'he-IL' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
         right={<>{(ext || ['seller', 'market_head', 'owner'].includes(u.role)) && <Link className="btn btn--p" href="/clients/new">+ {T('Клиент')}</Link>}<Link className="btn" href="/projects">{T('Шахматка')}</Link></>} />
       <div className="page">
+        {/* QA 09.11: новый партнёр видел пустой дашборд без подсказок — первые шаги, пока нет ни одного клиента */}
+        {ext && clients.length === 0 && <div className="card card--sand stack" style={{ gap: 8, marginBottom: 16 }}>
+          <div className="h3" style={{ margin: 0 }}>{T('С чего начать')}</div>
+          {([['/projects', 'Посмотрите проекты и ваши ставки'], ['/clients/new', 'Заведите первого клиента — он закрепится за вами после квалификации'], ['/links', 'Создайте свою ссылку на проекты для соцсетей и сайта'], ...(u.role === 'agency_head' || !u.agency_id ? [['/commission#payout', 'Заполните данные для выплат']] : [])] as [string, string][]).map(([h, l], i) => <Link key={h} className="kv" href={h}><span style={{ color: 'var(--ink)' }}>{i + 1}. {T(l)}</span><span className="small">→</span></Link>)}
+        </div>}
         <div className="grid g4">{kpis.map(([a, b]) => <div key={a} className="card card--tight kpi"><div className="small muted">{a}</div><div className="v num">{b}</div></div>)}</div>
         {news.length > 0 && (
           <div className="card mt16">

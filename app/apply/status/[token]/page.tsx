@@ -2,23 +2,25 @@ import { notFound } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { one } from '@/lib/db'
 import { t, date, LANGS, type Lang } from '@/lib/i18n'
+import { LangSwitch } from '@/components/LangSwitch'
 
 // Статус заявки партнёра для заявителя (М13): по ссылке с токеном, без входа. Без внутренних комментариев проверяющих.
 const STEPS: [string, string][] = [['new', 'Заявка получена'], ['review', 'Проверка документов'], ['contract', 'Договор'], ['approved', 'Доступ открыт']]
 export const dynamic = 'force-dynamic'
-export default async function ApplyStatus({ params }: { params: { token: string } }) {
+export default async function ApplyStatus({ params, searchParams }: { params: { token: string }; searchParams: { lang?: string } }) {
   if (!/^[0-9a-f]{24}$/.test(params.token)) notFound()
   const a = await one<{ name: string; status: string; created_at: string; market: string }>('select name, status, created_at, market from portal.agent_applications where status_token = $1', [params.token])
   if (!a) notFound()
   const lc = cookies().get('ge_lang')?.value as Lang | undefined
   const al = (headers().get('accept-language') || '').slice(0, 2) as Lang
-  const L: Lang = lc && LANGS.includes(lc) ? lc : LANGS.includes(al) ? al : a.market === 'IL' ? 'he' : a.market === 'DE' ? 'de' : 'en'
+  const ql = searchParams.lang as Lang | undefined
+  const L: Lang = lc && LANGS.includes(lc) ? lc : ql && LANGS.includes(ql) ? ql : LANGS.includes(al) ? al : a.market === 'IL' ? 'he' : a.market === 'DE' ? 'de' : 'en'
   const T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const idx = STEPS.findIndex(([k]) => k === a.status)
   return (
     <div dir={L === 'he' ? 'rtl' : 'ltr'} style={{ background: 'var(--sand)', minHeight: '100vh' }}>
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '40px 20px' }}>
-        <img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 24 }} />
+        <div className="between"><img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 24 }} /><LangSwitch lang={L} order={['de', 'en', 'ru', 'he']} /></div>
         <h1 className="h2 mt24">{T('Заявка партнёра')}</h1>
         <p className="muted">{a.name} · {T('отправлена {d}', { d: date(L, a.created_at) })}</p>
         <div className="card mt16">

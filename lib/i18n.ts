@@ -28,7 +28,7 @@ function dump(lang: Lang, ru: string) {
 
 const LOCALE: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', de: 'de-DE', he: 'he-IL' }
 export const num = (lang: Lang, n: number, d = 0) => new Intl.NumberFormat(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).format(n)
-export const usd = (lang: Lang, n: number) => '$' + num(lang, Math.round(n))
+export const usd = (lang: Lang, n: number) => (n < 0 ? '−$' : '$') + num(lang, Math.round(Math.abs(n)))
 export const pct = (lang: Lang, n: number) => num(lang, n, Number(n) % 1 ? 1 : 0) + '%'
 export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + (lang === 'ru' ? ' м²' : lang === 'he' ? ' מ״ר' : ' m²')
 export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')

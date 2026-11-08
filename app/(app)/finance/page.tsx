@@ -5,11 +5,8 @@ import { t, usd, pct, date } from '@/lib/i18n'
 import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { dealPaid } from '@/lib/actions'
-import { actDocument, payActNow } from '@/lib/docActions'
-import { ACT_STATUS } from '@/lib/acts'
 import { ROLE_LABEL } from '@/lib/money22'
 import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding, adjustment, writeOff } from '@/lib/moneyActions'
-import { ActionForm } from '@/components/ActionForm'
 
 // 2.2 · §8 Деньги. Админ — весь путь денег; руководитель рынка — свой рынок без доли Caspian; финансы — суммы к получению и выплате.
 // Платим только из полученного: начисление появляется, когда финансы отмечают транш Received.
@@ -44,14 +41,18 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
        l.invoice_file_id is not null invoice, coalesce(u.partner_form in ('company','sole'), false) needs_inv from portal.payout_lines l left join portal.users u on u.id = l.user_id
      where l.register_id = $1 ${head ? `and l.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''} order by l.carried, l.role, who`, [reg.id]) : []
   const markets = Array.from(new Set(lines.filter((l) => !l.carried && l.market).map((l) => l.market!)))
+  // QA 09.11: реестр месяца оплачен, а начисления продолжают приходить — говорим, куда они пойдут
+  const after = tab === 'register' && reg && reg.status !== 'collected' ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
+  const nextMonth = (() => { const [y, m] = month.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` })()
   const pending = tab === 'register' && !reg ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
   const debts = tab === 'debts' ? await q<{ role: string; user_id: string | null; who: string; bal: number; since: string }>(
     `select a.role, a.user_id, coalesce(u.name, a.recipient) who, sum(a.amount)::float bal, min(a.created_at) filter (where a.kind = 'clawback')::text since
      from portal.accruals a left join portal.users u on u.id = a.user_id where a.status = 'open' group by a.role, a.user_id, u.name, a.recipient having sum(a.amount) < 0 order by bal`) : []
-  const acts = tab === 'acts' ? await q<{ id: string; unit: string; client: string; agent: string; amount: number; deducted: number; clawback_left: number; status: string; number: string | null; pdf: string | null; docx: string | null }>(
-    `select ca.id, portal.unit_no(bl.external_id, un.number) unit, cl.name client, ag.name agent, ca.amount::float, ca.deducted::float, ca.clawback_left::float, ca.status, doc.number, doc.pdf_file_id pdf, doc.docx_file_id docx
-     from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = d.client_id join portal.users ag on ag.id = ca.agent_id left join portal.documents doc on doc.id = ca.document_id
-     order by ca.created_at desc`) : []
+  // 2.2: акты — строки реестра с номером A-YYYY-NNNN (старые акты v2 по сделке убраны: шли мимо реестра — QA 09.11)
+  const acts = tab === 'acts' ? await q<{ id: string; act_no: string; act_date: string; who: string | null; role: string; market: string | null; net: number; currency: string | null; amount_cur: number | null; agreed: boolean; invoice: boolean; needs_inv: boolean; carried: boolean; reg_status: string; reg_month: string }>(
+    `select l.id, l.act_no, l.act_date::text, coalesce(u.name, l.recipient) who, l.role, l.market, l.net::float, l.currency, l.amount_cur::float, l.agreed_at is not null agreed, l.invoice_file_id is not null invoice,
+       coalesce(u.partner_form in ('company','sole'), false) needs_inv, l.carried, r.status reg_status, r.month::text reg_month
+     from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id left join portal.users u on u.id = l.user_id where l.act_no is not null order by l.act_date desc, l.act_no desc limit 300`) : []
   const wh = tab === 'tax' ? await q<{ entity: string; country: string; rate: number }>('select entity, country, rate::float from portal.withholding order by entity, country') : []
   return (
     <>
@@ -64,9 +65,9 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
             <tr key={d.id}>
               <td><b>{d.unit}</b><div className="tiny muted">{d.project} · {date(L, d.created_at)}{d.stage === 'cancelled' ? ' · ' + T('расторгнута') : ''}</div></td>
               <td className="small">{d.client}</td><td>{usd(L, d.final_price)}</td><td><b>{usd(L, d.total)}</b></td>
-              <td className="tiny">{(d.shares || []).filter((s) => !(head && s.role === 'caspian')).map((s) => <div key={s.role}>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' ? ` · ${T(s.who)}` : ''}: <b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</div>)}
+              <td className="tiny">{(d.shares || []).filter((s) => !(head && s.role === 'caspian')).map((s) => <div key={s.role}>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' && s.who !== ROLE_LABEL[s.role] ? ` · ${T(s.who)}` : ''}: <b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</div>)}
                 {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}</td>
-              <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><button className="btn btn--sm">%</button></form> : pct(L, d.paid_pct)}</td>
+              <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><span className="small">%</span><button className="btn btn--sm">{T('Сохранить')}</button></form> : pct(L, d.paid_pct)}</td>
               <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻</button></form>}
                 {fin && d.shares && <details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка')}</summary>
                   <form action={adjustment} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="deal" value={d.id} />
@@ -80,7 +81,9 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
             <tr key={x.id}><td><b>{x.unit}</b><div className="tiny muted">{x.project}</div></td><td className="small">{x.dev}</td><td className="small">№{x.no} · {Math.round(x.pct * 100) / 100}%</td><td><b>{usd(L, x.amount)}</b></td>
               <td><Pill kind={TR[x.status][1]}>{T(TR[x.status][0])}</Pill>{x.status === 'scheduled' && <div className="tiny muted">{T('оплачено клиентом {p}%', { p: x.paid_pct })}</div>}</td>
               <td className="small">{x.status === 'received' ? date(L, x.received_at) : x.expected_at ? date(L, x.expected_at) : '—'}</td>
-              <td>{fin && x.status === 'expected' && <form action={trancheReceived}><input type="hidden" name="id" value={x.id} /><button className="btn btn--sm btn--p">{T('Получено (Received by AZ)')}</button></form>}</td></tr>))}</tbody></table></div>}
+              <td>{fin && x.status === 'expected' && <details><summary className="btn btn--sm btn--p">{T('Получено (Received by AZ)')}</summary>
+                {/* QA 09.11: отметка необратима и запускает начисления — второй шаг с суммой на глазах */}
+                <form action={trancheReceived} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="id" value={x.id} /><div className="tiny muted">{T('{a} от {d} пришли на счёт? Начисления по долям создадутся сразу, отменить нельзя.', { a: usd(L, x.amount), d: x.dev })}</div><button className="btn btn--sm">{T('Да, деньги на счёте')}</button></form></details>}</td></tr>))}</tbody></table></div>}
         {tab === 'register' && <>
           <form className="row" style={{ gap: 8 }}><input type="hidden" name="tab" value="register" /><label className="field"><span>{T('Месяц среза')}</span><input className="in" type="month" name="m" defaultValue={month} /></label><button className="btn btn--sm">{T('Показать')}</button></form>
           {!reg && <div className="card stack" style={{ gap: 8 }}><div>{T('Реестр за {m} ещё не собран. Открытых начислений по поступлениям до конца месяца: {n} на {s}.', { m: month, n: pending?.n || 0, s: usd(L, pending?.s || 0) })}</div>
@@ -100,9 +103,10 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
             <div className="tbl-wrap"><table className="tbl">
               <thead><tr>{['Получатель', 'Роль', 'Рынок', 'Начислено', 'Удержание налога', 'К выплате', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
               <tbody>{lines.length === 0 ? <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr> : lines.map((l, i) => (
-                <tr key={i} style={{ opacity: l.carried ? 0.6 : 1 }}><td>{l.who ? T(l.who) : '—'}</td><td className="small">{T(ROLE_LABEL[l.role] || l.role)}</td><td className="small">{l.market || '—'}</td><td>{usd(L, l.gross)}</td><td>{l.withheld ? '−' + usd(L, l.withheld) : '—'}</td><td><b>{usd(L, l.net)}</b></td>
+                <tr key={i} style={{ opacity: l.carried ? 0.6 : 1 }}><td>{l.who ? T(l.who) : '—'}</td><td className="small">{T(ROLE_LABEL[l.role] || l.role)}</td><td className="small">{l.market || '—'}</td><td>{usd(L, l.gross)}</td><td>{l.withheld ? '−' + usd(L, l.withheld) : '—'}</td><td>{l.carried ? <s className="muted">{usd(L, l.net)}</s> : <b>{usd(L, l.net)}</b>}</td>
                   <td className="tiny">{l.act_no && <div><a href={`/commission/act/${l.id}`}>{l.act_no}</a> · {T(l.agreed ? 'согласован' : 'ждём согласия')}{l.needs_inv ? ' · ' + T(l.invoice ? 'счёт есть' : 'ждём счёт') : ''}</div>}{l.carried ? <span className="warnc">{T('перенос')}: {(l.note || '').split('; ').map((x) => T(x)).join('; ')}</span> : ''}</td></tr>))}</tbody></table></div>
             <div className="row" style={{ justifyContent: 'space-between' }}><div className="small muted">{T('Итого к выплате')}: <b>{usd(L, lines.filter((l) => !l.carried).reduce((a, l) => a + l.net, 0))}</b></div>
+              {after && after.n > 0 && <div className="small warnc">{T('Ещё {n} начислений на {s} пришли после утверждения — войдут в реестр следующего месяца.', { n: after.n, s: usd(L, after.s) })} <a href={`?tab=register&m=${nextMonth}`}>{T('Открыть {m}', { m: nextMonth })}</a></div>}
               {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
           </div>}
         </>}
@@ -113,12 +117,13 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
               {owner && d.user_id && <form action={writeOff} className="mt8"><input type="hidden" name="user" value={d.user_id} /><input type="hidden" name="role" value={d.role} /><button className="btn btn--sm btn--ghost">{T('Списать долг')}</button></form>}</td></tr>))}</tbody></table>
           <div className="small muted mt8">{T('Клаубэк партнёра зачитывается против следующих выплат; через 3 месяца без зачёта — счёт на возврат по соглашению; списать долг может только админ. Клаубэк сотрудника — только против будущих бонусов, из оклада не удерживаем.')}</div></div>}
         {tab === 'acts' && fin && <div className="tbl-wrap"><table className="tbl">
-          <thead><tr>{['Сделка', 'Партнёр', 'Комиссия', 'Удержано', 'Статус', 'Документ'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
-          <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет')}</td></tr> : acts.map((a) => (
-            <tr key={a.id}><td><b>{a.unit}</b><div className="tiny muted">{a.client}</div></td><td className="small">{a.agent}</td><td>{usd(L, a.amount)}</td>
-              <td>{a.status === 'clawback' ? <span className="badc">{T('вернуть {a}', { a: usd(L, a.clawback_left) })}</span> : a.deducted ? '−' + usd(L, a.deducted) : '—'}</td>
-              <td><Pill kind={ACT_STATUS[a.status][1]}>{T(ACT_STATUS[a.status][0])}</Pill>{a.status === 'due' && <form action={payActNow} className="mt8"><input type="hidden" name="id" value={a.id} /><button className="btn btn--sm">{T('Выплатить')}</button></form>}</td>
-              <td className="small">{a.number ? <>{a.number}<div className="tiny">{a.pdf && <a href={`/files/${a.pdf}`} target="_blank">PDF</a>}{a.docx && <> · <a href={`/files/${a.docx}`}>docx</a></>}</div></> : a.status !== 'void' ? <ActionForm action={actDocument} lang={L}><input type="hidden" name="id" value={a.id} /><button className="btn btn--sm">{T('Создать акт')}</button></ActionForm> : '—'}</td></tr>))}</tbody></table>
+          <thead><tr>{['Акт', 'Получатель', 'Реестр', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
+          <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет — номера присваиваются при утверждении реестра')}</td></tr> : acts.map((a) => (
+            <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td><td className="small">{a.who || '—'}<div className="tiny muted">{T(ROLE_LABEL[a.role] || a.role)}{a.market ? ' · ' + a.market : ''}</div></td>
+              <td className="small"><a href={`?tab=register&m=${a.reg_month.slice(0, 7)}`}>{a.reg_month.slice(0, 7)}</a></td>
+              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
+              <td><Pill kind={a.reg_status === 'paid' && !a.carried ? 'ink' : a.carried ? 'warn' : a.agreed ? 'ok' : 'warn'}>{T(a.reg_status === 'paid' && !a.carried ? 'выплачено' : a.carried ? 'перенесено' : a.agreed ? 'согласован' : 'ждём согласия')}</Pill>{a.needs_inv && <div className="tiny muted">{T(a.invoice ? 'счёт есть' : 'ждём счёт')}</div>}</td>
+              <td><a className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</a></td></tr>))}</tbody></table>
           <div className="row mt16" style={{ gap: 8 }}><form action="/api/money/report" className="row" style={{ gap: 8 }}><label className="field"><span>{T('Отчёт агента застройщикам за месяц')}</span><input className="in" type="month" name="month" defaultValue={month} /></label><button className="btn btn--sm">{T('Скачать xlsx')}</button></form></div></div>}
         {tab === 'tax' && fin && <div className="card stack" style={{ gap: 10 }}>
           <div className="small muted">{T('Ставка удерживается при выплате партнёру за границу, если у него нет действующего сертификата налогового резидентства. Юрлицо — по рынку партнёра: DE → GmbH, IL → IL Ltd, остальные → Caspian.')}</div>

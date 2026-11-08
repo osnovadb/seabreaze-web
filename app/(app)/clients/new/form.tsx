@@ -26,15 +26,15 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
         </div>
         {F('interest', 'Интерес', 'text', 'Premium Residence, 2–3 комнаты')}
         {!ext && <label className="field"><span>{T('Источник')}</span><select className="in" name="source"><option value="office">{T('Офис / звонок')}</option><option value="site">{T('Сайт')}</option><option value="referral">{T('Рекомендация')}</option></select></label>}
-        <label className="check"><input type="checkbox" name="consent" /> <span>{T('Клиент согласен на обработку данных и передачу контактов застройщику для регистрации сделки.')} <Link className="bronze" href="/legal/consent" target="_blank">{T('Текст согласия')}</Link></span></label>
+        <label className="check"><input type="checkbox" name="consent" /> <span>{T('Клиент знает, что я передаю его контакты GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.')} <Link className="bronze" href="/legal/consent" target="_blank">{T('Текст согласия')}</Link></span></label>
         <Submit lang={lang} />
         <div className="tiny muted">{T('Проверка по телефону и e-mail в нашей базе. Чужих клиентов и их агентов вы не увидите — только ответ «закреплён» или «уже зарегистрирован».')}</div>
       </form>
       <div className="stack">
         {st?.ok && (
           <div className="okbox">
-            <div className="h3">{T('Клиент закреплён за вами')}</div>
-            <div className="mt8">{T('Номер регистрации {r} · защита до {d}', { r: st.reg!, d: date(lang, st.until!) })}</div>
+            <div className="h3">{T(st.candidate ? 'Кандидат заведён' : 'Клиент закреплён за вами')}</div>
+            <div className="mt8">{st.candidate ? T('Номер {r}. Заполните цель, бюджет, срок, страну и язык до {d} — тогда клиент закрепится за вами на 6 месяцев.', { r: st.reg!, d: date(lang, st.until!) }) : T('Номер регистрации {r} · защита до {d}', { r: st.reg!, d: date(lang, st.until!) })}</div>
             <div className="row mt16"><Link className="btn btn--p" href={`/clients/${st.id}`}>{T('Открыть карточку')}</Link><Link className="btn" href="/projects">{T('К шахматке')}</Link></div>
           </div>
         )}
@@ -52,7 +52,7 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
             )}
           </div>
         )}
-        {!st && <div className="card card--sand small muted">{T('После регистрации клиент закрепляется за вами на срок защиты проекта. Лид уходит куратору в CRM.')}</div>}
+        {!st && <div className="card card--sand small muted">{T(ext ? 'Новый клиент — сначала кандидат. Заполните цель, бюджет, срок, страну и язык (сразу или в течение 14 дней) — и он закрепится за вами на 6 месяцев. Клиенту уйдёт ссылка для согласия на обработку данных.' : 'Клиент закрепится за командой на 6 месяцев и встанет в очередь регистрации у застройщиков.')}</div>}
       </div>
     </div>
   )

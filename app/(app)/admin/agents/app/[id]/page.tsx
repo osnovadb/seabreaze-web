@@ -13,6 +13,9 @@ import { needUuid } from '@/lib/ids'
 
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { new: ['новая', 'warn'], review: ['на проверке', 'warn'], contract: ['договор', 'ink'], approved: ['одобрена', 'ok'], rejected: ['отказ', 'bad'] }
 
+// QA 09.11: журнал — словами, а не кодами
+const JLAB: Record<string, string> = { 'application.new': 'Статус: новая', 'application.review': 'Статус: на проверке', 'application.contract': 'Статус: договор', 'application.approved': 'Статус: одобрена', 'application.rejected': 'Статус: отказ', 'application.file': 'Добавлен документ', 'application.access': 'Создан доступ' }
+
 // Карточка заявки на партнёрство: данные, документы (разрешение маклера, выписка), решение и создание доступа
 export default async function Application({ params }: { params: { id: string } }) {
   needUuid(params.id)
@@ -29,7 +32,7 @@ export default async function Application({ params }: { params: { id: string } }
   return (
     <>
       <Top crumbs={[[T('Партнёры и заявки'), '/admin/agents'], [a.name]]} title={a.name}
-        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind={ST[a.status][1]}>{T(ST[a.status][0])}</Pill><span className="small muted">{T(a.kind === 'agency' ? 'Агентство' : 'Частный агент')} · {a.market} · {T('заявка от {d}', { d: date(L, a.created_at) })}</span></span>} />
+        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind={ST[a.status][1]}>{T(ST[a.status][0])}</Pill><span className="small muted">{T(a.kind === 'agency' ? 'Агентство' : a.kind === 'referrer' ? 'Рекомендатель' : 'Частный агент')} · {a.market} · {T('заявка от {d}', { d: date(L, a.created_at) })}</span></span>} />
       <div className="page split">
         <div className="stack">
           <div className="card">
@@ -60,13 +63,13 @@ export default async function Application({ params }: { params: { id: string } }
           <div className="card stack" style={{ gap: 8 }}>
             <div className="h3" style={{ margin: 0 }}>{T('Доступ')}</div>
             {a.user_id ? <div className="small">{T('Доступ создан')}: <Link className="bronze" href={`/admin/users/${a.user_id}`}>{a.user_name} →</Link></div>
-              : canAccess && ['contract', 'approved'].includes(a.status) ? <CreateAccess lang={L} id={a.id} curators={curators} />
+              : canAccess && ['contract', 'approved'].includes(a.status) ? <CreateAccess lang={L} id={a.id} curators={curators} stacked />
                 : <div className="small muted">{T('Доступ создаётся после проверки: статус «договор» или «одобрена».')}</div>}
           </div>
           <div className="card">
             <div className="h3">{T('Журнал')}</div>
             {log.length === 0 && <div className="small muted">—</div>}
-            {log.map((x, i) => <div key={i} className="kv"><span className="small"><code>{x.action}</code> · {x.who}</span><span className="tiny muted">{dateTime(L, x.created_at)}</span></div>)}
+            {log.map((x, i) => <div key={i} className="kv"><span className="small">{T(JLAB[x.action] || x.action)}{x.who ? ' · ' + x.who : ''}</span><span className="tiny muted">{dateTime(L, x.created_at)}</span></div>)}
           </div>
         </div>
       </div>

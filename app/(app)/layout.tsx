@@ -4,6 +4,7 @@ import { q, one } from '@/lib/db'
 import { t } from '@/lib/i18n'
 import { ROLE_NAMES, isExternal, canReviewAgents, canSeeFinance, canSeeSources, canManageUsers, canSeeJournal } from '@/lib/perm'
 import { Nav } from '@/components/Nav'
+import { FormBusy } from '@/components/FormBusy'
 import { feed } from '@/lib/posts'
 import { LangSwitch } from '@/components/LangSwitch'
 import { impersonate, logout } from '@/lib/actions'
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   return (
     <div className="app">
+      <FormBusy />
       <aside className="side">
         <div className="side__logo"><img src="/brand/wordmark-white.svg" alt="GetsEstate" /></div>
         <div className="side__role">{T('Портал')} · {T(ROLE_NAMES[u.role])}{u.market && u.market !== 'GLOBAL' ? ' · ' + u.market : ''}</div>

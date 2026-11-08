@@ -5,10 +5,20 @@ import { t, type Lang } from '@/lib/i18n'
 import { InviteLink } from '@/components/InviteLink'
 
 // Доступ из заявки: агентство (если заявка от агентства), пользователь с куратором; ссылку-приглашение показываем один раз
-export function CreateAccess({ lang, id, curators }: { lang: Lang; id: string; curators: { id: string; name: string }[] }) {
+export function CreateAccess({ lang, id, curators, stacked }: { lang: Lang; id: string; curators: { id: string; name: string }[]; stacked?: boolean }) {
   const T = (s: string) => t(lang, s)
   const [st, act] = useFormState(createFromApplication, null)
   if (st && 'link' in st) return <InviteLink lang={lang} link={st.link} mailed={st.mailed} title={T('Доступ создан') + ': ' + st.email + ' — ' + T('пароль и PIN пользователь задаст сам по ссылке (7 дней)')} />
+  // QA 09.11: в карточке заявки — колонкой с подписями (в строку кнопка обрезалась, у даты не было подписи)
+  if (stacked) return (
+    <form action={act} className="stack" style={{ gap: 8 }}>
+      <input type="hidden" name="id" value={id} />
+      <label className="field"><span>{T('Куратор партнёра')}</span><select className="in" name="curator" required defaultValue=""><option value="" disabled>—</option>{curators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <label className="field"><span>{T('Договор подписан (дата)')}</span><input className="in" type="date" name="contract" /></label>
+      <div><button className="btn btn--p">{T('Создать доступ')}</button></div>
+      {st && 'error' in st && st.error && <span className="err tiny">{T(st.error)}</span>}
+    </form>
+  )
   return (
     <form action={act} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
       <input type="hidden" name="id" value={id} />

@@ -139,7 +139,11 @@ export async function receiveTranche(trancheId: string, by: string) {
     if (!left) await t.query(`update portal.deals set stage = case when stage in ('contract','payments') then 'fee_received' else stage end where id = $1`, [tr.deal_id])
     return { ...tr, month, partner: shares.find((s: { role: string }) => s.role === 'partner') }
   })
-  if (made?.partner?.user_id) await notify(made.partner.user_id, 'payout', 'Застройщик оплатил транш — ваша доля {a} войдёт в реестр выплат за {m}', '/commission', { a: '$' + Math.round((made.partner.amount * made.pct) / 100).toLocaleString('en'), m: made.month.slice(0, 7) })
+  // QA 09.11: месяц не обещаем — реестр месяца может быть уже оплачен, тогда доля уходит в следующий; без данных для выплаты — сразу говорим, чего не хватает
+  if (made?.partner?.user_id) {
+    const g = await payoutGaps(made.partner.user_id)
+    await notify(made.partner.user_id, 'payout', g.missing.length ? 'Застройщик оплатил транш — ваша доля {a}. Для выплаты укажите данные в «Комиссии»' : 'Застройщик оплатил транш — ваша доля {a} войдёт в ближайший реестр выплат', '/commission', { a: '$' + Math.round((made.partner.amount * made.pct) / 100).toLocaleString('en') })
+  }
   return made
 }
 
@@ -177,9 +181,9 @@ export async function collectRegister(month: string, by: string) {
     } else id = (await t.query(`insert into portal.payout_registers (month, collected_by) values ($1,$2) returning id`, [month, by])).rows[0].id
     // всё открытое по поступлениям до конца месяца среза, включая перенесённое и минусы (клаубэк зачитывается против следующих выплат)
     const rows = (await t.query(`select a.role, a.user_id, a.recipient, sum(a.amount)::float s, array_agg(a.id) ids,
-        u.market, u.partner_form, u.tax_no, u.vat_no, u.tax_country, u.tax_cert_until::text cert, u.bank_changed_at
+        u.market, u.partner_form, u.tax_no, u.vat_no, u.tax_country, u.tax_cert_until::text cert, u.bank_changed_at, u.bank_iban
       from portal.accruals a left join portal.users u on u.id = a.user_id
-      where a.status = 'open' and a.month <= $1::date group by a.role, a.user_id, a.recipient, u.market, u.partner_form, u.tax_no, u.vat_no, u.tax_country, u.tax_cert_until, u.bank_changed_at`, [month])).rows
+      where a.status = 'open' and a.month <= $1::date group by a.role, a.user_id, a.recipient, u.market, u.partner_form, u.tax_no, u.vat_no, u.tax_country, u.tax_cert_until, u.bank_changed_at, u.bank_iban`, [month])).rows
     const monthEnd = (await t.query(`select (date_trunc('month', $1::date) + interval '1 month - 1 day')::date::text d`, [month])).rows[0].d
     let lines = 0
     for (const r of rows) {
@@ -190,13 +194,14 @@ export async function collectRegister(month: string, by: string) {
       // реквизиты сменились меньше 3 дней назад — выплата на новые реквизиты не раньше чем через 3 дня
       const bankHold = r.bank_changed_at && Date.now() - new Date(r.bank_changed_at).getTime() < 3 * 86400000
       const small = r.s < 100
+      const noBank = ext && !r.bank_iban // QA 09.11: без реквизитов платить некуда
       let withheld = 0
       if (ext && r.tax_country && (!r.cert || r.cert < monthEnd)) {
         const w = (await t.query(`select rate::float from portal.withholding where entity = $1 and country = $2`, [ENTITY[r.market] || 'Caspian', r.tax_country])).rows[0]
         if (w) withheld = r2((r.s * w.rate) / 100)
       }
-      const carried = small || !docOk || !!bankHold
-      const note = [small && 'меньше 100 $ — перенос', !docOk && 'нет документа (счёт или налоговый номер) — перенос', bankHold && 'новые реквизиты — выплата через 3 дня'].filter(Boolean).join('; ') || null
+      const carried = small || !docOk || noBank || !!bankHold
+      const note = [small && 'меньше 100 $ — перенос', !docOk && 'нет документа (счёт или налоговый номер) — перенос', noBank && 'нет банковских реквизитов — перенос', bankHold && 'новые реквизиты — выплата через 3 дня'].filter(Boolean).join('; ') || null
       await t.query(`insert into portal.payout_lines (register_id, role, user_id, recipient, market, gross, withheld, net, doc_ok, carried, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [id, r.role, r.user_id, r.recipient, r.market, r2(r.s), withheld, r2(r.s - withheld), docOk, carried, note])
       if (!carried) await t.query(`update portal.accruals set status = 'in_register', register_id = $2 where id = any($1)`, [r.ids, id])
@@ -256,4 +261,12 @@ export async function addAdjustment(dealId: string, role: string, amount: number
 export async function writeOffDebt(userId: string, role: string, by: string) {
   const n = await q<{ id: string }>(`update portal.accruals set status = 'void', note = coalesce(note || ' · ', '') || 'долг списан админом' where user_id = $1 and role = $2 and status = 'open' returning id`, [userId, role])
   return n.length && by
+}
+
+// QA 09.11: чего не хватает получателю для выплаты и сколько из-за этого ждёт (баннеры в кабинете партнёра и рекомендателя)
+export async function payoutGaps(userId: string) {
+  const u = await one<{ tax_no: string | null; vat_no: string | null; bank_iban: string | null }>('select tax_no, vat_no, bank_iban from portal.users where id = $1', [userId])
+  const missing = [!(u?.tax_no || u?.vat_no) && 'налоговый номер или номер НДС', !u?.bank_iban && 'банковские реквизиты (IBAN)'].filter(Boolean) as string[]
+  const waiting = (await one<{ s: number }>(`select coalesce(sum(amount), 0)::float s from portal.accruals where user_id = $1 and status = 'open' and role in ('partner','referrer')`, [userId]))?.s || 0
+  return { missing, waiting }
 }

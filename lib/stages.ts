@@ -42,10 +42,10 @@ const CAN_MOVE: Role[] = ['owner', 'market_head', 'seller', 'office', 'agent', '
 export function stageBlock(role: Role, c: StageCtx, target: string): string | null {
   if (!CAN_MOVE.includes(role)) return 'Нет прав'
   if (target === 'lost' || target === 'pause') return c.stage === 'lost' && target === 'lost' ? 'Клиент уже в отказе' : null
+  // 2.2: стадии, которые ведёт офис в Bitrix24 — у партнёра только просмотр (проверка до общей: иначе «Нет такой стадии» — QA 09.11)
+  if (target.startsWith('p:')) return target === 'p:candidate' ? 'Кандидат становится клиентом после квалификации' : 'Эту стадию ведёт офис в Bitrix24 — она обновится сама'
   if (!STAGES.some(([k]) => k === target)) return 'Нет такой стадии'
   const ext = role === 'agent' || role === 'agency_head'
-  // 2.2: стадии, которые ведёт офис в Bitrix24 — у партнёра только просмотр
-  if (target.startsWith('p:')) return target === 'p:candidate' ? 'Кандидат становится клиентом после квалификации' : 'Эту стадию ведёт офис в Bitrix24 — она обновится сама'
   if (c.qualified === false && AFTER_QUAL.includes(target) && !AFTER_QUAL.includes(c.stage)) return 'Сначала заполните квалификацию: цель, бюджет, срок, страна и язык'
   if (ext) {
     if (TEAM_ONLY.includes(c.stage)) return 'Этот этап ведёт команда'
@@ -60,3 +60,9 @@ export function stageBlock(role: Role, c: StageCtx, target: string): string | nu
 }
 export const agentGroup = (stage: string) => AGENT_STAGES.find(([, , s]) => s.includes(stage))?.[0] || 'new'
 export const groupTarget = (key: string) => AGENT_STAGES.find(([k]) => k === key)?.[2][0] || 'lead'
+
+// Статусы регистрации клиента у застройщика (§7): подпись и цвет — общие для «Регистраций» и карточки клиента
+export const REG_ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = {
+  to_send: ['К отправке', 'ink'], sent: ['Отправлено', 'warn'], confirmed: ['Подтверждено', 'ok'], confirmed_silence: ['Подтверждено молчанием', 'ok'],
+  rejected: ['Отказ', 'bad'], expired: ['Истекла', 'off'], withdrawn: ['Отозвана', 'off'],
+}

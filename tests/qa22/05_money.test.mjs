@@ -26,7 +26,7 @@ test('setup', async () => {
   await q(`update portal.conditions set max_bookings_total = 100000, max_bookings_client = 100`)
   OW = await user('owner', { market: null }); OF = await user('office'); FI = await user('finance'); MH = await user('market_head', { market: 'DE' })
   const ag = await agency('DE')
-  HEAD_AG = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-TAX' }); AG = await user('agent', { agency_id: ag.id })
+  HEAD_AG = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-TAX', bank_iban: 'QA00TESTIBAN0001' }); AG = await user('agent', { agency_id: ag.id })
   S = await user('seller')
 })
 test('«Договор подписан» только после KYC и только бэк-офисом', async () => {
@@ -133,10 +133,30 @@ test('реестр: меньше 100 $ и без налогового номер
   const lines = await q('select role, carried, note from portal.payout_lines where register_id = $1 and user_id = $2', [reg.id, H.id])
   assert.ok(lines.length && lines.every((l) => l.carried), 'малые суммы или без документа не перенесены: ' + JSON.stringify(lines))
 })
+test('реестр: без IBAN — перенос с пометкой; смена IBAN — 3 дня ожидания (QA 09.11)', async () => {
+  const m = '2031-04'
+  await q(`delete from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-T' })
+  await q(`insert into portal.accruals (role, user_id, amount, month) values ('partner', $1, 700, $2::date)`, [H.id, m + '-01'])
+  await act(FI, 'registerCollect', { month: m })
+  const reg = await one(`select id from portal.payout_registers where month = $1::date`, [m + '-01'])
+  const l = await one('select carried, note from portal.payout_lines where register_id = $1 and user_id = $2', [reg.id, H.id])
+  assert.ok(l?.carried && /банковских реквизитов/.test(l.note || ''), 'без IBAN строка не перенесена: ' + JSON.stringify(l))
+  // партнёр заполняет реквизиты сам: первое заполнение — без ожидания, смена — bank_changed_at
+  await act(H, 'savePayoutProfile', { partner_form: 'individual', tax_no: 'QA-T', bank_iban: 'qa00 test iban 0003', bank_swift: 'QATESTXX', bank_holder: 'QA Holder' })
+  let u = await one('select bank_iban, bank_changed_at from portal.users where id = $1', [H.id])
+  assert.equal(u.bank_iban, 'QA00TESTIBAN0003'); assert.equal(u.bank_changed_at, null, 'первое заполнение не должно держать выплату')
+  await act(H, 'savePayoutProfile', { partner_form: 'individual', tax_no: 'QA-T', bank_iban: 'QA00TESTIBAN0004', bank_swift: 'QATESTXX', bank_holder: 'QA Holder' })
+  u = await one('select bank_changed_at from portal.users where id = $1', [H.id])
+  assert.ok(u.bank_changed_at, 'смена IBAN не поставила 3-дневное ожидание')
+  await act(FI, 'registerCollect', { month: m })
+  const l2 = await one('select carried, note from portal.payout_lines where register_id = $1 and user_id = $2', [reg.id, H.id])
+  assert.ok(l2?.carried && /3 дня/.test(l2.note || ''), 'после смены реквизитов выплата не придержана: ' + JSON.stringify(l2))
+})
 test('согласие с актом: только сам партнёр; после согласия выплата проходит', async () => {
   const m = '2031-03'
   await q(`delete from portal.payout_registers where month = $1::date`, [m + '-01'])
-  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-T' })
+  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id, partner_form: 'individual', tax_no: 'QA-T', bank_iban: 'QA00TESTIBAN0002' })
   await q(`insert into portal.accruals (role, user_id, amount, month) values ('partner', $1, 500, $2::date)`, [H.id, m + '-01'])
   await act(FI, 'registerCollect', { month: m })
   const reg = await one(`select id from portal.payout_registers where month = $1::date`, [m + '-01'])

@@ -345,3 +345,14 @@ main, .page { min-width: 0; }
   .split, .split-l, .cat, .chess-wrap { grid-template-columns: minmax(0, 1fr) !important; }
   .g2, .g3, .g4 { grid-template-columns: minmax(0, 1fr); }
 }
+/* QA 09.11: кнопка-раскрывашка для необратимых действий (второй шаг подтверждения) */
+summary.btn { list-style: none; display: inline-flex; cursor: pointer; }
+summary.btn::-webkit-details-marker { display: none; }
+/* QA 09.11: карточка клиента — три колонки на широком, две на ноутбуке, одна на телефоне (было: средняя колонка 0 px на телефоне) */
+.cgrid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 1280px) { .cgrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cgrid > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .cgrid { grid-template-columns: minmax(0, 1fr); } }
+/* Меню на телефоне прокручивается вбок — гасим правый край, чтобы было видно, что пунктов больше */
+@media (max-width: 1100px) { .nav { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); } }
+/* QA 09.11: кнопка отправленной формы, пока сервер отвечает (components/FormBusy) */
+.is-busy { opacity: .55; cursor: progress !important; pointer-events: none; }

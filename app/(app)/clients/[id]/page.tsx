@@ -6,7 +6,7 @@ import { t, date, dateTime, usd, fmtVars } from '@/lib/i18n'
 import { isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
-import { partnerCol } from '@/lib/stages'
+import { partnerCol, REG_ST } from '@/lib/stages'
 import { StageStepper } from '@/components/StageStepper'
 import { ConsentBox } from '@/components/ConsentBox'
 import { EditContacts } from './contacts'
@@ -84,7 +84,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
           steps={ext ? PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: l, target })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
           current={ext ? agentIdx : teamIdx}
           ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) }} />
-        <div style={{ display: 'grid', gridTemplateColumns: '360px minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }} className="mt16">
+        <div className="cgrid mt16">
           <div className="stack">
             <div className="card">
               <div className="h3">{T('Клиент')}</div>
@@ -99,8 +99,10 @@ export default async function ClientCard({ params }: { params: { id: string } })
               <div className="h3" style={{ margin: 0 }}>{T('Квалификация')}</div>
               <input type="hidden" name="client" value={cl.id} />
               {cl.attach_status === 'candidate' && <div className="tiny muted">{T('Обязательно для закрепления: цель, бюджет, срок, страна проживания, язык')}</div>}
-              {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['country', 'Страна проживания'], ['language', 'Язык'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span><input className="in" name={k} defaultValue={cl[k] || ''} /></label>)}
-              <button className="btn">{T('Сохранить')}</button>
+              {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['country', 'Страна проживания'], ['language', 'Язык'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span>{k === 'language'
+                ? <select className="in" name="language" defaultValue={cl.language || ''}><option value="">—</option>{[['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['he', 'עברית']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>
+                : <input className="in" name={k} defaultValue={cl[k] || ''} />}</label>)}
+              <button className="btn btn--p">{T(cl.attach_status === 'candidate' ? 'Сохранить и закрепить клиента' : 'Сохранить квалификацию')}</button>
             </form>
           </div>
           <div className="stack">
@@ -108,7 +110,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
               <div className="h3">{T('Регистрации у застройщиков')}</div>
               {/* 244: партнёру — «готово / в работе» по каждому застройщику, без дат и ответов */}
               {ext ? Array.from(new Set(regs.map((r) => r.dev))).map((dv) => { const rs = regs.filter((r) => r.dev === dv); const ok = rs.every((r) => ['confirmed', 'confirmed_silence'].includes(r.status)); return <div key={dv} className="kv"><span>{dv}</span><Pill kind={ok ? 'ok' : 'warn'}>{T(ok ? 'готово' : 'в работе')}</Pill></div> })
-                : regs.map((r) => <div key={r.dev + r.project} className="kv"><span>{r.dev} · {r.project}</span><span className="small">{r.status}</span></div>)}
+                : regs.map((r) => <div key={r.dev + r.project} className="kv"><span>{r.dev} · {r.project}</span><span className="small">{T(REG_ST[r.status]?.[0] || r.status)}</span></div>)}
             </div>}
             <div className="card">
               <div className="h3">{T('Задачи')}</div>
@@ -140,7 +142,7 @@ export default async function ClientCard({ params }: { params: { id: string } })
             <div className="card">
               <div className="h3">{T('Подборки')}</div>
               {sels.length === 0 && <div className="small muted">{T('Добавьте квартиры из шахматки или каталога')}</div>}
-              {sels.map((s) => <Link key={s.id} href={`/selections/${s.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{T(s.title || 'Подборка')} · {s.n} · {s.lang.toUpperCase()}</span><span className={s.opened ? 'small okc' : 'small muted'}>{s.opened ? T('открыта {n} раз', { n: s.opened }) : T('не открыта')}</span></Link>)}
+              {sels.map((s) => <Link key={s.id} href={`/selections/${s.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{T(s.title || 'Подборка')} · {s.n} · {s.lang.toUpperCase()}</span><span className={s.opened ? 'small okc' : 'small muted'}>{s.opened ? T('открыта: {n}', { n: s.opened }) : T('не открыта')}</span></Link>)}
             </div>
             <div className="card">
               <div className="h3">{T('Брони')}</div>

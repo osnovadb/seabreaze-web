@@ -24,8 +24,12 @@ export default async function ClientKyc({ params, searchParams }: { params: { to
         const need = b.kind === 'company' ? ['registry', 'ubo', 'director'] : ['passport', 'address', 'funds']
         return <section key={b.id || 'main'} className="card stack mt16" style={{ gap: 8 }}>
           <h2 className="h3" style={{ margin: 0 }}>{b.name}{b.kind === 'company' ? ' · ' + T('компания') : ''}</h2>
-          <ul className="small" style={{ margin: 0 }}>{need.map((k) => <li key={k}>{T(KYC_DOC_NAMES[k])}{k === 'funds' ? ' (' + T('по запросу') + ')' : ''}: {got.some((g) => g.kind === k && (g.buyer_id || '') === b.id) ? <b className="okc">{T('получено')}</b> : <span className="muted">{T('нужно загрузить')}</span>}</li>)}</ul>
-          <ClientUpload lang={L} token={params.token} buyer={b.id} kinds={need.map((k) => [k, T(KYC_DOC_NAMES[k])])} />
+          {/* QA 09.11: на телефоне — по кнопке на каждый документ, без выбора вида в списке; статус рядом */}
+          {need.map((k) => { const ok = got.some((g) => g.kind === k && (g.buyer_id || '') === b.id); return (
+            <div key={k} className="stack" style={{ gap: 6, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
+              <div className="between"><b className="small">{T(KYC_DOC_NAMES[k])}</b>{ok ? <span className="okc small">✓ {T('получено')}</span> : <span className="muted small">{k === 'funds' ? T('если попросим') : T('нужно загрузить')}</span>}</div>
+              <ClientUpload lang={L} token={params.token} buyer={b.id} kinds={[[k, T(KYC_DOC_NAMES[k])]]} again={ok} />
+            </div>) })}
         </section>
       })}
       <p className="tiny muted mt24">{T('Если чего-то нет под рукой — загрузите позже по этой же ссылке.')}</p>
