@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { one } from '@/lib/db'
 import { signSession } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 // Только для локальной разработки и QA-экземпляра (QA_MODE=1, открывается через SSH-туннель как localhost): войти тестовым пользователем без пароля.
 // На стенде и в бою отключено.
 export async function GET(req: Request) {
