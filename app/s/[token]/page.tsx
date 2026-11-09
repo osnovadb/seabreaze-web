@@ -47,7 +47,7 @@ export default async function PublicSelection({ params, searchParams }: { params
             return (
               <div key={i.unit_id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 {img && <div style={{ position: 'relative' }}><img src={`/img/${img}.jpg`} alt="" style={{ width: '100%', aspectRatio: '16/8', objectFit: 'cover' }} /><span className="pill pill--off" style={{ position: 'absolute', top: 12, insetInlineStart: 12, background: '#fff' }}>{T('Визуализация')}</span></div>}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 16, padding: 20 }}>
+                <div className="selunit">
                   <div>
                     <div className="h2">{T('Квартира {n}', { n: unitNo(u) })}</div>
                     <div className="muted">{pr?.name} · {u.building} · {T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
@@ -56,7 +56,7 @@ export default async function PublicSelection({ params, searchParams }: { params
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
                     {(u.finish === 'shell' || img) && <div className="small muted mt8">{[u.finish === 'shell' ? T('Сдаётся без ремонта') : '', img ? T('на фото — пример дизайна застройщика') : ''].filter(Boolean).join('; ')}.</div>}
                   </div>
-                  {planUrl(u.plan_file) && <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" style={{ maxHeight: 220 }} /></div>}
+                  {planUrl(u.plan_file) && <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" /></div>}
                 </div>
                 {free && u.usd && planOf.get(u.id) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
@@ -68,7 +68,7 @@ export default async function PublicSelection({ params, searchParams }: { params
             )
           })}
         </div>
-        <div className="card mt24 between">
+        <div className="card mt24 between selcontact">
           <div><div className="label">{T('Ваш консультант')}</div><div className="h3 mt8">{s.agent}</div><div className="small muted">{s.agent_email}</div></div>
           <a className="btn btn--p btn--lg noprint" href={`mailto:${s.agent_email}`}>{T('Связаться с консультантом')}</a>
         </div>

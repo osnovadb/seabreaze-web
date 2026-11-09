@@ -364,3 +364,14 @@ summary.btn::-webkit-details-marker { display: none; }
 .embed-nav a { color: var(--ink-2); padding: 9px 0 8px; border-bottom: 2px solid transparent; }
 .embed-nav a:hover { color: var(--ink); }
 .embed-nav a.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--deep, #1F4E4C); }
+/* QA 09.11: подборка у клиента — на телефоне карточка в одну колонку, планировка целиком (было: 1fr + 220px, план обрезан) */
+.selunit { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; padding: 20px; }
+.selunit .planbox img { max-height: 220px; max-width: 100%; }
+@media (max-width: 640px) {
+  .selunit { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .selunit .planbox { justify-self: stretch; text-align: center; }
+  .selunit .planbox img { max-height: 320px; width: 100%; object-fit: contain; }
+  .selunit .h2 { font-size: 22px; }
+  .selcontact { flex-direction: column; align-items: stretch; gap: 12px; }
+  .selcontact .btn { width: 100%; }
+}
