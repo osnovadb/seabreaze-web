@@ -2500,5 +2500,6 @@
 "В очереди с": "Queued since",
 "Передать до": "Send by",
 "Ответ до": "Reply by",
-"Действует до": "Valid until"
+"Действует до": "Valid until",
+"бронь клиента": "client's booking"
 }

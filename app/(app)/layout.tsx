@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const cur = cid && /^[0-9a-f-]{36}$/.test(cid) ? await one<{ id: string; name: string }>('select id, name from portal.clients where id = $1', [cid]) : null
     // меню раздела внутри фрейма — по роли (пункты левого меню Bitrix24 ведут в те же разделы)
     const R = u.role
-    const em: [string, string, boolean][] = [['/catalog', 'Каталог', true], ['/registrations', 'Регистрации', ['owner', 'office', 'market_head'].includes(R)], ['/bookings', 'Брони', R !== 'finance' && R !== 'content'],
+    const em: [string, string, boolean][] = [['/projects', 'Проекты', true], ['/catalog', 'Каталог', true], ['/registrations', 'Регистрации', ['owner', 'office', 'market_head'].includes(R)], ['/bookings', 'Брони', R !== 'finance' && R !== 'content'],
       ['/kyc', 'KYC', ['owner', 'office'].includes(R)], ['/admin/privacy', 'Согласия и данные', ['owner', 'office'].includes(R)], ['/admin/agents', 'Партнёры', ['owner', 'market_head'].includes(R)],
       ['/finance', 'Финансы', ['owner', 'finance', 'market_head'].includes(R)], ['/reports', 'Отчёты', ['owner', 'market_head'].includes(R)], ['/news', 'Новости', true], ['/admin', 'Админка', ['owner', 'market_head', 'finance'].includes(R)]]
     return <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>

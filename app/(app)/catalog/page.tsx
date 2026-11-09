@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
 import { t, usd, m2 } from '@/lib/i18n'
 import { listProjects, unitsOfProjects, viewMode, codeFor, unitNo, planUrl, TYPE_NAME, VIEW_NAME, isLiving, type Code } from '@/lib/catalog'
@@ -21,11 +22,13 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
   const ps = await listProjects(c.user)
   const p = ps.find((x) => x.slug === sp.p) || null
   const mode = viewMode(c.user, false)
+  // внутри Bitrix24 подбор идёт для клиента вкладки: «бронь клиента» — только его брони
+  const cur = cookies().get('ge_embed')?.value === '1' ? (cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null
   const all = mode === 'team' && sp.all === '1'
   const k = (v?: string) => (v && Number(v) ? Number(v) * 1000 : undefined) // цена в фильтре — в тысячах долларов
   const nf = normFilter({ project: p?.id, building: sp.b, types: sp.t, rooms: sp.r, pmin: k(sp.pmin), pmax: k(sp.pmax ?? sp.max), amin: sp.amin, amax: sp.amax, fmin: sp.fmin, fmax: sp.fmax, view: sp.v, outdoor: sp.o, corner: sp.c, promo: sp.promo })
   const offers = new Map(await Promise.all(ps.map(async (x) => [x.id, await offersFor(x.id)] as const)))
-  const base = (await unitsOfProjects((p ? [p] : ps).map((x) => x.id))).map((u) => { const promo = promoOf(u, offers.get(u.project_id) || []); return { ...u, code: codeFor(u, c.user, mode), promo, net: u.usd != null ? u.usd - (promo?.usd || 0) : null } })
+  const base = (await unitsOfProjects((p ? [p] : ps).map((x) => x.id))).map((u) => { const promo = promoOf(u, offers.get(u.project_id) || []); return { ...u, code: codeFor(u, c.user, mode, cur), promo, net: u.usd != null ? u.usd - (promo?.usd || 0) : null } })
   const pool = base.filter((u) => all || u.code === 'F' || u.code === 'M')
   const units = pool.filter((u) => matchUnit(u, nf))
   const out = (u: (typeof units)[number]) => (u.plot_area || 0) + (u.ext_area || 0)
@@ -91,7 +94,7 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
                   <div className="ucard__img">{planUrl(u.plan_file) ? <img src={planUrl(u.plan_file)!} alt="" loading="lazy" /> : <span className="muted tiny">{T('планировка не загружена')}</span>}
                     {u.promo && <span className="ucard__promo">{promoBadge(u.promo, T('Акция'))}</span>}</div>
                   <div className="ucard__b">
-                    <div className="between"><b>{unitNo(u)}</b>{STATUS[u.code] ? <Pill kind={STATUS[u.code]![1]}>{T(STATUS[u.code]![0])}</Pill> : <Pill kind="off">{T('не в продаже')}</Pill>}</div>
+                    <div className="between"><b>{unitNo(u)}</b>{STATUS[u.code] ? <Pill kind={STATUS[u.code]![1]}>{T(u.code === 'M' && cur ? 'бронь клиента' : STATUS[u.code]![0])}</Pill> : <Pill kind="off">{T('не в продаже')}</Pill>}</div>
                     <div className="tiny muted">{!p ? ps.find((x) => x.id === u.project_id)?.name + ' · ' : ''}{u.building} · {T('{f} этаж', { f: u.floor })}</div>
                     <div className="small mt8">{isLiving(u.unit_type) && u.rooms ? T('{r} комн.', { r: u.rooms }) + ' · ' : T(TYPE_NAME[u.unit_type] || u.unit_type) + ' · '}{m2(L, u.area)}{out(u) ? ` + ${u.plot_area ? T('сад') : T('терраса')} ${m2(L, out(u))}` : ''}</div>
                     {u.view_side && <div className="tiny muted">{T('Вид')} {T(VIEW_NAME[u.view_side] || u.view_side)}{u.is_corner ? ' · ' + T('угловая') : ''}</div>}
@@ -114,7 +117,7 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
                       <td className="small">{u.view_side ? T(VIEW_NAME[u.view_side] || u.view_side) : '—'}</td>
                       <td className="num"><b>{u.usd ? usd(L, u.promo ? u.usd - u.promo.usd : u.usd) : '—'}</b>{u.promo && u.usd ? <div className="tiny muted"><s>{usd(L, u.usd)}</s></div> : null}</td>
                       <td className="num small muted">{u.usd ? usd(L, per(u)) : ''}</td>
-                      <td>{STATUS[u.code] ? <Pill kind={STATUS[u.code]![1]}>{T(STATUS[u.code]![0])}</Pill> : <Pill kind="off">{T('не в продаже')}</Pill>}</td>
+                      <td>{STATUS[u.code] ? <Pill kind={STATUS[u.code]![1]}>{T(u.code === 'M' && cur ? 'бронь клиента' : STATUS[u.code]![0])}</Pill> : <Pill kind="off">{T('не в продаже')}</Pill>}</td>
                     </tr>
                   ))}
                 </tbody>

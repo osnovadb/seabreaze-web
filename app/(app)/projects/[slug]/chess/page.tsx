@@ -26,12 +26,13 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const b = bs.find((x) => x.id === searchParams.b) || [...bs].sort((a, z) => z.free - a.free)[0]
   const units = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
-  const free = units.filter((u) => codeFor(u, c.user, mode) === 'F')
+  const curClient = cookies().get('ge_embed')?.value === '1' ? (cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null // QA 09.11: бронь другого клиента — не «ваша»
+  const free = units.filter((u) => codeFor(u, c.user, mode, curClient) === 'F')
   const sync = seesSource(c.user.role) ? await one<{ at: string; src: string }>(`select max(u.synced_at) at, min(u.source_id) src from units u where u.building_id = $1`, [b.id]) : null
   const ri = await riserInfo(b.id)
   const orient = (u: (typeof units)[number]) => orientText(L, orientOf(u, ri)) || undefined
   const hasFacade = !!(await one('select 1 from portal.facades where building_id = $1 and quad is not null limit 1', [b.id]))
-  const sel = units.find((u) => u.id === searchParams.u && codeFor(u, c.user, mode) !== 'X')
+  const sel = units.find((u) => u.id === searchParams.u && codeFor(u, c.user, mode, curClient) !== 'X')
   const selBooking = sel?.booking_id && mode === 'team' ? await one<{ client: string; agent: string; ends_at: string }>(`select cl.name client, us.name agent, b.ends_at from portal.bookings b join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id where b.id = $1`, [sel.booking_id]) : null
   // Партнёру сверху — его лимиты по проекту (прототип 5): брони из лимита, клиенты в работе, ставка
   const lim = isExternal(c.user.role) ? await (async () => {
@@ -44,7 +45,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   // Данные для шахматки в браузере: статус по роли, цена с акцией, вид, планировка — фильтры и подсветка без перезагрузки
   const offers = await offersFor(p.id)
   const cu: CU[] = units.map((u) => {
-    const code = codeFor(u, c.user, mode), x = code === 'X', pr = x ? null : promoOf(u, offers)
+    const code = codeFor(u, c.user, mode, curClient), x = code === 'X', pr = x ? null : promoOf(u, offers)
     return { id: u.id, no: x ? '' : unitNo(u), riser: riser(u), floor: u.floor, code, rooms: x ? null : u.rooms, area: x ? 0 : u.area, out: x ? 0 : (u.plot_area || 0) + (u.ext_area || 0), type: u.unit_type, typeName: TYPE_NAME[u.unit_type] || u.unit_type,
       usd: x ? null : u.usd, net: x || u.usd == null ? null : u.usd - (pr?.usd || 0), promo: pr ? promoBadge(pr, T('Акция')) : null, plan: x ? null : planUrl(u.plan_file),
       view_side: x ? null : orientOf(u, ri).view, orient: x ? '' : orient(u) || '', layout: x ? null : u.layout_code, plot_area: x ? null : u.plot_area, ext_area: x ? null : u.ext_area, is_corner: x ? null : u.is_corner,
@@ -81,7 +82,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
           <ChessBoard units={shown} lang={L} team={mode === 'team'} selected={sel?.id} hrefFor={Object.fromEntries(shown.map((u) => [u.id, qs({ u: u.id, side: side || undefined })]))} views={views} layouts={layouts}
             clients={clients} projectId={p.id} canPick={clients.length > 0 || editor} initial={searchParams.l ? { l: searchParams.l } : undefined}
             bulk={{ toSelection: addManyToSelection, ...(editor ? { status: bulkStatus } : {}), ...(c.user.role === 'owner' ? { hide: bulkHide } : {}) }} />
-          {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
+          {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
             : null}
         </div>
         <div className="row mt16 small muted">

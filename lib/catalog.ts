@@ -10,7 +10,7 @@ export type Unit = {
   id: string; project_id: string; building_id: string; building: string; block: string; number: string; floor: number; unit_type: string; bedrooms: number | null
   rooms: number | null; area: number; ext_area: number | null; plot_area: number | null; status: string; external_status: string | null; price: number | null
   usd: number | null; currency: string; plan_file: string | null; layout_code: string | null; synced_at: string; source_id: string
-  booking_id: string | null; booking_status: string | null; booking_agent: string | null; booking_ends: string | null; deal_id: string | null
+  booking_id: string | null; booking_status: string | null; booking_agent: string | null; booking_client: string | null; booking_ends: string | null; deal_id: string | null
   hidden: boolean; sales_status: string; locked: string[]; delivery: string | null; view_side: string | null; is_corner: boolean | null; finish: string | null
 }
 // Код статуса в шахматке: F свободно, B бронь застройщика, S продано, N не в продаже, SB квота SeaBreeze,
@@ -35,7 +35,7 @@ const UNIT_SELECT = `
     coalesce((u.raw->>'rooms')::int, case u.unit_type when 'studio' then 1 when '1br' then 2 when '2br' then 3 when '3br' then 4 else u.bedrooms + 1 end) as rooms,
     u.area_total_m2::float as area, u.area_external_m2::float as ext_area, u.plot_area_m2::float as plot_area, u.status, u.external_status,
     u.price_list::float as price, (${toUsdSql})::float as usd, u.price_currency as currency, l.plan_file, l.code as layout_code, u.synced_at, u.source_id,
-    bk.id as booking_id, bk.status as booking_status, bk.agent_id as booking_agent, bk.ends_at as booking_ends, dl.id as deal_id,
+    bk.id as booking_id, bk.status as booking_status, bk.agent_id as booking_agent, bk.client_id as booking_client, bk.ends_at as booking_ends, dl.id as deal_id,
     exists (select 1 from portal.unit_hidden h where h.unit_id = u.id) as hidden, b.delivery, u.view_side, u.is_corner, u.finish,
     (select coalesce(array_agg(x), '{}') from jsonb_array_elements_text(u.locked_fields) x) as locked, coalesce(ps.sales_status, 'draft') as sales_status
   from units u
@@ -86,16 +86,18 @@ export const unitsOfProject = (projectId: string) => q<Unit>(`${UNIT_SELECT} whe
 export const unitById = (id: string) => one<Unit>(`${UNIT_SELECT} where u.id = $1`, [id])
 export const unitsByIds = (ids: string[]) => (ids.length ? q<Unit>(`${UNIT_SELECT} where u.id = any($1)`, [ids]) : Promise.resolve([] as Unit[]))
 
-export function codeFor(u: Unit, viewer: User | null, mode: 'team' | 'agent' | 'show'): Code {
+// client — «текущий клиент» вкладки Bitrix24: своя бронь для ДРУГОГО клиента — не «ваша бронь» (QA 09.11: у Tom Weiss висела бронь Anna)
+export function codeFor(u: Unit, viewer: User | null, mode: 'team' | 'agent' | 'show', client?: string | null): Code {
+  const mine = !!u.booking_id && !!viewer && u.booking_agent === viewer.id && (!client || u.booking_client === client)
   const free = u.status === 'available' && u.price != null
   if (mode === 'show') return free && !u.hidden && !u.booking_id && !u.deal_id ? 'F' : 'X'
   if (mode === 'agent') {
     if (u.hidden) return 'X'
-    if (u.booking_id && viewer && u.booking_agent === viewer.id) return 'M'
+    if (mine) return 'M'
     return free && !u.booking_id && !u.deal_id ? 'F' : 'X'
   }
   if (u.deal_id) return 'D'
-  if (u.booking_id) return viewer && u.booking_agent === viewer.id ? 'M' : 'O'
+  if (u.booking_id) return mine ? 'M' : 'O'
   if (free) return 'F'
   if (u.status === 'reserved') return 'B'
   if (u.status === 'sold') return 'S'
