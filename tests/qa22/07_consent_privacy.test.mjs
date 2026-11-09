@@ -72,6 +72,8 @@ test('удаление по запросу: без сделки — данные
   assert.ok(c.anonymized_at); assert.equal(c.phone, null); assert.equal(c.email, null); assert.match(c.name, /^Deleted · R-/)
   assert.equal((await one(`select status from portal.privacy_requests where id = $1`, [req.id])).status, 'done')
   assert.equal((await page(null, `/c/${c.consent_token || 'x'}`)).status, 404, 'ссылка согласия жива после удаления')
+  // QA 09.11: неотправленные регистрации удалённого клиента не уходят застройщику
+  assert.equal((await one(`select count(*)::int n from portal.registrations where client_id = $1 and status = 'to_send'`, [cl])).n, 0, 'удалённый клиент остался в очереди регистраций')
 })
 test('удаление при сделке: договор и KYC сохраняются', async () => {
   const cl = (await register(S)).result.id

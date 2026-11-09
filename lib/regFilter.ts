@@ -4,7 +4,7 @@ import { q } from './db'
 export type RegParams = { f?: string; d?: string; p?: string; m?: string; src?: string; s?: string; from?: string; to?: string; by?: string; flag?: string; cons?: string; ids?: string }
 export type RegRow = { id: string; status: string; reject_reason: string | null; mass: boolean; priority: boolean; due_send: string | null; sent_at: string | null; answer_due: string | null
   valid_until: string | null; created_at: string; decided_at: string | null; client: string; client_id: string; reg_no: string; phone: string | null; email: string | null; country: string | null
-  consent_status: string | null; owner_type: string; owner: string; agency: string | null; market: string | null; developer: string; developer_id: string; project: string; project_id: string; silence_rule: string }
+  consent_status: string | null; owner_type: string; owner: string; agency: string | null; market: string | null; developer: string; developer_id: string; project: string; project_id: string; silence_rule: string; anonymized: boolean }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const UUID = /^[0-9a-f-]{36}$/
@@ -19,6 +19,8 @@ export function groupOf(r: Pick<RegRow, 'status' | 'answer_due' | 'valid_until'>
 export async function loadRegistrations(sp: RegParams, user: { role: string; market: string | null }) {
   const w: string[] = [], a: unknown[] = []
   const add = (sql: string, v: unknown) => { a.push(v); w.push(sql.replace(/\$\?/g, '$' + a.length)) }
+  // удалённые по запросу клиента — только во «Все» (история), никогда в отправку и файл застройщику
+  if (sp.f !== 'all') w.push('cl.anonymized_at is null')
   if (user.role === 'market_head') add('cl.market = $?', user.market || '')
   if (sp.d && UUID.test(sp.d)) add('r.developer_id = $?::uuid', sp.d)
   if (sp.p && UUID.test(sp.p)) add('r.project_id = $?::uuid', sp.p)
@@ -45,7 +47,7 @@ export async function loadRegistrations(sp: RegParams, user: { role: string; mar
   if (ids.length) add('r.id = any($?::uuid[])', ids)
   const rows = await q<RegRow>(`select r.id, r.status, r.reject_reason, r.mass, r.priority, r.due_send::text, r.sent_at, r.answer_due::text, r.valid_until::text, r.created_at, r.decided_at,
       cl.name client, cl.id client_id, cl.reg_no, cl.phone, cl.email, cl.country, cl.consent_status, cl.owner_type, u.name owner, ag.name agency, cl.market,
-      d.name developer, d.id developer_id, p.name project, p.id project_id, coalesce(k.silence_rule, 'remind') silence_rule
+      d.name developer, d.id developer_id, p.name project, p.id project_id, coalesce(k.silence_rule, 'remind') silence_rule, cl.anonymized_at is not null anonymized
     from portal.registrations r join portal.clients cl on cl.id = r.client_id join portal.users u on u.id = cl.owner_id left join portal.agencies ag on ag.id = u.agency_id
       join portal.developers d on d.id = r.developer_id join public.projects p on p.id = r.project_id cross join lateral (select * from portal.cur_conditions(r.project_id)) k
     ${w.length ? 'where ' + w.join(' and ') : ''}

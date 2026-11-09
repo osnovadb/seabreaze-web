@@ -58,6 +58,8 @@ export async function executePrivacyRequest(f: FormData) {
   if (job) await processJob(q, job).catch(() => null)
   // застройщикам — уведомление об удалении по шаблону: задача бэк-офису, отметка в журнале
   const regs = await q<{ name: string }>(`select distinct d.name from portal.registrations r join portal.developers d on d.id = r.developer_id where r.client_id = $1 and r.status <> 'to_send'`, [cl.id])
+  // QA 09.11: неотправленные регистрации удалённого клиента — отозвать (иначе он уходил застройщику в пакете и в xlsx)
+  await q(`update portal.registrations set status = 'withdrawn', note = 'удаление данных по запросу клиента' where client_id = $1 and status = 'to_send'`, [cl.id])
   if (regs.length) await queueTask(cl.id, `Privacy: notify developers · ${cl.reg_no}`, `Клиент ${cl.reg_no} попросил удалить данные. Уведомите застройщиков по шаблону: ${regs.map((x) => x.name).join(', ')}.`, 'office')
   await audit(c.real.id, 'privacy.done', 'client', cl.id, result)
   revalidatePath('/admin/privacy')

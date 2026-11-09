@@ -27,6 +27,7 @@ export async function GET(req: Request) {
   let rows = await loadRegistrations(sp, c.user)
   if (!sp.ids) rows = rows.filter((r) => groupOf(r, today)[sp.f || 'today'] ?? true)
   const kind = u.get('kind') === 'full' ? 'full' : 'dev'
+  if (kind === 'dev') rows = rows.filter((r) => !r.anonymized) // удалённые по запросу — никогда застройщику
   const lang = ['ru', 'en', 'az'].includes(u.get('lang') || '') ? u.get('lang')! : 'ru'
   let buf: Buffer, name: string
   if (kind === 'dev') {
