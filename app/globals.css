@@ -360,3 +360,7 @@ summary.btn::-webkit-details-marker { display: none; }
 @media (max-width: 700px) { .steps__now { display: block; } .steps .step__l { visibility: hidden; height: 0; } }
 /* QA 09.11 (Денис, вёрстка во фрейме): подсказки и формы, оказавшиеся внутри рамки таблицы, — с отступами, а не впритык к краю */
 .tbl-wrap > :not(table) { padding: 10px 14px; }
+.embed-nav { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--paper); font-size: 13px; }
+.embed-nav a { color: var(--ink-2); padding: 9px 0 8px; border-bottom: 2px solid transparent; }
+.embed-nav a:hover { color: var(--ink); }
+.embed-nav a.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--deep, #1F4E4C); }

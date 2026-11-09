@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { SOURCE_LABEL } from '@/lib/stages'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, date, dateTime } from '@/lib/i18n'
@@ -44,7 +45,7 @@ export default async function Privacy() {
           <div className="card"><div className="h3">{T('Ждём согласие')}</div>
             {pending.length === 0 ? <div className="muted small">{T('Пусто')}</div> : pending.map((p) => <div key={p.id} className="kv"><span><a href={`/clients/${p.id}`}>{p.reg_no}</a> · {p.name} <span className="tiny muted">· {p.owner}</span></span><span className="tiny muted">{p.consent_requested_at ? T('ссылка {d}, напоминаний {n}', { d: date(L, p.consent_requested_at), n: p.consent_reminders }) : T('ссылка не отправлена')}</span></div>)}</div>
           <div className="card"><div className="h3">{T('Журнал согласий')}</div>
-            {log.length === 0 ? <div className="muted small">{T('Пусто')}</div> : log.map((x, i) => <div key={i} className="kv"><span className="small">{x.client || '—'} · {T(KIND[x.kind] || x.kind)}: <b className={x.granted ? 'okc' : 'badc'}>{T(x.granted ? 'да' : 'нет')}</b> <span className="tiny muted">· {x.source}{x.who ? ' · ' + x.who : ''}</span></span><span className="tiny muted">{dateTime(L, x.at)}</span></div>)}</div>
+            {log.length === 0 ? <div className="muted small">{T('Пусто')}</div> : log.map((x, i) => <div key={i} className="kv"><span className="small">{x.client || '—'} · {T(KIND[x.kind] || x.kind)}: <b className={x.granted ? 'okc' : 'badc'}>{T(x.granted ? 'да' : 'нет')}</b> <span className="tiny muted">· {T(SOURCE_LABEL[x.source] || x.source)}{x.who ? ' · ' + x.who : ''}</span></span><span className="tiny muted">{dateTime(L, x.at)}</span></div>)}</div>
         </div>
       </div>
     </>

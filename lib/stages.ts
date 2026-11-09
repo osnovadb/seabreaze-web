@@ -66,3 +66,7 @@ export const REG_ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'in
   to_send: ['К отправке', 'ink'], sent: ['Отправлено', 'warn'], confirmed: ['Подтверждено', 'ok'], confirmed_silence: ['Подтверждено молчанием', 'ok'],
   rejected: ['Отказ', 'bad'], expired: ['Истекла', 'off'], withdrawn: ['Отозвана', 'off'],
 }
+
+// Источник клиента и согласия — словами (QA 09.11: в отчётах и журнале согласий были коды partner_link, consent_link)
+export const SOURCE_LABEL: Record<string, string> = { agent: 'Партнёр', partner: 'Партнёр', partner_link: 'Ссылка партнёра', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация',
+  quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт', bitrix24: 'Bitrix24', consent_link: 'Ссылка согласия', withdraw: 'Отзыв согласия' }

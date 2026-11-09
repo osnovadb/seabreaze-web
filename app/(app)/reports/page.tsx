@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { SOURCE_LABEL } from '@/lib/stages'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, pct } from '@/lib/i18n'
@@ -7,7 +8,7 @@ import { clientScope } from '@/lib/scope'
 import { Top, STAGES, stageName } from '@/components/ui'
 import { split, type SplitCond } from '@/lib/money'
 
-const SRC: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
+const SRC = SOURCE_LABEL
 type Row = { key: string; clients: number; active: number; booked: number; deals: number; lost: number }
 
 // Отчёты команды (ТЗ, «CRM»): воронка и конверсия по владельцам, источникам и рынкам, причины отказов, прогноз вознаграждения.
