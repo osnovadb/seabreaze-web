@@ -42,7 +42,7 @@ const UNIT_SELECT = `
   left join portal.project_settings ps on ps.project_id = u.project_id
   join buildings b on b.id = u.building_id
   left join layouts l on l.id = u.layout_id
-  left join lateral (select id, status, agent_id, ends_at from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending') order by created_at desc limit 1) bk on true
+  left join lateral (select id, status, agent_id, client_id, ends_at from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending') order by created_at desc limit 1) bk on true
   left join lateral (select id from portal.deals d where d.unit_id = u.id and d.stage <> 'cancelled' limit 1) dl on true`
 
 // Видимость для партнёров: статус «в продаже» или «стоп-продажи», рынок открыт или исключение «открыть»; исключение «закрыть» сильнее рынка.
