@@ -12,7 +12,7 @@ export const metadata = { title: 'GetsEstate · Portal', robots: { index: false,
 
 export default async function Root({ children }: { children: React.ReactNode }) {
   const ctx = await getCtx()
-  const lc = cookies().get('ge_lang')?.value
+  const lc = (await cookies()).get('ge_lang')?.value
   const lang = ctx?.lang || (lc as 'ru' | 'en' | 'de' | 'he') || 'ru'
   return (
     <html lang={lang} dir={isRtl(lang) ? 'rtl' : 'ltr'} className={`${serif.variable} ${sans.variable} ${hebrew.variable}`}>

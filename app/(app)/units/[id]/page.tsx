@@ -15,7 +15,11 @@ const CODE_NAME: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' 
   O: ['Наша бронь', 'ours'], M: ['Ваша бронь', 'ours'], D: ['Наша сделка', 'ink'], X: ['Недоступно', 'off'],
 }
 
-export default async function UnitPage({ params, searchParams }: { params: { id: string }; searchParams: { img?: string } }) {
+export default async function UnitPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ img?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)

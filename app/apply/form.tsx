@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { applyAgent } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -9,7 +10,7 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, 'Отправить заявку')}</button>
 }
 export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
-  const [st, act] = useFormState(applyAgent, null)
+  const [st, act] = useActionState(applyAgent, null)
   const T = (s: string) => t(lang, s)
   if (st?.ok) return (
     <div className="okbox mt24"><b>{T('Заявка отправлена')}</b><div className="mt8">{T('Продавец рынка свяжется с вами в течение 2 рабочих дней. Статус: проверка.')}</div></div>

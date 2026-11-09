@@ -33,9 +33,9 @@ export async function login(_: unknown, f: FormData) {
   await audit(u.id, 'login')
   redirect('/')
 }
-export async function logout() { clearSession(); redirect('/login') }
+export async function logout() { await clearSession(); redirect('/login') }
 export async function setLang(lang: Lang) {
-  cookies().set('ge_lang', lang, { path: '/', maxAge: 365 * 86400, sameSite: 'lax' })
+  ;(await cookies()).set('ge_lang', lang, { path: '/', maxAge: 365 * 86400, sameSite: 'lax' })
   const c = await getCtx()
   if (c && !c.impersonating) await q('update portal.users set locale = $1 where id = $2', [lang, c.user.id])
   revalidatePath('/', 'layout')
@@ -45,7 +45,7 @@ export async function impersonate(f: FormData) {
   if (c.real.role !== 'owner') return
   const id = s(f, 'user')
   await signSession(c.real.id, id && id !== c.real.id ? id : undefined)
-  cookies().delete('ge_lang')
+  ;(await cookies()).delete('ge_lang')
   await audit(c.real.id, 'impersonate', 'user', id)
   redirect('/')
 }
@@ -68,7 +68,7 @@ export async function exitShow(_: unknown, f: FormData) {
     // 5 неверных PIN за 15 минут — выходим из аккаунта целиком, чтобы PIN нельзя было подобрать
     await audit(c.real.id, 'show.pin_fail')
     const fails = await one<{ n: number }>(`select count(*)::int n from portal.audit where user_id = $1 and action = 'show.pin_fail' and created_at > now() - interval '15 minutes'`, [c.real.id])
-    if (fails!.n >= 5) { clearShow(); clearSession(); redirect('/login') }
+    if (fails!.n >= 5) { await clearShow(); await clearSession(); redirect('/login') }
     return { error: 'Неверный PIN' }
   }
   if (c.show?.clientId) {
@@ -77,7 +77,7 @@ export async function exitShow(_: unknown, f: FormData) {
       join units u on u.id = si.unit_id join buildings bl on bl.id = u.building_id where se.client_id = $1 and se.title = 'Встреча' and si.liked and si.created_at > now() - interval '4 hours' order by si.created_at`, [c.show.clientId])
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'meeting','Встреча в режиме показа · отмечено квартир: {n}',$3)`, [c.show.clientId, c.user.id, { n: liked.length + (liked.length ? ' (' + liked.map((x) => x.unit).join(', ') + ')' : '') }])
   }
-  clearShow()
+  await clearShow()
   redirect('/')
 }
 export async function likeInShow(unitId: string) {
@@ -591,7 +591,7 @@ export async function setOwnLocale(f: FormData) {
   const c = await requireCtx()
   if (c.impersonating || !LANGS.includes(s(f, 'locale') as Lang)) return
   await q('update portal.users set locale = $2 where id = $1', [c.real.id, s(f, 'locale')])
-  cookies().delete('ge_lang')
+  ;(await cookies()).delete('ge_lang')
   revalidatePath('/', 'layout')
 }
 

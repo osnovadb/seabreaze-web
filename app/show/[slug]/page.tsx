@@ -9,7 +9,11 @@ import { UnitPanel } from '@/components/UnitPanel'
 import { FacadeView } from '@/components/FacadeView'
 import { Legend } from '@/components/ui'
 
-export default async function ShowProject({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; r?: string; u?: string; view?: string } }) {
+export default async function ShowProject(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; r?: string; u?: string; view?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)

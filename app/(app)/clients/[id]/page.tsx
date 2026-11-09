@@ -14,7 +14,8 @@ import { split, type SplitCond } from '@/lib/money'
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
 import { addActivity, saveQualification, addTask, toggleTask, setKyc, fixation, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 
-export default async function ClientCard({ params }: { params: { id: string } }) {
+export default async function ClientCard(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ext = isExternal(c.user.role)

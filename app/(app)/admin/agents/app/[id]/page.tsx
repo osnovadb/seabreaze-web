@@ -13,7 +13,8 @@ import { CreateAccess } from '../../access'
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { new: ['новая', 'warn'], review: ['на проверке', 'warn'], contract: ['договор', 'ink'], approved: ['одобрена', 'ok'], rejected: ['отказ', 'bad'] }
 
 // Карточка заявки на партнёрство: данные, документы (разрешение маклера, выписка), решение и создание доступа
-export default async function Application({ params }: { params: { id: string } }) {
+export default async function Application(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   if (!canReviewAgents(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

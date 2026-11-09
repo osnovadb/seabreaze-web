@@ -11,7 +11,8 @@ type D = { id: string; status: string; name: string; phone: string | null; email
   client_id: string; client: string; reg_no: string; registered: string; owner: string; owner_agency: string | null; requester: string; requester_agency: string | null; market: string | null; decider: string | null }
 
 // Споры «чей клиент»: решение по журналу — кто зарегистрировал раньше и что было до запроса
-export default async function Disputes({ searchParams }: { searchParams: { f?: string } }) {
+export default async function Disputes(props: { searchParams: Promise<{ f?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

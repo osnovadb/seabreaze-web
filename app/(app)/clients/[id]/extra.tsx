@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { requestTour, uploadClientDoc } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 // Заявка офису на тур в Баку (прототип 11: «Показы» → «Запросить тур в Баку»)
 export function TourForm({ lang, clientId, clientLang }: { lang: Lang; clientId: string; clientLang: string }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(requestTour, null)
+  const [st, act] = useActionState(requestTour, null)
   if (st?.ok) return <div className="okbox small">{T('Заявка отправлена офису в Баку — он подтвердит даты и трансфер.')}</div>
   return (
     <details>
@@ -32,7 +32,7 @@ export function TourForm({ lang, clientId, clientLang }: { lang: Lang; clientId:
 const KINDS: [string, string][] = [['passport', 'паспорт'], ['kyc', 'KYC'], ['booking', 'бронь'], ['contract', 'договор'], ['payment', 'платёж'], ['other', 'другое']]
 export function DocUpload({ lang, clientId, team }: { lang: Lang; clientId: string; team: boolean }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(uploadClientDoc, null)
+  const [st, act] = useActionState(uploadClientDoc, null)
   return (
     <form action={act} className="stack mt8" style={{ gap: 6 }}>
       <input type="hidden" name="client" value={clientId} />

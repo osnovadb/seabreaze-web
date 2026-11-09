@@ -8,7 +8,8 @@ import { MarkupEditor } from '@/components/MarkupEditor'
 import { saveFloorPlan } from '@/lib/markup'
 
 // Разметка плана этажа: контур на каждый стояк (на всех этажах диапазона квартира стояка занимает то же место)
-export default async function FloorEditor({ params }: { params: { id: string; fid: string } }) {
+export default async function FloorEditor(props: { params: Promise<{ id: string; fid: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

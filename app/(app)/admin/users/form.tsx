@@ -1,11 +1,11 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createUser } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 import { ROLE_NAMES } from '@/lib/perm'
 
 export function NewUser({ lang, agencies }: { lang: Lang; agencies: { id: string; name: string }[] }) {
-  const [st, act] = useFormState(createUser, null)
+  const [st, act] = useActionState(createUser, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>

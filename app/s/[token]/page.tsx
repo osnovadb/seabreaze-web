@@ -7,7 +7,11 @@ import { openedSelection } from '@/lib/actions'
 import { DESIGN } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
-export default async function PublicSelection({ params, searchParams }: { params: { token: string }; searchParams: { preview?: string } }) {
+export default async function PublicSelection(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ preview?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string }>(
     `select s.id, s.lang, cl.name client, u.name agent, u.email agent_email, s.title from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id where s.token = $1`, [params.token])
   if (!s) notFound()

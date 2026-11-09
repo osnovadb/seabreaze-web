@@ -7,7 +7,8 @@ import { projectVisible } from '@/lib/catalog'
 import { clientScope } from '@/lib/scope'
 
 // Отдача файла с проверкой прав: файл проекта — если проект виден и аудитория подходит; документ клиента — если клиент в зоне видимости.
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!/^[0-9a-f-]{36}$/.test(params.id)) return new Response('bad id', { status: 400 })
   const c = await getCtx()
   if (!c) return new Response('unauthorized', { status: 401 })

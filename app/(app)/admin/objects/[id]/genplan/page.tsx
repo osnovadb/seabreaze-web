@@ -7,7 +7,8 @@ import { MarkupEditor } from '@/components/MarkupEditor'
 import { saveGenplan } from '@/lib/markup'
 
 // Разметка генплана: контур на каждый дом (блок)
-export default async function GenplanEditor({ params }: { params: { id: string } }) {
+export default async function GenplanEditor(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

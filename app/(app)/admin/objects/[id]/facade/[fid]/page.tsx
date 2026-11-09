@@ -7,7 +7,8 @@ import { FacadeEditor } from '@/components/FacadeEditor'
 import { saveFacade } from '@/lib/markup'
 
 // Калибровка фасада: четыре угла сетки окон, стояки и этажи
-export default async function FacadeCal({ params }: { params: { id: string; fid: string } }) {
+export default async function FacadeCal(props: { params: Promise<{ id: string; fid: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
 import { planBase, schedule, isFull, type Plan } from '@/lib/plans'
@@ -22,7 +23,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   // Скидка застройщика за 100% снижает цену до раздела денег
   const list = planBase(plan, priceList)
   const sc = plan ? schedule(plan, list * (1 - disc / 100)) : null
-  const [st, act] = useFormState(createBooking, null)
+  const [st, act] = useActionState(createBooking, null)
   const sp = split(cond, list, disc, ext)
   return (
     <form action={act} className="stack">

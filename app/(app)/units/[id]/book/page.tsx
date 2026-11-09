@@ -8,7 +8,11 @@ import { clientScope } from '@/lib/scope'
 import { Top } from '@/components/ui'
 import { BookForm } from './form'
 
-export default async function Book({ params, searchParams }: { params: { id: string }; searchParams: { client?: string } }) {
+export default async function Book(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ client?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)

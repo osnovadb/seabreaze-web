@@ -9,7 +9,8 @@ import { endSessions, setUserActive } from '@/lib/actions'
 import { EditUser, Secrets } from './form'
 
 // Карточка пользователя в админке: владелец правит всех, руководитель рынка — агентов своего рынка
-export default async function UserCard({ params }: { params: { id: string } }) {
+export default async function UserCard(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

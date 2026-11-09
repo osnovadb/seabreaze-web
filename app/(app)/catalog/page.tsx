@@ -4,7 +4,10 @@ import { t, usd, m2 } from '@/lib/i18n'
 import { listProjects, unitsOfProject, viewMode, codeFor, unitNo } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
 
-export default async function Catalog({ searchParams }: { searchParams: { p?: string; r?: string; max?: string; o?: string; all?: string; s?: string } }) {
+export default async function Catalog(
+  props: { searchParams: Promise<{ p?: string; r?: string; max?: string; o?: string; all?: string; s?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ps = await listProjects(c.user)

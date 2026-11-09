@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { updateUser, resetPassword, resetPin } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 import { ROLE_NAMES, type Role } from '@/lib/perm'
@@ -12,7 +13,7 @@ function Btn({ label, primary }: { label: string; primary?: boolean }) {
 
 export function EditUser({ lang, u, owner, agencies, curators }: { lang: Lang; u: U; owner: boolean; agencies: { id: string; name: string }[]; curators: { id: string; name: string }[] }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(updateUser, null)
+  const [st, act] = useActionState(updateUser, null)
   const ext = u.role === 'agent' || u.role === 'agency_head'
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>
@@ -39,8 +40,8 @@ export function EditUser({ lang, u, owner, agencies, curators }: { lang: Lang; u
 
 export function Secrets({ lang, id }: { lang: Lang; id: string }) {
   const T = (s: string) => t(lang, s)
-  const [pw, actPw] = useFormState(resetPassword, null)
-  const [pin, actPin] = useFormState(resetPin, null)
+  const [pw, actPw] = useActionState(resetPassword, null)
+  const [pin, actPin] = useActionState(resetPin, null)
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <div className="h3" style={{ margin: 0 }}>{T('Пароль и PIN')}</div>

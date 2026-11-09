@@ -9,7 +9,11 @@ import { DESIGN, LOBBY } from '@/components/ui'
 import { likeInShow } from '@/lib/actions'
 import { ShowBook } from './book'
 
-export default async function ShowUnit({ params, searchParams }: { params: { id: string }; searchParams: { booked?: string } }) {
+export default async function ShowUnit(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ booked?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)

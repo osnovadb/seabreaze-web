@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createFromApplication } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 // Доступ из заявки: агентство (если заявка от агентства), пользователь с куратором; пароль и PIN показываем один раз
 export function CreateAccess({ lang, id, curators }: { lang: Lang; id: string; curators: { id: string; name: string }[] }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(createFromApplication, null)
+  const [st, act] = useActionState(createFromApplication, null)
   if (st?.ok) return <div className="okbox small">{T('Доступ создан')}: {st.email} · {T('пароль')} <b>{st.password}</b> · PIN <b>{st.pin}</b><div className="tiny">{T('Передайте лично; письмо со входом подключим вместе с почтой.')}</div></div>
   return (
     <form action={act} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>

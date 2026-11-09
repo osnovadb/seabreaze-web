@@ -10,7 +10,11 @@ import { UnitPanel } from '@/components/UnitPanel'
 import { Top, Legend } from '@/components/ui'
 import { Chess } from '@/components/Chess'
 
-export default async function ChessPage({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; m?: string; r?: string; u?: string; v?: string } }) {
+export default async function ChessPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; m?: string; r?: string; u?: string; v?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)

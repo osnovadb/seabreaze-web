@@ -1,11 +1,11 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { changeOwnPassword, changeOwnPin } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function PasswordForm({ lang }: { lang: Lang }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(changeOwnPassword, null)
+  const [st, act] = useActionState(changeOwnPassword, null)
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>
       <div className="h3" style={{ margin: 0 }}>{T('Пароль')}</div>
@@ -21,7 +21,7 @@ export function PasswordForm({ lang }: { lang: Lang }) {
 
 export function PinForm({ lang }: { lang: Lang }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(changeOwnPin, null)
+  const [st, act] = useActionState(changeOwnPin, null)
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>
       <div className="h3" style={{ margin: 0 }}>{T('PIN режима показа')}</div>

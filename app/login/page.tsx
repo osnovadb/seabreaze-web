@@ -5,9 +5,10 @@ import { LoginForm } from './form'
 import { LangSwitch } from '@/components/LangSwitch'
 
 // Ссылки с сайтов рынков: ?lang=de&market=DE — язык и рынок выбраны заранее
-export default function Login({ searchParams }: { searchParams: { lang?: string; market?: string } }) {
+export default async function Login(props: { searchParams: Promise<{ lang?: string; market?: string }> }) {
+  const searchParams = await props.searchParams;
   const ql = ['ru', 'en', 'de', 'he'].includes(searchParams.lang || '') ? searchParams.lang : null
-  const lang = (ql || cookies().get('ge_lang')?.value || 'ru') as Lang
+  const lang = (ql || (await cookies()).get('ge_lang')?.value || 'ru') as Lang
   const T = (s: string) => t(lang, s)
   return (
     <div className="auth" dir={isRtl(lang) ? 'rtl' : 'ltr'}>

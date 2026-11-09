@@ -9,7 +9,8 @@ import { clientScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
 
-export default async function SelectionEdit({ params }: { params: { id: string } }) {
+export default async function SelectionEdit(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const cs = clientScope(c.user)
@@ -18,8 +19,8 @@ export default async function SelectionEdit({ params }: { params: { id: string }
   if (!s) notFound()
   const items = await q<{ unit_id: string; note: string | null; liked: boolean }>('select unit_id, note, liked from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
-  const host = headers().get('x-forwarded-host') || headers().get('host')
-  const proto = headers().get('x-forwarded-proto') || 'http'
+  const host = (await headers()).get('x-forwarded-host') || (await headers()).get('host')
+  const proto = (await headers()).get('x-forwarded-proto') || 'http'
   const link = `${proto}://${host}/s/${s.token}`
   return (
     <>

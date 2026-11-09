@@ -1,10 +1,10 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createAgencyAgent } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function NewAgent({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(createAgencyAgent, null)
+  const [st, act] = useActionState(createAgencyAgent, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>

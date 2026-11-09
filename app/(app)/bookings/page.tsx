@@ -9,7 +9,8 @@ import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
 
 type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null }
-export default async function Bookings({ searchParams }: { searchParams: { f?: string; created?: string } }) {
+export default async function Bookings(props: { searchParams: Promise<{ f?: string; created?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!(canBook(c.user.role) || c.user.role === 'finance')) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
