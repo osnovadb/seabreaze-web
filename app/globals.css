@@ -358,3 +358,5 @@ summary.btn::-webkit-details-marker { display: none; }
 .is-busy { opacity: .55; cursor: progress !important; pointer-events: none; }
 .steps__now { display: none; }
 @media (max-width: 700px) { .steps__now { display: block; } .steps .step__l { visibility: hidden; height: 0; } }
+/* QA 09.11 (Денис, вёрстка во фрейме): подсказки и формы, оказавшиеся внутри рамки таблицы, — с отступами, а не впритык к краю */
+.tbl-wrap > :not(table) { padding: 10px 14px; }

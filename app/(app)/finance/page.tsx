@@ -110,20 +110,20 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
               {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
           </div>}
         </>}
-        {tab === 'debts' && <div className="tbl-wrap"><table className="tbl">
+        {tab === 'debts' && <div><div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Кто', 'Роль', 'Долг', 'С какого числа'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{debts.length === 0 ? <tr><td colSpan={4} className="muted">{T('Долгов нет')}</td></tr> : debts.map((d, i) => (
             <tr key={i}><td>{d.who}</td><td className="small">{T(ROLE_LABEL[d.role] || d.role)}</td><td className="badc"><b>{usd(L, -d.bal)}</b></td><td className="small">{date(L, d.since)}{d.role === 'partner' && d.since && Date.now() - new Date(d.since).getTime() > 90 * 86400000 ? <div className="tiny badc">{T('3 месяца без зачёта — выставить счёт на возврат')}</div> : ''}
-              {owner && d.user_id && <form action={writeOff} className="mt8"><input type="hidden" name="user" value={d.user_id} /><input type="hidden" name="role" value={d.role} /><button className="btn btn--sm btn--ghost">{T('Списать долг')}</button></form>}</td></tr>))}</tbody></table>
+              {owner && d.user_id && <form action={writeOff} className="mt8"><input type="hidden" name="user" value={d.user_id} /><input type="hidden" name="role" value={d.role} /><button className="btn btn--sm btn--ghost">{T('Списать долг')}</button></form>}</td></tr>))}</tbody></table></div>
           <div className="small muted mt8">{T('Клаубэк партнёра зачитывается против следующих выплат; через 3 месяца без зачёта — счёт на возврат по соглашению; списать долг может только админ. Клаубэк сотрудника — только против будущих бонусов, из оклада не удерживаем.')}</div></div>}
-        {tab === 'acts' && fin && <div className="tbl-wrap"><table className="tbl">
+        {tab === 'acts' && fin && <div><div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Акт', 'Получатель', 'Реестр', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет — номера присваиваются при утверждении реестра')}</td></tr> : acts.map((a) => (
             <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td><td className="small">{a.who || '—'}<div className="tiny muted">{T(ROLE_LABEL[a.role] || a.role)}{a.market ? ' · ' + a.market : ''}</div></td>
               <td className="small"><a href={`?tab=register&m=${a.reg_month.slice(0, 7)}`}>{a.reg_month.slice(0, 7)}</a></td>
               <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
               <td><Pill kind={a.reg_status === 'paid' && !a.carried ? 'ink' : a.carried ? 'warn' : a.agreed ? 'ok' : 'warn'}>{T(a.reg_status === 'paid' && !a.carried ? 'выплачено' : a.carried ? 'перенесено' : a.agreed ? 'согласован' : 'ждём согласия')}</Pill>{a.needs_inv && <div className="tiny muted">{T(a.invoice ? 'счёт есть' : 'ждём счёт')}</div>}</td>
-              <td><a className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</a></td></tr>))}</tbody></table>
+              <td><a className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</a></td></tr>))}</tbody></table></div>
           <div className="row mt16" style={{ gap: 8 }}><form action="/api/money/report" className="row" style={{ gap: 8 }}><label className="field"><span>{T('Отчёт агента застройщикам за месяц')}</span><input className="in" type="month" name="month" defaultValue={month} /></label><button className="btn btn--sm">{T('Скачать xlsx')}</button></form></div></div>}
         {tab === 'tax' && fin && <div className="card stack" style={{ gap: 10 }}>
           <div className="small muted">{T('Ставка удерживается при выплате партнёру за границу, если у него нет действующего сертификата налогового резидентства. Юрлицо — по рынку партнёра: DE → GmbH, IL → IL Ltd, остальные → Caspian.')}</div>
