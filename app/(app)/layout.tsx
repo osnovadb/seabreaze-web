@@ -67,6 +67,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>
         <Link href={`/b24/units/${cur.id}?tab=pick`} className="small" style={{ color: '#fff' }}>{T('Подбор')}</Link>
         <Link href={`/b24/units/${cur.id}?tab=units`} className="small" style={{ color: '#fff' }}>{T('Квартиры клиента')}</Link>
+        {/* QA 09.11: выйти из клиента — иначе он «залипал» на 12 часов на всех экранах фрейма */}
+        <a href="/b24/ctx?clear=1&to=/catalog" className="small" style={{ color: '#fff', marginInlineStart: 'auto', opacity: .85 }}>{T('Выйти из клиента')} ×</a>
       </div>}
       {children}</div></div>
   }

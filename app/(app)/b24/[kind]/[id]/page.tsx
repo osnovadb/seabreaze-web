@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
 import { t } from '@/lib/i18n'
 import { hookOn } from '@/lib/b24'
@@ -7,7 +8,7 @@ import { resolveClient, type Kind } from '@/lib/b24link'
 import { Top } from '@/components/ui'
 
 // 2.2 · Вкладка Units (сделка, контакт) и Selection (лид) в Bitrix24: клиент портала → его карточка с квартирами, подбором и условиями
-export default async function B24Tab({ params, searchParams }: { params: { kind: string; id: string }; searchParams: { err?: string } }) {
+export default async function B24Tab({ params, searchParams }: { params: { kind: string; id: string }; searchParams: { err?: string; nc?: string } }) {
   const c = await requireCtx()
   const kind = params.kind as Kind
   if (!['deal', 'contact', 'lead'].includes(kind) || !/^\d+$/.test(params.id)) notFound()
@@ -15,6 +16,8 @@ export default async function B24Tab({ params, searchParams }: { params: { kind:
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const r = await resolveClient(kind, Number(params.id))
   if (r.id) redirect(`/b24/ctx?client=${r.id}`) // запомнить клиента вкладки и открыть Units
+  // QA 09.11: карточка Bitrix24 без клиента портала — прежний «текущий клиент» (другой человек) сбрасываем, иначе подбор шёл ему
+  if (cookies().get('ge_client')?.value && !searchParams.nc) redirect(`/b24/ctx?clear=1&to=${encodeURIComponent(`/b24/${kind}/${params.id}?nc=1${searchParams.err ? '&err=' + searchParams.err : ''}`)}`)
   const what = kind === 'deal' ? T('Сделка') : kind === 'contact' ? T('Контакт') : T('Лид')
   return (
     <>

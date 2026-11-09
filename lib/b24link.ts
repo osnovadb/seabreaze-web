@@ -27,6 +27,15 @@ export async function b24Person(kind: Kind, id: number) {
 export async function resolveClient(kind: Kind, id: number) {
   const linked = await one<{ id: string }>(`select id from portal.clients where ${COL[kind]} = $1 limit 1`, [id])
   if (linked) return { id: linked.id, person: null }
+  // QA 09.11: сделка из сконвертированного лида портала — связь по лиду (обмен раз в минуту мог ещё не дойти)
+  if (kind === 'deal' && hookOn()) {
+    const d = await restHook('crm.deal.get', { id }).catch(() => null)
+    const byLead = Number(d?.LEAD_ID) ? await one<{ id: string }>('select id from portal.clients where b24_lead_id = $1 and b24_deal_id is null limit 1', [Number(d.LEAD_ID)]) : null
+    if (byLead) {
+      await q('update portal.clients set b24_deal_id = $2, b24_contact_id = coalesce(b24_contact_id, $3) where id = $1', [byLead.id, id, Number(d.CONTACT_ID) || null])
+      return { id: byLead.id, person: null }
+    }
+  }
   const p = await b24Person(kind, id).catch(() => null)
   if (!p) return { id: null, person: null }
   const m = await one<{ id: string }>(`select id from portal.clients where attach_status <> 'junk' and ((length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or (email_norm <> '' and email_norm = $2)) order by created_at limit 1`, [p.phoneNorm, p.emailNorm])
