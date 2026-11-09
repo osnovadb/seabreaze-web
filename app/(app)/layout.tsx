@@ -15,7 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const c = await requireCtx()
   const u = c.user, T = (s: string) => t(c.lang, s)
   // 2.2 · рекомендателю — только его кабинет (§6 П9): рекомендации, уведомления, профиль
-  if (u.role === 'referrer' && !['/refer', '/notifications', '/profile'].some(async x => ((await headers()).get('x-path') || '').startsWith(x))) redirect('/refer')
+  // Next 15: headers() асинхронный — путь получаем заранее (codemod сделал async-колбэк в .some → проверка всегда проходила)
+  const xpath = (await headers()).get('x-path') || ''
+  if (u.role === 'referrer' && !['/refer', '/notifications', '/profile'].some((x) => xpath.startsWith(x))) redirect('/refer')
   const cnt = await one<{ notif: number; req: number; apps: number; kyc: number; regs: number }>(`select
     (select count(*)::int from portal.notifications where user_id = $1 and not read) notif,
     (select count(*)::int from portal.bookings where status = 'requested') req,
@@ -63,7 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>
         {/* QA 09.11: меню раздела во фрейме — крупнее и с подсветкой текущего раздела */}
-        <nav className="embed-nav">{(async () => { const path = (await headers()).get('x-path') || ''; const vis = em.filter((x) => x[2]); const cur = vis.map((x) => x[0]).filter((h) => path === h || path.startsWith(h + '/')).sort((a, b) => b.length - a.length)[0]; return vis.map(([h, l]) => <Link key={h} href={h} className={h === cur ? 'on' : ''}>{T(l)}</Link>) })()}</nav>
+        <nav className="embed-nav">{(() => { const path = xpath; const vis = em.filter((x) => x[2]); const cur = vis.map((x) => x[0]).filter((h) => path === h || path.startsWith(h + '/')).sort((a, b) => b.length - a.length)[0]; return vis.map(([h, l]) => <Link key={h} href={h} className={h === cur ? 'on' : ''}>{T(l)}</Link>) })()}</nav>
         {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
           <span className="small">{T('Клиент')}: <b>{cur.name}</b></span>
           <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>
