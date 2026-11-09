@@ -21,7 +21,7 @@ export default function Apply({ searchParams }: { searchParams: { lang?: string;
         <div className="small" style={{ marginTop: 40, color: 'var(--mist-2)' }}>{T('Для агентов и агентств в Германии, Австрии, Швейцарии и Израиле')}</div>
       </div>
       <div className="auth__form">
-        <div className="between"><Link className="small muted" href="/login">← {T('Вход')}</Link><LangSwitch light lang={lang} order={['de', 'en', 'ru', 'he']} /></div>
+        <div className="between"><Link className="small muted" href={`/login?lang=${lang}`}>← {T('Вход')}</Link><LangSwitch light lang={lang} order={['de', 'en', 'ru', 'he']} /></div>
         <h1 className="h2" style={{ fontSize: 30, marginTop: 40 }}>{T('Заявка на партнёрство')}</h1>
         <p className="muted">{T('Ответим за 2 рабочих дня. Доступ к каталогу — после проверки и договора.')}</p>
         <ApplyForm lang={lang} market={['DE', 'IL', 'GLOBAL'].includes(searchParams.market || '') ? searchParams.market! : lang === 'he' ? 'IL' : 'DE'} />

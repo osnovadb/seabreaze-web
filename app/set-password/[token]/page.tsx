@@ -20,7 +20,7 @@ export default async function SetPassword({ params }: { params: { token: string 
       </> : <>
         <h1 className="h2" style={{ fontSize: 30, marginTop: 64 }}>{T('Ссылка не действует')}</h1>
         <p className="muted">{T('Ссылка устарела или уже использована. Запросите новую — или напишите своему куратору.')}</p>
-        <Link className="btn btn--p mt16" href="/forgot">{T('Запросить новую ссылку')}</Link>
+        <Link className="btn btn--p mt16" href={`/forgot?lang=${lang}`}>{T('Запросить новую ссылку')}</Link>
       </>}
     </AuthLayout>
   )
