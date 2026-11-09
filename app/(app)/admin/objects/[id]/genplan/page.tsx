@@ -11,7 +11,11 @@ import Link from 'next/link'
 import { needUuid } from '@/lib/ids'
 
 // Разметка генплана: контур на каждый дом (блок)
-export default async function GenplanEditor({ params, searchParams }: { params: { id: string }; searchParams: { m?: string } }) {
+export default async function GenplanEditor(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')

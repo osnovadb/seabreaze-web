@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { linkLead } from '@/lib/linkActions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -9,7 +10,7 @@ function Submit({ lang }: { lang: Lang }) {
 }
 // Две галочки согласия под брендом агентства (§15): обязательная — данные и передача застройщикам; необязательная — реклама и рассылки
 export function LinkLeadForm({ lang, code, projects, project, brand }: { lang: Lang; code: string; projects: string[]; project?: string; brand: string }) {
-  const [st, act] = useFormState(linkLead, null)
+  const [st, act] = useActionState(linkLead, null)
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   if (st?.ok) return <div className="okbox">{T('Спасибо! {b} свяжется с вами в ближайшее время.', { b: brand })}</div>
   return (

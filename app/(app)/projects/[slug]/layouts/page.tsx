@@ -10,7 +10,11 @@ import { Top } from '@/components/ui'
 
 // Вид «Планировки» (как у Profitbase): каждая планировка проекта — картинка, площадь, сколько свободно и почём;
 // нажатие ведёт в шахматку блока с подсветкой этой планировки
-export default async function Layouts({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string } }) {
+export default async function Layouts(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)

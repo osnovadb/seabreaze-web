@@ -1,10 +1,10 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { uploadInvoice } from '@/lib/moneyActions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function InvoiceForm({ lang, id }: { lang: Lang; id: string }) {
-  const [st, act] = useFormState(uploadInvoice, null)
+  const [st, act] = useActionState(uploadInvoice, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="row noprint" style={{ gap: 8, alignItems: 'flex-end' }}>

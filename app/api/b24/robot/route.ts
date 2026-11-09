@@ -2,7 +2,7 @@
 // Bitrix24 вызывает обработчик с токеном приложения; результат возвращаем через bizproc.event.send. Действует от имени ответственного по сделке.
 import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { isRedirectError } from 'next/dist/client/components/redirect'
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { q, one, audit } from '@/lib/db'
 import { restApp, domainOk, restHook } from '@/lib/b24'
 import { actingAs } from '@/lib/auth'

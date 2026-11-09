@@ -9,7 +9,8 @@ import { InvoiceForm } from './invoice'
 
 // 2.2 · §8 Акт вознаграждения за месяц: суммы без НДС в USD и в валюте получателя по курсу на дату акта; корректировки и клаубэк — строками со ссылкой на продажу
 const ENTITY: Record<string, string> = { DE: 'GetsEstate GmbH (DE)', IL: 'GetsEstate IL Ltd (IL)' }
-export default async function Act({ params }: { params: { id: string } }) {
+export default async function Act(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const l = await one<{ id: string; register_id: string; user_id: string; role: string; market: string | null; gross: number; withheld: number; net: number; act_no: string | null; act_date: string | null; currency: string | null; fx_rate: number | null; fx_source: string | null; amount_cur: number | null; agreed_at: string | null; invoice_file_id: string | null; month: string; name: string; email: string; partner_form: string | null; tax_no: string | null; vat_payer: boolean; vat_no: string | null; tax_country: string | null; bank_holder: string | null; bank_iban: string | null; bank_swift: string | null; bank_name: string | null }>(

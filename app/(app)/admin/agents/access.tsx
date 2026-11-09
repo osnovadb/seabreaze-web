@@ -1,5 +1,5 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createFromApplication } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 import { InviteLink } from '@/components/InviteLink'
@@ -7,7 +7,7 @@ import { InviteLink } from '@/components/InviteLink'
 // Доступ из заявки: агентство (если заявка от агентства), пользователь с куратором; ссылку-приглашение показываем один раз
 export function CreateAccess({ lang, id, curators, stacked }: { lang: Lang; id: string; curators: { id: string; name: string }[]; stacked?: boolean }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(createFromApplication, null)
+  const [st, act] = useActionState(createFromApplication, null)
   if (st && 'link' in st) return <InviteLink lang={lang} link={st.link} mailed={st.mailed} title={T('Доступ создан') + ': ' + st.email + ' — ' + T('пароль и PIN пользователь задаст сам по ссылке (7 дней)')} />
   // QA 09.11: в карточке заявки — колонкой с подписями (в строку кнопка обрезалась, у даты не было подписи)
   if (stacked) return (

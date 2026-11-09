@@ -8,7 +8,8 @@ import { AdminTabs } from '@/components/AdminTabs'
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off']> = { queued: ['в очереди', 'warn'], sent: ['отправлено', 'ok'], error: ['ошибка', 'bad'], skipped: ['пропущено', 'off'] }
 
 // Почта и Telegram (запуск): подключены ли каналы и что в очереди. Пока почты нет — письмо можно открыть и переслать вручную.
-export default async function Outbox({ searchParams }: { searchParams: { s?: string } }) {
+export default async function Outbox(props: { searchParams: Promise<{ s?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

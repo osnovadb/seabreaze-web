@@ -8,7 +8,8 @@ import { saveFacade } from '@/lib/markup'
 import { needUuid } from '@/lib/ids'
 
 // Калибровка фасада: четыре угла сетки окон, стояки и этажи
-export default async function FacadeCal({ params }: { params: { id: string; fid: string } }) {
+export default async function FacadeCal(props: { params: Promise<{ id: string; fid: string }> }) {
+  const params = await props.params;
   needUuid(params.fid)
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')

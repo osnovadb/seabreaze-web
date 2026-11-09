@@ -12,7 +12,11 @@ import { fxFor } from '@/lib/fx'
 import { promoForUnit } from '@/lib/promo'
 import { optionsFor } from '@/lib/options'
 
-export default async function Book({ params, searchParams }: { params: { id: string }; searchParams: { client?: string } }) {
+export default async function Book(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ client?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const u = await unitById(params.id)
@@ -37,8 +41,8 @@ export default async function Book({ params, searchParams }: { params: { id: str
       <div className="page split-l">
         <div className="card">{planUrl(u.plan_file) ? <div className="planbox" style={{ border: 0 }}><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="muted">{T('План появится позже')}</div>}</div>
         <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct }}
-          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || cookies().get('ge_client')?.value} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
+          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || (await cookies()).get('ge_client')?.value} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
       </div>
     </>
-  )
+  );
 }

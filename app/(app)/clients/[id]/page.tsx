@@ -23,7 +23,8 @@ import { needUuid } from '@/lib/ids'
 const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
 const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'отменена' }
 
-export default async function ClientCard({ params }: { params: { id: string } }) {
+export default async function ClientCard(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

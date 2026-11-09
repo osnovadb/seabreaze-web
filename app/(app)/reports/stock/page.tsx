@@ -12,7 +12,8 @@ type Mo = { m: string; sold: number; bookings: number; deals: number; total: num
 // Остатки и темп продаж (группа 4, «дашборд РОП» у Profitbase): что свободно по корпусам и комнатам, цена за м²,
 // сколько продаётся в месяц и на сколько месяцев хватит остатка. Продажи застройщика — из журнала квартиры (с 04.11.2026),
 // наши брони и сделки — из портала.
-export default async function Stock({ searchParams }: { searchParams: { p?: string; by?: string } }) {
+export default async function Stock(props: { searchParams: Promise<{ p?: string; by?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

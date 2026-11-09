@@ -12,7 +12,8 @@ import { partnerCol } from '@/lib/stages'
 
 type Row = { has_deal: boolean; qualified: boolean; id: string; name: string; reg_no: string; stage: string; country: string | null; budget: string | null; interest: string | null; protected_until: string; pause_until: string | null; lost_reason: string | null; last_activity_at: string; owner: string; opened: number | null; booking: string | null; booking_ends: string | null; fix: string | null; b24_stage: string | null; attach_status: string; bstatus: string | null; paid: boolean; regs_sent: boolean }
 
-export default async function Clients({ searchParams }: { searchParams: { v?: string; q?: string } }) {
+export default async function Clients(props: { searchParams: Promise<{ v?: string; q?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!canSeeClients(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

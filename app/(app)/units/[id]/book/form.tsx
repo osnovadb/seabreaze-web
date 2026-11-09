@@ -1,7 +1,7 @@
 'use client'
+import { useActionState, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
 import { createBooking } from '@/lib/actions'
 import { split, type SplitCond } from '@/lib/money'
 import { priceChain, isFull, termUnknown, hasSchedule, planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
@@ -28,7 +28,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const maxDisc = ch.poolAllowed ? ceiling : 0
   useEffect(() => { if (disc > maxDisc) setDisc(maxDisc) }, [maxDisc]) // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false)
-  const [st, act] = useFormState(createBooking, null)
+  const [st, act] = useActionState(createBooking, null)
   const sp = split(cond, list, disc, ext)
   const [picked, setPicked] = useState<string[]>([])
   // Опции — сверху итоговой цены, без скидок и вне раздела денег (комиссия считается с квартиры)

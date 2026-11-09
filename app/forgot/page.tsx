@@ -3,7 +3,8 @@ import { t } from '@/lib/i18n'
 import { AuthLayout, authLang } from '@/components/AuthLayout'
 import { ForgotForm } from './form'
 
-export default function Forgot({ searchParams }: { searchParams: { lang?: string } }) {
+export default async function Forgot(props: { searchParams: Promise<{ lang?: string }> }) {
+  const searchParams = await props.searchParams;
   const lang = authLang(searchParams.lang)
   const T = (s: string) => t(lang, s)
   return (

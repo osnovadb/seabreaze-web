@@ -1,11 +1,12 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { clientKycUpload } from '@/lib/kycActions'
 import { t, type Lang } from '@/lib/i18n'
 
 function Btn({ lang, again }: { lang: Lang; again?: boolean }) { const { pending } = useFormStatus(); return <button className={'btn btn--sm' + (again ? '' : ' btn--p')} disabled={pending}>{t(lang, pending ? 'Загружаем…' : again ? 'Добавить ещё' : 'Загрузить')}</button> }
 export function ClientUpload({ lang, token, buyer, kinds, again }: { lang: Lang; token: string; buyer: string; kinds: string[][]; again?: boolean }) {
-  const [st, act] = useFormState(clientKycUpload, null)
+  const [st, act] = useActionState(clientKycUpload, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>

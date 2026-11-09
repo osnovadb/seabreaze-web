@@ -1,6 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { t, type Lang } from '@/lib/i18n'
 import { centroid, polyStr, type P } from '@/lib/geom'
 
@@ -16,7 +15,7 @@ export function MarkupEditor({ lang, src, items, initial, action, hidden }: {
   const [active, setActive] = useState(items.find((i) => !initial.some((x) => x.key === i.key))?.key || items[0]?.key || '')
   const [drag, setDrag] = useState<number | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const [st, act] = useFormState(action, null)
+  const [st, act] = useActionState(action, null)
   const cur = shapes.find((x) => x.key === active)
   const pos = (e: { clientX: number; clientY: number }): P => {
     const r = box.current!.getBoundingClientRect()

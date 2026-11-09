@@ -4,7 +4,8 @@ import { LoginForm } from './form'
 import { AuthLayout, authLang } from '@/components/AuthLayout'
 
 // Ссылки с сайтов рынков: ?lang=de&market=DE — язык и рынок выбраны заранее
-export default function Login({ searchParams }: { searchParams: { lang?: string; market?: string } }) {
+export default async function Login(props: { searchParams: Promise<{ lang?: string; market?: string }> }) {
+  const searchParams = await props.searchParams;
   const lang = authLang(searchParams.lang)
   const T = (s: string) => t(lang, s)
   return (

@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { setPassword } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -9,7 +10,7 @@ function Submit({ lang }: { lang: Lang }) {
 }
 export function SetForm({ lang, token, needPin }: { lang: Lang; token: string; needPin: boolean }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(setPassword, null)
+  const [st, act] = useActionState(setPassword, null)
   return (
     <form action={act} className="stack mt24" style={{ maxWidth: 420 }}>
       {st?.error && <div className="err">{T(st.error)}</div>}

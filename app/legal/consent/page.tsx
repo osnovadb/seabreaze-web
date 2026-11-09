@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { CONSENT, type LegalLang } from '@/lib/legal'
 
-export default function Page({ searchParams }: { searchParams: { lang?: string } }) {
-  const c = (searchParams.lang || cookies().get('ge_lang')?.value || 'en') as string
+export default async function Page(props: { searchParams: Promise<{ lang?: string }> }) {
+  const searchParams = await props.searchParams;
+  const c = (searchParams.lang || (await cookies()).get('ge_lang')?.value || 'en') as string
   const lang: LegalLang = (['ru', 'en', 'de'].includes(c) ? c : 'en') as LegalLang
   const d = CONSENT[lang]
   return (

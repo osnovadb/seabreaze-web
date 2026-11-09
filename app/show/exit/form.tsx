@@ -1,10 +1,10 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { exitShow } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function ExitForm({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(exitShow, null)
+  const [st, act] = useActionState(exitShow, null)
   return (
     <form action={act} className="stack">
       {st?.error && <div className="err">{t(lang, st.error)}</div>}

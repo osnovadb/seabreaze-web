@@ -1,6 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { t, type Lang } from '@/lib/i18n'
 import { quadCell, polyStr, type P } from '@/lib/geom'
 
@@ -17,7 +16,7 @@ export function FacadeEditor({ lang, src, id, project, initial, action }: {
   const [from, setFrom] = useState(initial.floor_from), [to, setTo] = useState(initial.floor_to)
   const [drag, setDrag] = useState<number | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const [st, act] = useFormState(action, null)
+  const [st, act] = useActionState(action, null)
   const rs = risers.split(/[\s,;]+/).filter(Boolean)
   const rows = Math.max(1, to - from + 1)
   useEffect(() => {

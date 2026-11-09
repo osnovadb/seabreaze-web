@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { updateClientContacts } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 // Правка контактов клиента — с проверкой, что телефон или e-mail не принадлежит другому клиенту
 export function EditContacts({ lang, cl }: { lang: Lang; cl: { id: string; name: string; phone: string | null; email: string | null; country: string | null; language: string | null } }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(updateClientContacts, null)
+  const [st, act] = useActionState(updateClientContacts, null)
   return (
     <details className="mt8">
       <summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Изменить контакты')}</summary>

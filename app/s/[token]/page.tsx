@@ -11,7 +11,11 @@ import { openedSelection } from '@/lib/actions'
 import { DESIGN } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
-export default async function PublicSelection({ params, searchParams }: { params: { token: string }; searchParams: { preview?: string } }) {
+export default async function PublicSelection(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ preview?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // 2.2 · подборка партнёра — под его брендом (агентство или имя) и с его контактами, без наших (§11 П5)
   const s = await one<{ id: string; lang: Lang; client: string; agent: string; agent_email: string; title: string; market: string | null; partner: boolean; agency: string | null }>(
     `select s.id, s.lang, cl.name client, cl.market, u.name agent, u.email agent_email, s.title, u.role in ('agent','agency_head') partner, a.name agency

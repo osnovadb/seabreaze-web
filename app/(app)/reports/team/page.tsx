@@ -10,7 +10,8 @@ const ROLE: Record<string, string> = { owner: 'владелец', market_head: '
 
 // Дашборд руководителя продаж (группа 4): по каждому, кто ведёт клиентов, — новые клиенты, брони и сделки за месяц,
 // конверсия бронь → сделка за всё время, просроченные задачи и клиенты без активности. Руководитель рынка видит свой рынок.
-export default async function Team({ searchParams }: { searchParams: { m?: string } }) {
+export default async function Team(props: { searchParams: Promise<{ m?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

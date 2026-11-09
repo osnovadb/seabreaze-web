@@ -16,7 +16,8 @@ const defaults = (projectId: string): Conditions => ({ id: '', project_id: proje
   agent_fix_pct: 2, agent_pool_pct: 10, agent_our_pool_share: 0, seller_share_pct: 15, seller_self_disc: 10, seller_max_disc: 20, booking_days: 14, booking_ext_days: 14, protect_months: 3,
   max_bookings_client: 3, max_bookings_agent: 3, max_bookings_total: 10, pay_timing: 'after_first_payment', payment_plans: [], note: null, created_at: '', booking_fee: 0, booking_fee_currency: 'USD', head_bonus_pct: 0, escort_fix_usd: 500, referrer_pct: 2, consultant_pct: 1, vat_rate: 18 })
 
-export default async function Conditions({ searchParams }: { searchParams: { p?: string } }) {
+export default async function Conditions(props: { searchParams: Promise<{ p?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

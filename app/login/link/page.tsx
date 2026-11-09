@@ -3,7 +3,8 @@ import { AuthLayout, authLang } from '@/components/AuthLayout'
 import { LinkForm } from './form'
 
 // 2.2 · Рекомендатель входит без пароля: одноразовая ссылка на почту (решение 249)
-export default function LoginLink({ searchParams }: { searchParams: { lang?: string; expired?: string } }) {
+export default async function LoginLink(props: { searchParams: Promise<{ lang?: string; expired?: string }> }) {
+  const searchParams = await props.searchParams;
   const lang = authLang(searchParams.lang)
   const T = (s: string) => t(lang, s)
   return (

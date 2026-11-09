@@ -10,7 +10,10 @@ import { bookingAction } from '@/lib/actions'
 
 type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
-export default async function Bookings({ searchParams }: { searchParams: { f?: string; created?: string; s?: string; contract?: string } }) {
+export default async function Bookings(
+  props: { searchParams: Promise<{ f?: string; created?: string; s?: string; contract?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!(canBook(c.user.role) || c.user.role === 'finance')) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

@@ -1,14 +1,14 @@
 // Доступы (запуск): одноразовые ссылки приглашения и сброса пароля — в базе только sha256 токена;
 // письма — в очередь portal.outbox_messages (уйдут, когда подключат SMTP); защита входа от подбора пароля.
 import crypto from 'node:crypto'
-import { headers } from 'next/headers'
+import { headers, type UnsafeUnwrappedHeaders } from 'next/headers';
 import { q, one } from './db'
 import { t, type Lang } from './i18n'
 
 export const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex')
 export function baseUrl() {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '')
-  const h = headers()
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
+  const h = (headers() as unknown as UnsafeUnwrappedHeaders)
   return `${h.get('x-forwarded-proto') || 'https'}://${h.get('x-forwarded-host') || h.get('host')}`
 }
 // Новая ссылка гасит прежние неиспользованные ссылки того же вида
@@ -39,5 +39,5 @@ export async function loginBlocked(email: string, ip: string) {
   return (r?.e || 0) >= 5 || (r?.i || 0) >= 20
 }
 export const noteLogin = (email: string, ip: string, ok: boolean) => q('insert into portal.login_attempts (email, ip, ok) values ($1,$2,$3)', [email, ip, ok])
-export const clientIp = () => (headers().get('cf-connecting-ip') || headers().get('x-forwarded-for') || headers().get('x-real-ip') || '').split(',')[0].trim()
+export const clientIp = () => ((headers() as unknown as UnsafeUnwrappedHeaders).get('cf-connecting-ip') || (headers() as unknown as UnsafeUnwrappedHeaders).get('x-forwarded-for') || (headers() as unknown as UnsafeUnwrappedHeaders).get('x-real-ip') || '').split(',')[0].trim()
 export const mailOn = () => !!process.env.SMTP_URL && process.env.SMTP_URL !== 'log' // log — режим проверки, письма не уходят

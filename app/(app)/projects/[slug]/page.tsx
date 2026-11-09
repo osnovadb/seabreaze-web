@@ -17,7 +17,11 @@ const LANG_FLAG: Record<string, string> = { all: 'RU EN DE HE', ru: 'RU', en: 'E
 
 // Рабочая страница проекта (ТЗ, «Портал и CMS»): генплан и шахматка, условия, материалы для клиента, документы и ссылка на страницу проекта на сайте рынка.
 // Полный контент и дизайн проекта — в CMS и на сайте.
-export default async function ProjectPage({ params, searchParams }: { params: { slug: string }; searchParams: { tab?: string; l?: string } }) {
+export default async function ProjectPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string; l?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)
@@ -107,7 +111,7 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   function TermsCard({ short }: { short?: boolean }) {

@@ -7,7 +7,8 @@ import { Top, Pill } from '@/components/ui'
 
 const RES: Record<string, [string, 'ok' | 'warn' | 'off' | 'bad' | 'ink']> = { new_client: ['новый клиент', 'ok'], existing: ['уже наш клиент', 'ink'], partner_client: ['клиент партнёра', 'warn'], spam: ['спам', 'off'], error: ['ошибка', 'bad'] }
 // Входящие заявки (М5): что пришло с сайтов и смарт-каталога, чем стало и ушло ли в Bitrix24
-export default async function Leads({ searchParams }: { searchParams: { f?: string } }) {
+export default async function Leads(props: { searchParams: Promise<{ f?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

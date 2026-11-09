@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { registerClient, requestDispute } from '@/lib/actions'
 import { t, date, type Lang } from '@/lib/i18n'
 
@@ -9,8 +10,8 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, 'Зарегистрировать клиента')}</button>
 }
 export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
-  const [st, act] = useFormState(registerClient, null)
-  const [ds, dact] = useFormState(requestDispute, null)
+  const [st, act] = useActionState(registerClient, null)
+  const [ds, dact] = useActionState(requestDispute, null)
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const F = (name: string, label: string, type = 'text', ph = '') => <label className="field"><span>{T(label)}</span><input className="in" name={name} type={type} placeholder={ph ? T(ph) : ''} /></label>
   return (

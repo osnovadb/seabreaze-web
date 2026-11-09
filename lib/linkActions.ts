@@ -48,7 +48,7 @@ async function linkLeadLocked(f: FormData) {
   if (!name || (!phone && !email)) return { error: 'Нужны имя и телефон или e-mail' }
   if (!f.get('consent')) return { error: 'Без согласия на обработку данных мы не можем передать заявку' }
   const pn = norm.phone(phone), em = norm.email(email)
-  const ip = (headers().get('cf-connecting-ip') || headers().get('x-forwarded-for') || '').split(',')[0].trim()
+  const ip = ((await headers()).get('cf-connecting-ip') || (await headers()).get('x-forwarded-for') || '').split(',')[0].trim()
   // повтор той же заявки за 10 минут не дублируем; не больше 10 заявок с адреса за час
   const flood = await one<{ same: number; ip: number }>(`select count(*) filter (where ((phone_norm = $1 and $1 <> '') or (email_norm = $2 and $2 <> '')) and created_at > now() - interval '10 minutes')::int same,
       count(*) filter (where payload->>'ip' = $3)::int ip from portal.inbound_leads where source = 'partner_link' and created_at > now() - interval '1 hour'`, [pn, em, ip])

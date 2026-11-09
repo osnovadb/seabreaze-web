@@ -13,7 +13,8 @@ import { needUuid } from '@/lib/ids'
 type Item = { unit_id: string; no: string; building: string; floor: number; area: number | null; old_price: number | null; new_price: number; currency: string; applied: boolean | null; now: number | null; now_cur: string }
 
 // Прайс-лист: черновик — правило и предпросмотр «было → стало»; опубликованный — что применено, что пропущено, откат
-export default async function PriceList({ params }: { params: { id: string } }) {
+export default async function PriceList(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')

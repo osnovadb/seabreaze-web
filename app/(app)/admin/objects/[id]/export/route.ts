@@ -7,7 +7,8 @@ import { TYPE_NAME } from '@/lib/catalog'
 import { isUuid } from '@/lib/ids'
 
 // Шахматка проекта в xlsx — она же шаблон для импорта: поправили цены или статусы и загрузили обратно
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!isUuid(params.id)) return new Response('not found', { status: 404 })
   const c = await requireCtx()
   if (c.user.role !== 'owner') return new Response('forbidden', { status: 403 })

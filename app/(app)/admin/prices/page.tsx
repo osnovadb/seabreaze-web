@@ -9,7 +9,8 @@ import { normRule } from '@/lib/priceRule'
 
 
 // Прайс-листы проекта: список и новый черновик
-export default async function Prices({ searchParams }: { searchParams: { p?: string; units?: string } }) {
+export default async function Prices(props: { searchParams: Promise<{ p?: string; units?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -35,5 +36,5 @@ export default async function Prices({ searchParams }: { searchParams: { p?: str
         </div>
       </div>
     </>
-  )
+  );
 }

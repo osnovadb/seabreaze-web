@@ -7,12 +7,16 @@ import { LangSwitch } from '@/components/LangSwitch'
 // Статус заявки партнёра для заявителя (М13): по ссылке с токеном, без входа. Без внутренних комментариев проверяющих.
 const STEPS: [string, string][] = [['new', 'Заявка получена'], ['review', 'Проверка документов'], ['contract', 'Договор'], ['approved', 'Доступ открыт']]
 export const dynamic = 'force-dynamic'
-export default async function ApplyStatus({ params, searchParams }: { params: { token: string }; searchParams: { lang?: string } }) {
+export default async function ApplyStatus(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ lang?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (!/^[0-9a-f]{24}$/.test(params.token)) notFound()
   const a = await one<{ name: string; status: string; created_at: string; market: string }>('select name, status, created_at, market from portal.agent_applications where status_token = $1', [params.token])
   if (!a) notFound()
-  const lc = cookies().get('ge_lang')?.value as Lang | undefined
-  const al = (headers().get('accept-language') || '').slice(0, 2) as Lang
+  const lc = (await cookies()).get('ge_lang')?.value as Lang | undefined
+  const al = ((await headers()).get('accept-language') || '').slice(0, 2) as Lang
   const ql = searchParams.lang as Lang | undefined
   const L: Lang = lc && LANGS.includes(lc) ? lc : ql && LANGS.includes(ql) ? ql : LANGS.includes(al) ? al : a.market === 'IL' ? 'he' : a.market === 'DE' ? 'de' : 'en'
   const T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

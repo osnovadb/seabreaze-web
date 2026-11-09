@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { importClients } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 // Импорт и выгрузка клиентов в xlsx (М13)
 export function ImportExport({ lang }: { lang: Lang }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const [st, act] = useFormState(importClients, null)
+  const [st, act] = useActionState(importClients, null)
   return (
     <details className="card">
       <summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Импорт и выгрузка xlsx')}</summary>

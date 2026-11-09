@@ -9,7 +9,10 @@ import { ActionForm } from '@/components/ActionForm'
 import { Top } from '@/components/ui'
 
 // План и факт агентства (М10): по рынкам, менеджерам и агентствам, за месяц или квартал; помесячно; динамика цен проекта; xlsx
-export default async function PlanFact({ searchParams }: { searchParams: { kind?: string; p?: string; project?: string } }) {
+export default async function PlanFact(
+  props: { searchParams: Promise<{ kind?: string; p?: string; project?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!canSeePlanFact(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

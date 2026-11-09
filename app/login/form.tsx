@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { login } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -8,7 +9,7 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, pending ? 'Входим…' : 'Войти')}</button>
 }
 export function LoginForm({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(login, null)
+  const [st, act] = useActionState(login, null)
   return (
     <form action={act} className="stack mt24" style={{ maxWidth: 420 }}>
       {st?.error && <div className="err">{t(lang, st.error)}</div>}

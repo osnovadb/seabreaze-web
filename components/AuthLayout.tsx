@@ -1,4 +1,4 @@
-import { cookies, headers } from 'next/headers'
+import { cookies, headers, type UnsafeUnwrappedCookies, type UnsafeUnwrappedHeaders } from 'next/headers';
 import { t, isRtl, type Lang } from '@/lib/i18n'
 import { LangSwitch } from '@/components/LangSwitch'
 
@@ -7,9 +7,9 @@ import { LangSwitch } from '@/components/LangSwitch'
 const AL = ['ru', 'en', 'de', 'he']
 export const authLang = (q?: string): Lang => {
   if (AL.includes(q || '')) return q as Lang
-  const c = cookies().get('ge_lang')?.value || ''
+  const c = (cookies() as unknown as UnsafeUnwrappedCookies).get('ge_lang')?.value || ''
   if (AL.includes(c)) return c as Lang
-  const br = (headers().get('accept-language') || '').split(',').map((x) => x.trim().slice(0, 2).toLowerCase()).find((x) => AL.includes(x))
+  const br = ((headers() as unknown as UnsafeUnwrappedHeaders).get('accept-language') || '').split(',').map((x) => x.trim().slice(0, 2).toLowerCase()).find((x) => AL.includes(x))
   return (br || 'en') as Lang
 }
 export function AuthLayout({ lang, children }: { lang: Lang; children: React.ReactNode }) {

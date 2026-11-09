@@ -2,7 +2,7 @@
 // Вызывает те же серверные действия, что и кнопки интерфейса, от имени выбранного пользователя (actingAs) — тесты проверяют настоящую бизнес-логику.
 import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { isRedirectError } from 'next/dist/client/components/redirect'
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { actingAs } from '@/lib/auth'
 import * as A1 from '@/lib/actions'
 import * as A2 from '@/lib/regActions'

@@ -7,7 +7,8 @@ import { ActionForm } from '@/components/ActionForm'
 import { sendSelectionToDeals } from '@/lib/b24ListActions'
 
 // 2.2 · §12 Встройка в список сделок (CRM_DEAL_LIST_MENU): выбранные сделки → подборка каждому клиенту
-export default async function DealList({ searchParams }: { searchParams: { ids?: string } }) {
+export default async function DealList(props: { searchParams: Promise<{ ids?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ids = (searchParams.ids || '').split(',').map(Number).filter((x) => x > 0).slice(0, 100)

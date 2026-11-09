@@ -1,11 +1,11 @@
 'use client'
 import { InviteLink } from '@/components/InviteLink'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createAgencyAgent, resetPassword } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function NewAgent({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(createAgencyAgent, null)
+  const [st, act] = useActionState(createAgencyAgent, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="card stack" style={{ gap: 10 }}>
@@ -25,7 +25,7 @@ export function NewAgent({ lang }: { lang: Lang }) {
 
 // Ссылка для входа сотруднику: приглашение (если пароль не задан) или сброс пароля
 export function AgentLink({ lang, id }: { lang: Lang; id: string }) {
-  const [st, act] = useFormState(resetPassword, null)
+  const [st, act] = useActionState(resetPassword, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act}>

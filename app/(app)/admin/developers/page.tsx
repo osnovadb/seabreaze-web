@@ -13,7 +13,8 @@ const blank: Developer = { id: '', name: '', catalog_id: null, reg_method: 'emai
   commission_pct: null, rates_by_market: {}, vat_mode: 'over', options_in_base: false, pay_timing: 'after_first_payment', fx_rule: null, clawback_months: 3,
   clawback_offset: 'any', payment_wait_days: 10, sells_to_az: false, tz: 'Asia/Baku', contacts: null, note: null, active: true }
 
-export default async function Developers({ searchParams }: { searchParams: { d?: string } }) {
+export default async function Developers(props: { searchParams: Promise<{ d?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'market_head', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

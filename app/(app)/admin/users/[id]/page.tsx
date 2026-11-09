@@ -10,7 +10,8 @@ import { EditUser, Secrets } from './form'
 import { needUuid } from '@/lib/ids'
 
 // Карточка пользователя в админке: владелец правит всех, руководитель рынка — агентов своего рынка
-export default async function UserCard({ params }: { params: { id: string } }) {
+export default async function UserCard(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')

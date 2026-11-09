@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { answerConsent } from '@/lib/consentActions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -9,7 +10,7 @@ function Btn({ lang, label, act, kind = 'btn btn--p' }: { lang: Lang; label: str
   return <button className={kind} name="act" value={act} disabled={pending} formNoValidate={act !== 'give'}>{t(lang, label)}</button>
 }
 export function ConsentForm({ lang, token, status, marketing }: { lang: Lang; token: string; status: string; marketing: boolean }) {
-  const [st, act] = useFormState(answerConsent, null)
+  const [st, act] = useActionState(answerConsent, null)
   const T = (s: string) => t(lang, s)
   if (st?.ok === 'declined') return <div className="okbox mt16" role="status">{T('Мы записали ваш отказ и не будем с вами связываться.')}</div>
   if (st?.ok === 'saved') return <div className="okbox mt16" role="status">{T('Спасибо! Ваш выбор сохранён.')}</div>

@@ -10,7 +10,11 @@ import { ViewTabs } from '@/components/ViewTabs'
 import { FloorPlan, type FC } from '@/components/FloorPlan'
 import { Top, Legend } from '@/components/ui'
 
-export default async function Floor({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; f?: string; u?: string } }) {
+export default async function Floor(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; f?: string; u?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)

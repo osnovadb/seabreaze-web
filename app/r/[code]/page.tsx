@@ -4,13 +4,18 @@ import { t, usd, type Lang } from '@/lib/i18n'
 import { LinkLeadForm } from './form'
 
 export const dynamic = 'force-dynamic'
-export async function generateMetadata({ params }: { params: { code: string } }) {
+export async function generateMetadata(props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   const p = await linkPage(params.code)
   return { title: p ? p.agency || p.partner : 'GetsEstate', robots: { index: false, follow: false } }
 }
 
 // 2.2 · §6 П8 Личная ссылка партнёра: под его брендом (имя агентства и контакты из регистрации), без наших контактов; форма — его кандидат
-export default async function PartnerLink({ params, searchParams }: { params: { code: string }; searchParams: { project?: string } }) {
+export default async function PartnerLink(
+  props: { params: Promise<{ code: string }>; searchParams: Promise<{ project?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const p = await linkPage(params.code)
   if (!p) notFound()
   const L = (['de', 'en', 'ru', 'he'].includes(p.lang) ? p.lang : 'de') as Lang

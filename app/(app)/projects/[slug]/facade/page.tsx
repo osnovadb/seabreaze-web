@@ -12,7 +12,11 @@ import { ViewTabs } from '@/components/ViewTabs'
 
 type F = { id: string; title: string; file_id: string; risers: string[]; floor_from: number; floor_to: number; quad: number[][] }
 // Фасад: квартиры прямо на фото дома (как фасадный виджет Profitbase); клик — квартира справа
-export default async function Facade({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; s?: string; u?: string } }) {
+export default async function Facade(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; s?: string; u?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)

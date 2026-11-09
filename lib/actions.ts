@@ -58,9 +58,9 @@ export async function login(_: unknown, f: FormData) {
   await audit(u.id, 'login')
   redirect('/')
 }
-export async function logout() { clearSession(); redirect('/login') }
+export async function logout() { await clearSession(); redirect('/login') }
 export async function setLang(lang: Lang) {
-  cookies().set('ge_lang', lang, { path: '/', maxAge: 365 * 86400, sameSite: 'lax' })
+  ;(await cookies()).set('ge_lang', lang, { path: '/', maxAge: 365 * 86400, sameSite: 'lax' })
   const c = await getCtx()
   if (c && !c.impersonating) await q('update portal.users set locale = $1 where id = $2', [lang, c.user.id])
   revalidatePath('/', 'layout')
@@ -70,7 +70,7 @@ export async function impersonate(f: FormData) {
   if (c.real.role !== 'owner') return
   const id = s(f, 'user')
   await signSession(c.real.id, id && id !== c.real.id ? id : undefined)
-  cookies().delete('ge_lang')
+  ;(await cookies()).delete('ge_lang')
   await audit(c.real.id, 'impersonate', 'user', id)
   redirect('/')
 }
@@ -93,7 +93,7 @@ export async function exitShow(_: unknown, f: FormData) {
     // 5 неверных PIN за 15 минут — выходим из аккаунта целиком, чтобы PIN нельзя было подобрать
     await audit(c.real.id, 'show.pin_fail')
     const fails = await one<{ n: number }>(`select count(*)::int n from portal.audit where user_id = $1 and action = 'show.pin_fail' and created_at > now() - interval '15 minutes'`, [c.real.id])
-    if (fails!.n >= 5) { clearShow(); clearSession(); redirect('/login') }
+    if (fails!.n >= 5) { await clearShow(); await clearSession(); redirect('/login') }
     return { error: 'Неверный PIN' }
   }
   if (c.show?.clientId) {
@@ -102,7 +102,7 @@ export async function exitShow(_: unknown, f: FormData) {
       join units u on u.id = si.unit_id join buildings bl on bl.id = u.building_id where se.client_id = $1 and se.title = 'Встреча' and si.liked and si.created_at > now() - interval '4 hours' order by si.created_at`, [c.show.clientId])
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'meeting','Встреча в режиме показа · отмечено квартир: {n}',$3)`, [c.show.clientId, c.user.id, { n: liked.length + (liked.length ? ' (' + liked.map((x) => x.unit).join(', ') + ')' : '') }])
   }
-  clearShow()
+  await clearShow()
   redirect('/')
 }
 export async function likeInShow(unitId: string) {
@@ -214,7 +214,7 @@ async function registerClientLocked(f: FormData) {
   await pushDeal(r!.id, ext ? `кандидат от партнёра ${c.user.name} (${reg})` : `клиент заведён в портале (${reg})`) // §13 п.4
   if (ext) await partnerProgress(c.user.id) // §13 п.20: First client
   // QA 09.11: партнёр заполнил всю квалификацию прямо в форме — закрепляем сразу, а не ждём повторного «Сохранить» в карточке
-  if (ext && await qualifyIfReady(c.user.id, r!.id)) {
+  if (ext && (await qualifyIfReady(c.user.id, r!.id))) {
     const u2 = await one<{ until: string }>('select protected_until::text until from portal.clients where id = $1', [r!.id])
     return { ok: true, id: r!.id, reg, until: u2!.until, candidate: false }
   }
@@ -527,7 +527,7 @@ export async function createBooking(_: unknown, f: FormData) {
   await audit(c.real.id, 'booking.create', 'booking', b!.id, { unit: unit.id, disc }, c.impersonating ? c.user.id : null)
   await pushDeal(clientId, queued ? `запрос брони ${unitNo(unit)} в очереди лимита застройщика` : `запрос брони ${unitNo(unit)}: ${Math.round(sp.final).toLocaleString('en')} $, скидка ${disc}%`)
   if (c.show) redirect(`/show/unit/${unit.id}?booked=1`)
-  if (cookies().get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units&created=${b!.id}`) // внутри Bitrix24 — назад во вкладку Units
+  if ((await cookies()).get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units&created=${b!.id}`) // внутри Bitrix24 — назад во вкладку Units
   redirect(`/bookings?created=${b!.id}`)
 }
 export async function bookingAction(f: FormData) {
@@ -625,7 +625,7 @@ export async function addToSelection(f: FormData) {
   await q(`insert into portal.selection_items (selection_id, unit_id, sort) values ($1,$2,(select coalesce(max(sort),0)+1 from portal.selection_items where selection_id = $1)) on conflict do nothing`, [sel!.id, unitId])
   await q(`update portal.clients set stage = case when stage in ('lead','contact','qualify','fixation') then 'selection' else stage end, last_activity_at = now() where id = $1`, [clientId])
   await pushDeal(clientId, 'квартира добавлена в квартиры клиента')
-  if (cookies().get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units`)
+  if ((await cookies()).get('ge_embed')?.value === '1') redirect(`/b24/units/${clientId}?tab=units`)
   redirect(`/selections/${sel!.id}`)
 }
 // Несколько квартир из шахматки в подборку клиента разом (без перехода в подборку — шахматка остаётся открытой)
@@ -939,7 +939,7 @@ export async function setOwnLocale(f: FormData) {
   const c = await requireCtx()
   if (c.impersonating || !LANGS.includes(s(f, 'locale') as Lang)) return
   await q('update portal.users set locale = $2 where id = $1', [c.real.id, s(f, 'locale')])
-  cookies().delete('ge_lang')
+  ;(await cookies()).delete('ge_lang')
   revalidatePath('/', 'layout')
 }
 

@@ -12,7 +12,8 @@ import { selectionUpdate } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
 import { needUuid } from '@/lib/ids'
 
-export default async function SelectionEdit({ params }: { params: { id: string } }) {
+export default async function SelectionEdit(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -24,8 +25,8 @@ export default async function SelectionEdit({ params }: { params: { id: string }
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
   const plansBy = new Map<string, Plan[]>()
   for (const u of units.values()) { const k = u.project_id + ':' + (u.building_id || ''); if (!plansBy.has(k)) plansBy.set(k, await plansFor(u.project_id, u.building_id)) }
-  const host = headers().get('x-forwarded-host') || headers().get('host')
-  const proto = headers().get('x-forwarded-proto') || 'http'
+  const host = (await headers()).get('x-forwarded-host') || (await headers()).get('host')
+  const proto = (await headers()).get('x-forwarded-proto') || 'http'
   const link = `${proto}://${host}/s/${s.token}`
   return (
     <>

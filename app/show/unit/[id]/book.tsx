@@ -1,10 +1,10 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createBooking } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
 export function ShowBook({ lang, unitId, clientId }: { lang: Lang; unitId: string; clientId: string }) {
-  const [st, act] = useFormState(createBooking, null)
+  const [st, act] = useActionState(createBooking, null)
   return (
     <form action={act} className="mt8">
       <input type="hidden" name="unit" value={unitId} /><input type="hidden" name="client" value={clientId} /><input type="hidden" name="discount" value="0" />

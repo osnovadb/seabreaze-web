@@ -1,6 +1,5 @@
 'use client'
-import { useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useState } from 'react'
 import { makeDocument, docStatus } from '@/lib/docActions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -11,7 +10,7 @@ export function MakeDoc({ lang, clientId, clientLang, bookings, fixations, commi
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [kind, setKind] = useState(bookings.length ? 'booking_offer' : 'fixation_act')
-  const [st, act] = useFormState(makeDocument, null)
+  const [st, act] = useActionState(makeDocument, null)
   const kinds = ['booking_offer', 'fixation_act', ...(commission ? ['commission_act'] : [])]
   const byBooking = kind !== 'fixation_act'
   return (
@@ -32,7 +31,7 @@ export function MakeDoc({ lang, clientId, clientLang, bookings, fixations, commi
 }
 export function DocStatus({ lang, id, status }: { lang: Lang; id: string; status: string }) {
   const T = (s: string) => t(lang, s)
-  const [st, act] = useFormState(docStatus, null)
+  const [st, act] = useActionState(docStatus, null)
   if (status === 'signed' || status === 'void') return null
   return (
     <form action={act} className="row" style={{ gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>

@@ -6,7 +6,8 @@ import { AuthLayout, authLang } from '@/components/AuthLayout'
 import { SetForm } from './form'
 
 // Ссылка из приглашения или сброса: задать пароль (и PIN режима показа, если его ещё нет) и сразу войти
-export default async function SetPassword({ params }: { params: { token: string } }) {
+export default async function SetPassword(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const tk = await tokenUser(params.token)
   const lang = tk?.locale || authLang()
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)

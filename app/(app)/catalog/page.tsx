@@ -14,7 +14,10 @@ const STATUS: Partial<Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'our
 
 // Каталог (М12): все открытые проекты сразу, фильтры диапазонами, карточки с планировкой или таблица, по 48 на страницу.
 // Фильтр общий с сохранёнными поисками (lib/unitMatch.mjs): что видно здесь, то и придёт уведомлением.
-export default async function Catalog({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function Catalog(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   // Галочки (тип, комнаты) приходят повторяющимися параметрами — склеиваем через запятую
   const sp: SP = Object.fromEntries(Object.entries(searchParams).map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : v]))
   const c = await requireCtx()
@@ -23,7 +26,7 @@ export default async function Catalog({ searchParams }: { searchParams: Record<s
   const p = ps.find((x) => x.slug === sp.p) || null
   const mode = viewMode(c.user, false)
   // внутри Bitrix24 подбор идёт для клиента вкладки: «бронь клиента» — только его брони
-  const cur = cookies().get('ge_embed')?.value === '1' ? (cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null
+  const cur = (await cookies()).get('ge_embed')?.value === '1' ? ((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null
   const all = mode === 'team' && sp.all === '1'
   const k = (v?: string) => (v && Number(v) ? Number(v) * 1000 : undefined) // цена в фильтре — в тысячах долларов
   const nf = normFilter({ project: p?.id, building: sp.b, types: sp.t, rooms: sp.r, pmin: k(sp.pmin), pmax: k(sp.pmax ?? sp.max), amin: sp.amin, amax: sp.amax, fmin: sp.fmin, fmax: sp.fmax, view: sp.v, outdoor: sp.o, corner: sp.c, promo: sp.promo })

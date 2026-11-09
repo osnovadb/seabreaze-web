@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server'
 import { linkPage } from '@/lib/partnerPage'
 
 export const dynamic = 'force-dynamic'
-export async function GET(_: Request, { params }: { params: { code: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   const p = await linkPage(params.code)
   if (!p) return NextResponse.json({ error: 'not found' }, { status: 404 })
   const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '')

@@ -1,5 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
+import { useActionState } from 'react'
 import { requestReset } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -8,7 +9,7 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, 'Получить ссылку')}</button>
 }
 export function ForgotForm({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(requestReset, null)
+  const [st, act] = useActionState(requestReset, null)
   if (st?.ok) return <div className="okbox mt24">{t(lang, 'Если такой e-mail есть в портале, ссылка для нового пароля придёт в течение нескольких минут. Если письма нет — напишите своему куратору.')}</div>
   return (
     <form action={act} className="stack mt24" style={{ maxWidth: 420 }}>

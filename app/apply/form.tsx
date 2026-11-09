@@ -1,7 +1,7 @@
 'use client'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
-import { useFormState, useFormStatus } from 'react-dom'
+import { useFormStatus } from 'react-dom'
 import { applyAgent } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -10,7 +10,7 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, 'Отправить заявку')}</button>
 }
 export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
-  const [st, act] = useFormState(applyAgent, null)
+  const [st, act] = useActionState(applyAgent, null)
   // QA 09.11: рекомендателю лицензия, компания и документы не нужны — прячем; подсказка — только для выбранного вида
   const [kind, setKind] = useState('agent')
   const [mk, setMk] = useState(market)

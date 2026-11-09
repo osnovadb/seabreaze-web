@@ -7,7 +7,11 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GetsEstate', robots: { index: false, follow: false } }
 
 // 2.2 · §15 Страница согласия клиента: на его языке, иврит справа налево; клиентские страницы — WCAG AA (273)
-export default async function Consent({ params, searchParams }: { params: { token: string }; searchParams: { lang?: string } }) {
+export default async function Consent(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ lang?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const cl = await one<{ name: string; language: string | null; consent_status: string; marketing: boolean; brand: string | null }>(
     `select c.name, c.language, c.consent_status, c.marketing_consent_at is not null marketing, case when c.owner_type = 'partner' then coalesce(a.name, u.name) end brand
      from portal.clients c join portal.users u on u.id = c.owner_id left join portal.agencies a on a.id = c.agency_id where c.consent_token = $1 and c.anonymized_at is null`, [params.token])

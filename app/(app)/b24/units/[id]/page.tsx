@@ -15,7 +15,11 @@ import { clientScope } from '@/lib/scope'
 type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
-export default async function Units({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string; created?: string } }) {
+export default async function Units(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (!/^[0-9a-f-]{36}$/.test(params.id)) notFound()
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

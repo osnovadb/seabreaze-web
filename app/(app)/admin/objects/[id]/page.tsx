@@ -18,7 +18,11 @@ const TYPES = UNIT_TYPES
 const ST: Record<string, string> = { available: 'свободна', reserved: 'бронь застройщика', sold: 'продана', unavailable: 'не в продаже' }
 
 // Карточка проекта в админке: всё, что влияет на деньги, наличие и доступ (ТЗ, «Портал и CMS»)
-export default async function ObjectCard({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string; b?: string; fl?: string } }) {
+export default async function ObjectCard(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; b?: string; fl?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   if (!['owner', 'office'].includes(c.user.role)) redirect('/')
@@ -477,5 +481,4 @@ export default async function ObjectCard({ params, searchParams }: { params: { i
       </div>
     )
   }
-
 }

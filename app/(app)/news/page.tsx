@@ -9,7 +9,8 @@ import { Top, Pill } from '@/components/ui'
 import { MarkRead } from './read'
 
 // Лента новостей и баннеров (М9). Партнёр видит записи своего рынка на своём языке или английском; редакторы — всё действующее.
-export default async function News({ searchParams }: { searchParams: { all?: string } }) {
+export default async function News(props: { searchParams: Promise<{ all?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const editor = canWritePosts(c.user.role)

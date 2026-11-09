@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { t, type Lang } from '@/lib/i18n'
 
 type St = { ok?: boolean; error?: string; applied?: boolean; report?: { create: number; update: number; same: number; errors: string[]; errorsTotal: number } } | null
 // Импорт шахматки: «Проверить» показывает, что изменится, ничего не записывая; «Загрузить» — то же одной транзакцией
 export function ChessImport({ lang, projectId, action }: { lang: Lang; projectId: string; action: (s: St, f: FormData) => Promise<St> }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const [st, act] = useFormState(action, null)
+  const [st, act] = useActionState(action, null)
   const r = st?.report
   return (
     <form action={act} className="card stack" style={{ gap: 8 }}>

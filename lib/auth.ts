@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { cookies } from 'next/headers'
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { redirect } from 'next/navigation'
 import { SignJWT, jwtVerify } from 'jose'
 import { one } from './db'
@@ -22,15 +22,16 @@ export async function signSession(uid: string, as?: string) {
   const token = await new SignJWT({ uid, as: as || null, ver }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime('14d').sign(KEY())
   // 2.2: портал открывается во фрейме Bitrix24 — cookie должна уходить и в стороннем контексте (SameSite=None; Secure)
   const sec = process.env.NODE_ENV === 'production'
-  cookies().set(COOKIE, token, { httpOnly: true, sameSite: sec ? 'none' : 'lax', secure: sec, path: '/', maxAge: 14 * 86400 })
+  ;(await cookies()).set(COOKIE, token, { httpOnly: true, sameSite: sec ? 'none' : 'lax', secure: sec, path: '/', maxAge: 14 * 86400 })
 }
-export function clearSession() {
-  cookies().delete(COOKIE)
-  cookies().delete(SHOW)
+export async function clearSession() {
+  const jar = await cookies()
+  jar.delete(COOKIE)
+  jar.delete(SHOW)
 }
 
 async function readSession(): Promise<{ uid: string; as: string | null; ver: number } | null> {
-  const c = cookies().get(COOKIE)?.value
+  const c = (await cookies()).get(COOKIE)?.value
   if (!c) return null
   try {
     const { payload } = await jwtVerify(c, KEY())
@@ -57,10 +58,10 @@ export async function getCtx(): Promise<Ctx | null> {
   const real = await userById(s.uid)
   if (!real || real.session_ver !== s.ver) return null
   const user = (s.as && real.role === 'owner' ? await userById(s.as) : null) || real
-  const lc = cookies().get('ge_lang')?.value as Lang | undefined
+  const lc = (await cookies()).get('ge_lang')?.value as Lang | undefined
   const lang: Lang = lc && ['ru', 'en', 'de', 'he'].includes(lc) ? lc : user.locale
   let show: Ctx['show'] = null
-  const sc = cookies().get(SHOW)?.value
+  const sc = (await cookies()).get(SHOW)?.value
   if (sc) {
     try {
       const { payload } = await jwtVerify(sc, KEY())
@@ -78,6 +79,6 @@ export async function requireCtx(): Promise<Ctx> {
 
 export async function setShow(clientId: string | null, lang: Lang) {
   const token = await new SignJWT({ client: clientId, lang }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime('4h').sign(KEY())
-  cookies().set(SHOW, token, { httpOnly: true, sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 4 * 3600 })
+  ;(await cookies()).set(SHOW, token, { httpOnly: true, sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 4 * 3600 })
 }
-export function clearShow() { cookies().delete(SHOW) }
+export async function clearShow() { (await cookies()).delete(SHOW) }

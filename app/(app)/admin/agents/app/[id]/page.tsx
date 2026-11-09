@@ -17,7 +17,8 @@ const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { ne
 const JLAB: Record<string, string> = { 'application.new': 'Статус: новая', 'application.review': 'Статус: на проверке', 'application.contract': 'Статус: договор', 'application.approved': 'Статус: одобрена', 'application.rejected': 'Статус: отказ', 'application.file': 'Добавлен документ', 'application.access': 'Создан доступ' }
 
 // Карточка заявки на партнёрство: данные, документы (разрешение маклера, выписка), решение и создание доступа
-export default async function Application({ params }: { params: { id: string } }) {
+export default async function Application(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
   if (!canReviewAgents(c.user.role)) redirect('/')

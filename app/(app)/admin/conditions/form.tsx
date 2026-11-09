@@ -1,6 +1,5 @@
 'use client'
-import { useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useState } from 'react'
 import { saveConditions } from '@/lib/actions'
 import { split } from '@/lib/money'
 import { t, usd, type Lang } from '@/lib/i18n'
@@ -8,7 +7,7 @@ import type { Conditions } from '@/lib/catalog'
 
 export function CondForm({ lang, projectId, cur, canEdit, example }: { lang: Lang; projectId: string; cur: Conditions; canEdit: boolean; example: { no: string; usd: number } | null }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const [st, act] = useFormState(saveConditions, null)
+  const [st, act] = useActionState(saveConditions, null)
   const [v, setV] = useState({ ...cur })
   const [disc, setDisc] = useState(6)
   const set = (k: keyof Conditions) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: Number(e.target.value.replace(',', '.')) })

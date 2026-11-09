@@ -1,10 +1,10 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { createPrivacyRequest } from '@/lib/privacy'
 import { t, type Lang } from '@/lib/i18n'
 
 export function PrivacyForm({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(createPrivacyRequest, null)
+  const [st, act] = useActionState(createPrivacyRequest, null)
   const T = (s: string) => t(lang, s)
   return (
     <form action={act} className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>

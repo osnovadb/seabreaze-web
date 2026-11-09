@@ -15,7 +15,8 @@ const ST = REG_ST
 const WHY: Record<string, string> = { developer_client: 'клиент застройщика', other_agency: 'за другим агентством', other: 'другое' }
 const KEYS = ['f', 'd', 'p', 'm', 'src', 's', 'from', 'to', 'by', 'flag', 'cons'] as const
 
-export default async function Registrations({ searchParams }: { searchParams: RegParams }) {
+export default async function Registrations(props: { searchParams: Promise<RegParams> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!['owner', 'office', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

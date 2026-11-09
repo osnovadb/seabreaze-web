@@ -1,6 +1,6 @@
 'use server'
 // 2.2 · §15 Клиент сам ставит галочки по ссылке; отказ или отзыв — сразу в Bitrix24 (поля контакта, выход из сегментов), бэк-офису — задача
-import { headers } from 'next/headers'
+import { headers, type UnsafeUnwrappedHeaders } from 'next/headers';
 import { revalidatePath } from 'next/cache'
 import { q, one, audit, notify } from './db'
 import { requireCtx } from './auth'
@@ -8,7 +8,7 @@ import { requestConsent } from './consent'
 import { pushDeal, queueTask } from './b24sync'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
-const ip = () => (headers().get('cf-connecting-ip') || headers().get('x-forwarded-for') || '').split(',')[0].trim()
+const ip = () => ((headers() as unknown as UnsafeUnwrappedHeaders).get('cf-connecting-ip') || (headers() as unknown as UnsafeUnwrappedHeaders).get('x-forwarded-for') || '').split(',')[0].trim()
 
 export async function answerConsent(_: unknown, f: FormData) {
   const cl = await one<{ id: string; owner_id: string; consent_status: string; marketing_consent_at: string | null; name: string; language: string | null }>(

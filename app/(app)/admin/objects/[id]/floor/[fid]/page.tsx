@@ -11,7 +11,11 @@ import { cleanMarks } from '@/lib/surround'
 import Link from 'next/link'
 
 // Разметка плана этажа: контур на каждый стояк (на всех этажах диапазона квартира стояка занимает то же место)
-export default async function FloorEditor({ params, searchParams }: { params: { id: string; fid: string }; searchParams: { m?: string } }) {
+export default async function FloorEditor(
+  props: { params: Promise<{ id: string; fid: string }>; searchParams: Promise<{ m?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string) => t(L, s)

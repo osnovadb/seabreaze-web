@@ -16,7 +16,11 @@ import { one } from '@/lib/db'
 import { UnitPanel } from '@/components/UnitPanel'
 import { Top } from '@/components/ui'
 
-export default async function ChessPage({ params, searchParams }: { params: { slug: string }; searchParams: { b?: string; u?: string; l?: string; side?: string } }) {
+export default async function ChessPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; u?: string; l?: string; side?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)
@@ -26,7 +30,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const b = bs.find((x) => x.id === searchParams.b) || [...bs].sort((a, z) => z.free - a.free)[0]
   const units = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
-  const curClient = cookies().get('ge_embed')?.value === '1' ? (cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null // QA 09.11: бронь другого клиента — не «ваша»
+  const curClient = (await cookies()).get('ge_embed')?.value === '1' ? ((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null // QA 09.11: бронь другого клиента — не «ваша»
   const free = units.filter((u) => codeFor(u, c.user, mode, curClient) === 'F')
   const sync = seesSource(c.user.role) ? await one<{ at: string; src: string }>(`select max(u.synced_at) at, min(u.source_id) src from units u where u.building_id = $1`, [b.id]) : null
   const ri = await riserInfo(b.id)
@@ -59,7 +63,7 @@ export default async function ChessPage({ params, searchParams }: { params: { sl
   const shown = side ? cu.filter((u) => u.view_side === side) : cu
   const layouts = Array.from(new Set(cu.map((u) => u.layout).filter(Boolean))).sort() as string[]
   const cs = clientScope(c.user)
-  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by (cl.id::text = '${(cookies().get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
+  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
   const editor = ['owner', 'office'].includes(c.user.role)
   return (
     <>

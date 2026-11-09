@@ -1,12 +1,12 @@
 'use client'
-import { useFormState } from 'react-dom'
+import { useActionState } from 'react'
 import { saveDeveloper } from '@/lib/devActions'
 import { t, type Lang } from '@/lib/i18n'
 import type { Developer } from '@/lib/developers'
 
 export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; canEdit: boolean }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const [st, act] = useFormState(saveDeveloper, null)
+  const [st, act] = useActionState(saveDeveloper, null)
   const N = (k: keyof Developer, label: string, unit: string) => (
     <label className="field"><span>{T(label)}</span><div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input className="in" name={k} defaultValue={cur[k] === null ? '' : String(cur[k])} inputMode="numeric" disabled={!canEdit} /><span className="small muted" style={{ width: 70 }}>{T(unit)}</span></div></label>
   )

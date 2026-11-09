@@ -8,7 +8,11 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'GetsEstate · KYC', robots: { index: false, follow: false } }
 
 // 2.2 · §11 П9 Загрузка документов KYC/KYB клиентом по защищённой ссылке: только загрузка, без просмотра загруженного
-export default async function ClientKyc({ params, searchParams }: { params: { token: string }; searchParams: { lang?: string } }) {
+export default async function ClientKyc(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ lang?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const cl = await one<{ id: string; name: string; language: string | null; kyc_status: string }>('select id, name, language, kyc_status from portal.clients where kyc_token = $1 and anonymized_at is null', [params.token])
   if (!cl) notFound()
   const buyers = await q<{ id: string; kind: string; name: string }>('select id, kind, name from portal.buyers where client_id = $1 order by created_at', [cl.id])

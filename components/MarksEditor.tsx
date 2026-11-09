@@ -1,6 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { useFormState } from 'react-dom'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { t, type Lang } from '@/lib/i18n'
 import { MARKS, type Mark } from '@/lib/surround'
 
@@ -17,7 +16,7 @@ export function MarksEditor({ lang, src, initial, action, hidden, overlay }: {
   const [label, setLabel] = useState('')
   const [drag, setDrag] = useState<number | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const [st, act] = useFormState(action, null)
+  const [st, act] = useActionState(action, null)
   const pos = (e: { clientX: number; clientY: number }) => {
     const r = box.current!.getBoundingClientRect()
     return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }

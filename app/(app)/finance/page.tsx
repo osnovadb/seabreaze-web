@@ -13,7 +13,8 @@ import { trancheReceived, recomputeShares, registerCollect, registerConfirm, reg
 const TABS: [string, string][] = [['sales', 'Продажи и доли'], ['tranches', 'Транши от застройщиков'], ['register', 'Реестр выплат'], ['debts', 'Долги и клаубэк'], ['acts', 'Акты'], ['tax', 'Удержание налога']]
 const TR: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { scheduled: ['ждём оплату клиента', 'off'], expected: ['ожидаем от застройщика', 'warn'], received: ['получено', 'ok'], cancelled: ['отменён', 'off'] }
 
-export default async function Finance({ searchParams }: { searchParams: { tab?: string; m?: string } }) {
+export default async function Finance(props: { searchParams: Promise<{ tab?: string; m?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!canSeeFinance(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -137,5 +138,5 @@ export default async function Finance({ searchParams }: { searchParams: { tab?: 
         </div>}
       </div>
     </>
-  )
+  );
 }

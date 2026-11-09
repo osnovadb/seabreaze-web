@@ -10,7 +10,8 @@ import { b24Retry, b24RetryDead, b24PullNow } from '@/lib/b24Actions'
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { pending: ['в очереди', 'warn'], running: ['отправляется', 'ink'], sent: ['доставлено', 'ok'], error: ['повтор', 'warn'], dead: ['не доставлено', 'bad'] }
 const EV: Record<number, string> = { 2: 'лид из Bitrix24', 3: 'контакт изменён', 4: 'кандидат партнёра', 5: 'квалификация', 6: 'сделка команды', 14: 'расторжение', 15: 'стадия сделки партнёра', 17: 'комментарий', 21: 'сотрудник', 22: 'ответственный' }
 
-export default async function B24Exchange({ searchParams }: { searchParams: { s?: string; tab?: string } }) {
+export default async function B24Exchange(props: { searchParams: Promise<{ s?: string; tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)

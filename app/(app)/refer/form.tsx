@@ -1,6 +1,6 @@
 'use client'
-import { useFormState, useFormStatus } from 'react-dom'
-import { useEffect, useRef } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
+import { useFormStatus } from 'react-dom'
 import { referClient } from '@/lib/refActions'
 import { t, type Lang } from '@/lib/i18n'
 
@@ -9,7 +9,7 @@ function Submit({ lang }: { lang: Lang }) {
   return <button className="btn btn--p" disabled={pending}>{t(lang, 'Передать контакт')}</button>
 }
 export function ReferForm({ lang }: { lang: Lang }) {
-  const [st, act] = useFormState(referClient, null)
+  const [st, act] = useActionState(referClient, null)
   const ref = useRef<HTMLFormElement>(null)
   const T = (s: string) => t(lang, s)
   useEffect(() => { if (st?.ok) ref.current?.reset() }, [st])

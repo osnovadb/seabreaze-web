@@ -3,7 +3,8 @@ import { secretOk, cors, body } from '../common'
 
 // Заявки с форм и квиза сайтов (М5): POST /api/leads/<секрет> — JSON или form-data. Ответ сразу, тяжёлой работы нет.
 export async function OPTIONS(req: Request) { return new Response(null, { status: 204, headers: cors(req) }) }
-export async function POST(req: Request, { params }: { params: { secret: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ secret: string }> }) {
+  const params = await props.params;
   const h = cors(req)
   if (!secretOk(params.secret)) return Response.json({ ok: false }, { status: 404, headers: h })
   const b = await body(req)
