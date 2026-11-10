@@ -10,12 +10,18 @@ const DICT: Record<Exclude<Lang, 'ru'>, Record<string, string>> = { en, de, he }
 // Русские переопределения: ключ остаётся прежним, показ меняется (например, «Продавец» → «Менеджер по продажам»)
 const RU: Record<string, string> = ru
 
+const warned = new Set<string>()
 // Текст пишем по-русски; остальные языки — по словарю, ключ — русская строка.
 // Нет перевода → английский, нет английского → русский (и строка попадает в дамп при I18N_DUMP).
 export function t(lang: Lang, ru: string, vars?: Record<string, string | number>): string {
   let s = ru
   if (lang === 'ru') s = RU[ru] ?? ru
-  else s = DICT[lang][ru] ?? DICT.en[ru] ?? (dump(lang, ru), ru)
+  else {
+    // неизвестный язык (QA 10.11: страница «Регистрации» падала 500) — английский и отметка в журнале
+    const d = DICT[lang as Exclude<Lang, 'ru'>]
+    if (!d && !warned.has(String(lang))) { warned.add(String(lang)); console.warn('i18n: unknown lang', JSON.stringify(lang)) }
+    s = d?.[ru] ?? DICT.en[ru] ?? (dump(lang, ru), ru)
+  }
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v))
   return s
 }
