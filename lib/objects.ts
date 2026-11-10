@@ -275,11 +275,15 @@ export const saveDownDiscount = safe(async (_: unknown, f: FormData) => {
   const from = num(f, 'from_pct'), disc = num(f, 'discount_pct')
   if (from == null || from <= 0 || from > 100) return { error: t(c.lang, 'Первый взнос — от 1 до 100 %') }
   if (disc == null || disc < 0 || disc >= 100) return { error: t(c.lang, 'Скидка — от 0 до 99 %') }
+  // QA 10.11: две ступени на один взнос — ошибка; меньшая скидка за больший взнос — предупреждение
+  const others = await q<{ from_pct: number; discount_pct: number }>(`select from_pct::float, discount_pct::float from portal.down_discounts where project_id = $1 and building_id is not distinct from $2 and id is distinct from $3::uuid`, [pid, s(f, 'building') || null, id || null])
+  if (others.some((o) => o.from_pct === from)) return { error: t(c.lang, 'Ступень с таким взносом уже есть — измените её') }
+  const odd = others.some((o) => (o.from_pct < from && o.discount_pct > disc) || (o.from_pct > from && o.discount_pct < disc))
   const vals = [s(f, 'building') || null, from, disc, s(f, 'valid_from') || null, s(f, 'valid_to') || null, s(f, 'note') || null]
   if (id) await q(`update portal.down_discounts set building_id = $2, from_pct = $3, discount_pct = $4, valid_from = $5, valid_to = $6, note = $7 where id = $1 and project_id = $8`, [id, ...vals, pid])
   else await q(`insert into portal.down_discounts (building_id, from_pct, discount_pct, valid_from, valid_to, note, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [...vals, pid, c.user.id])
   await log(c, id ? 'object.down_discount_update' : 'object.down_discount_create', 'project', pid, { from, disc }); done(pid)
-  return { ok: true }
+  return { ok: true, warning: odd ? t(c.lang, 'Проверьте сетку: за больший взнос скидка меньше, чем за меньший') : undefined }
 })
 
 /* ── Видимость ── */

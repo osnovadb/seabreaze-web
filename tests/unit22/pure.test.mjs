@@ -124,3 +124,26 @@ test('калькулятор: скидка из пула — до предела
   assert.equal(ok.needsApproval, false)
   assert.deepEqual(fromPlan(PL({ down: 30, months: 24 })), { downPct: 30, months: 24 }); assert.deepEqual(fromPlan(PL({ down: 100 })), { downPct: 100, months: 0 })
 })
+test('калькулятор (QA 10.11): план выбирается по взносу и сроку; срок до 120; план без срока — ориентировочно', async () => {
+  const { pickPlan, startPlan } = await import('../../lib/calc.ts')
+  const marina = [PL({ id: 'full', down: 100, fpd: 5 }), PL({ id: 'inst', down: 30, months: 24 })]
+  assert.equal(startPlan(marina).id, 'inst', 'старт — с плана рассрочки, а не с «100% сразу»')
+  const a = calcVariant({ list: 100000, plans: marina, downPct: 60, months: 12, disc: 0 })
+  assert.equal(a.plan.id, 'inst'); assert.equal(a.downPct, 60); assert.equal(a.months, 12); assert.equal(a.clamped.length, 0)
+  const f = calcVariant({ list: 100000, plans: marina, downPct: 100, months: 12, disc: 0 })
+  assert.equal(f.plan.id, 'full'); assert.equal(f.months, 0); assert.equal(f.total, 95000)
+  const lo = calcVariant({ list: 100000, plans: marina, downPct: 10, months: 12, disc: 0 })
+  assert.equal(lo.plan.id, 'inst'); assert.equal(lo.downPct, 30, 'взнос ниже минимума подтягивается к рассрочке, не к 100 %')
+  const free = calcVariant({ list: 100000, plans: [], downPct: 20, months: 200, disc: 0 })
+  assert.equal(free.months, 120); assert.ok(free.clamped.length)
+  const brabus = [PL({ id: 'b', down: 15 })]
+  assert.equal(calcVariant({ list: 100000, plans: brabus, downPct: 15, months: 0, disc: 0 }).approx, false)
+  const b36 = calcVariant({ list: 100000, plans: brabus, downPct: 15, months: 36, disc: 0 })
+  assert.equal(b36.approx, true, 'у плана застройщика срок не задан — расчёт с выбранным сроком ориентировочный'); assert.equal(b36.months, 36)
+  assert.equal(pickPlan([], 50, 12), null)
+})
+test('калькулятор: введённая сумма взноса сохраняется как есть', () => {
+  const total = 161400, v = 80000
+  const r = calcVariant({ list: total, plans: [], downPct: (v / total) * 100, months: 24, disc: 0 })
+  assert.equal(r.down, 80000)
+})

@@ -2544,5 +2544,12 @@
 "мин. {p}": "mind. {p}",
 "не суммируется": "nicht kombinierbar",
 "от, %": "ab, %",
-"по этапам застройщика": "nach Bauträger-Etappen"
+"по этапам застройщика": "nach Bauträger-Etappen",
+"Срок рассрочки у застройщика не задан — расчёт ориентировочный.": "Der Bauträger hat keine Ratenlaufzeit festgelegt — Berechnung nur zur Orientierung.",
+"Рассрочка и платежи": "Raten und Zahlungen",
+"Ваш бонус по сделке": "Ihr Bonus aus dem Abschluss",
+"{p} от нашей части — до вычета прочих долей по сделке": "{p} von unserem Anteil — vor anderen Anteilen am Abschluss",
+"Срок не длиннее {m} мес.": "Laufzeit höchstens {m} Monate",
+"Ступень с таким взносом уже есть — измените её": "Eine Stufe mit dieser Anzahlung gibt es schon — bitte bearbeiten",
+"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Staffel prüfen: höhere Anzahlung hat einen kleineren Rabatt als eine niedrigere"
 }

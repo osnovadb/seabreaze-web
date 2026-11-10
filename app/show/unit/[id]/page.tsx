@@ -56,7 +56,7 @@ export default async function ShowUnit(
         )}
         <div className="tiny muted mt16">{T('Квартиры сдаются без ремонта; на фото — пример дизайна застройщика.')}</div>
       </div>
-      {free && u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)} lang={L} fx={fx} promo={promo} mode={mode} />}
+      {free && u.usd && <VariantCalc key={u.id} client list={u.usd} plans={plans} grid={activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)} lang={L} fx={fx} promo={promo} mode={mode} />}
       </div>
     </div>
   )

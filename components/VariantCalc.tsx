@@ -4,7 +4,7 @@
 // последний платёж, график и справочно € / ₪. Рамки — из плана застройщика; без планов — свободно, с пометкой «ориентировочно».
 // «Для себя» (доход партнёра / наш) — свёрнуто, чтобы не показывать клиенту с экрана.
 import { useMemo, useState } from 'react'
-import { calcVariant, fromPlan, type DownStep } from '@/lib/calc'
+import { calcVariant, fromPlan, startPlan, MAX_FREE_MONTHS, type DownStep } from '@/lib/calc'
 import { planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import type { SplitCond } from '@/lib/money'
 import type { Opt } from '@/lib/options'
@@ -14,13 +14,17 @@ import { ScheduleTable, type FxView } from './Calculator'
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date())
 const SIGN = { EUR: '€', ILS: '₪' } as const
 
-export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title }: {
+export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false }: {
   list: number; plans: Plan[]; grid?: DownStep[]; promo?: PromoView | null; mode?: PromoMode; options?: Opt[]; fx: FxView; lang: Lang
-  cond?: SplitCond | null; ext?: boolean; cap?: number; ceiling?: number; self?: 'agent' | 'ours' | null; title?: string
+  cond?: SplitCond | null; ext?: boolean; cap?: number; ceiling?: number; self?: 'agent' | 'ours' | 'seller' | null; title?: string; client?: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const init = fromPlan(plans[0])
-  const [planId, setPlanId] = useState<string | null>(plans[0]?.id || null)
+  // старт — с плана рассрочки (QA: открывался на «100% сразу»); дальше план выбирается сам по взносу и сроку, чип — только подсказка-пресет
+  const first = startPlan(plans)
+  const init = fromPlan(first)
+  const [planId, setPlanId] = useState<string | null>(first?.id || null)
+  const [amt, setAmt] = useState<string | null>(null) // сумма взноса, пока её вводят руками
+  const [pctS, setPctS] = useState<string | null>(null) // процент взноса, пока его вводят (рамки применяются после ввода)
   const [downPct, setDownPct] = useState(init.downPct)
   const [months, setMonths] = useState(init.months)
   const [disc, setDisc] = useState(0)
@@ -31,25 +35,25 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   const r = useMemo(() => calcVariant({ list, plans, grid, promo, mode, planId, downPct, months, disc, start, optionsUsd, cap, ceiling, cond, ext }),
     [list, plans, grid, promo, mode, planId, downPct, months, disc, start, optionsUsd, cap, ceiling, cond, ext])
   const pickPlan = (p: Plan | null) => { setPlanId(p?.id || null); const v = fromPlan(p); setDownPct(v.downPct); setMonths(v.months); setOpen(false) }
-  const maxM = r.maxMonths ?? 120
+  const maxM = r.maxMonths ?? MAX_FREE_MONTHS
   const fxs = (n: number) => (fx ? SIGN[fx.cur] + num(lang, Math.round(n * fx.perUsd)) : '')
   // ступени сетки — подсказка «ещё N % взноса — скидка M %»
   const next = grid.filter((g) => g.from_pct > r.downPct).sort((a, b) => a.from_pct - b.from_pct)[0]
   return (
     <div className="card stack vcalc" style={{ gap: 12 }}>
-      <div className="h3" style={{ margin: 0 }}>{title ?? T('Калькулятор вариантов')}</div>
+      <div className="h3" style={{ margin: 0 }}>{title ?? T(client ? 'Рассрочка и платежи' : 'Калькулятор вариантов')}</div>
       {plans.length > 0 && <div className="chips noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === r.plan?.id ? ' on' : '')} onClick={() => pickPlan(p)}>{planLabel(T, p.name)}</button>)}</div>}
-      {r.approx && <div className="note small">{T('Условия рассрочки у застройщика не заданы — расчёт ориентировочный.')}</div>}
+      {r.approx && <div className="note small">{T(r.plan ? 'Срок рассрочки у застройщика не задан — расчёт ориентировочный.' : 'Условия рассрочки у застройщика не заданы — расчёт ориентировочный.')}</div>}
       <div className="vcalc__ctrls noprint">
         <label className="field"><span>{T('Первый взнос')} · <b>{pct(lang, r.downPct)}</b>{r.minDown > 0 && r.minDown < 100 ? <span className="tiny muted"> · {T('мин. {p}', { p: pct(lang, r.minDown) })}</span> : null}</span>
-          <input type="range" className="disc" min={0} max={100} step={1} value={downPct} onChange={(e) => setDownPct(Number(e.target.value))} />
+          <input type="range" className="disc" min={0} max={100} step={1} value={r.downPct} onChange={(e) => { setAmt(null); setDownPct(Number(e.target.value)) }} />
           <span className="row" style={{ gap: 6 }}>
-            <input className="in in--sm" inputMode="decimal" value={downPct} onChange={(e) => setDownPct(Number(e.target.value.replace(',', '.')) || 0)} style={{ width: 70 }} aria-label="%" /><span className="small">%</span>
-            <input className="in in--sm" inputMode="decimal" value={Math.round(r.total * r.downPct / 100)} onChange={(e) => { const v = Number(e.target.value.replace(/\D/g, '')) || 0; setDownPct(r.total ? Math.round((v / r.total) * 1000) / 10 : 0) }} style={{ width: 120 }} aria-label="USD" /><span className="small">USD</span>
+            <input className="in in--sm" inputMode="decimal" value={pctS ?? String(Math.round(r.downPct * 10) / 10)} onFocus={() => setPctS(String(Math.round(r.downPct * 10) / 10))} onBlur={() => setPctS(null)} onChange={(e) => { setAmt(null); setPctS(e.target.value); setDownPct(Number(e.target.value.replace(',', '.')) || 0) }} style={{ width: 70 }} aria-label="%" /><span className="small">%</span>
+            <input className="in in--sm" inputMode="decimal" value={amt ?? String(r.down)} onFocus={() => setAmt(String(r.down))} onBlur={() => setAmt(null)} onChange={(e) => { const t0 = e.target.value.replace(/[^\d]/g, ''); setAmt(t0); const v = Number(t0) || 0; setDownPct(r.total ? Math.min(100, (v / r.total) * 100) : 0) }} style={{ width: 120 }} aria-label="USD" /><span className="small">USD</span>
           </span></label>
         <label className="field"><span>{T('Срок рассрочки')} · <b>{r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки')}</b>{r.maxMonths ? <span className="tiny muted"> · {T('макс. {m} мес.', { m: r.maxMonths })}</span> : null}</span>
-          <input type="range" className="disc" min={0} max={maxM} step={1} value={Math.min(months, maxM)} disabled={r.downPct >= 100} onChange={(e) => setMonths(Number(e.target.value))} />
-          <span className="row" style={{ gap: 6 }}><input className="in in--sm" type="number" min={0} max={maxM} value={r.downPct >= 100 ? 0 : months} disabled={r.downPct >= 100} onChange={(e) => setMonths(Number(e.target.value) || 0)} style={{ width: 70 }} /><span className="small">{T('мес.')}</span></span></label>
+          <input type="range" className="disc" min={0} max={maxM} step={1} value={Math.min(r.months, maxM)} disabled={r.downPct >= 100} onChange={(e) => setMonths(Number(e.target.value))} />
+          <span className="row" style={{ gap: 6 }}><input className="in in--sm" type="number" min={0} max={maxM} value={r.months} disabled={r.downPct >= 100} onChange={(e) => setMonths(Math.min(maxM, Number(e.target.value) || 0))} style={{ width: 70 }} /><span className="small">{T('мес.')}</span></span></label>
         {ceiling > 0 && r.poolAllowed && <label className="field"><span>{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')} · <b>{pct(lang, r.disc)}</b></span>
           <input type="range" className="disc" min={0} max={ceiling} step={0.5} value={Math.min(disc, ceiling)} onChange={(e) => setDisc(Number(e.target.value))} />
           <span className="between tiny muted"><span>0%</span>{cap < ceiling && <span>{T('без согласования до {p}', { p: pct(lang, cap) })}</span>}<span>{pct(lang, ceiling)}</span></span></label>}
@@ -60,7 +64,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
       {r.clamped.map((k) => <div key={k} className="tiny warnc">{T(k, { p: pct(lang, r.minDown), m: r.maxMonths ?? 0, c: pct(lang, ceiling) })}</div>)}
       {r.needsApproval && <div className="note small">{T('Скидка сверх {p} — вариант требует согласования владельца или руководителя рынка', { p: pct(lang, cap) })}</div>}
       <div className="vcalc__kpis">
-        {[[T('Цена для клиента'), usd(lang, r.total), fx ? '≈ ' + fxs(r.total) : ''],
+        {[[T(client ? 'Цена' : 'Цена для клиента'), usd(lang, r.total), fx ? '≈ ' + fxs(r.total) : ''],
           [T('Первый взнос'), usd(lang, r.down), pct(lang, r.downPct)],
           [T('Платёж в месяц'), r.monthly ? usd(lang, r.monthly) : '—', r.months ? T('{m} мес.', { m: r.months }) : r.fixed ? T('по этапам застройщика') : ''],
           [T('Последний платёж'), r.last ? date(lang, r.last) : '—', '']].map(([a, b, c]) => <div key={a} className="card card--tight kpi"><div className="small muted">{a}</div><div className="v" style={{ fontSize: 20 }}>{b}</div><div className="tiny muted">{c}</div></div>)}
@@ -75,7 +79,8 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
       </div>
       <ScheduleTable rows={r.rows} price={r.total} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} />
       {self && r.split && <details className="noprint"><summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Для себя')}</summary>
-        <div className="kv mt8"><span>{self === 'agent' ? T('Ваш доход по сделке') : T('Наш доход по сделке')}</span><b className="okc">{usd(lang, self === 'agent' ? r.split.agent : r.split.ours)}</b></div>
+        <div className="kv mt8"><span>{self === 'agent' ? T('Ваш доход по сделке') : self === 'seller' ? T('Ваш бонус по сделке') : T('Наш доход по сделке')}</span><b className="okc">{usd(lang, self === 'agent' ? r.split.agent : self === 'seller' ? r.split.seller : r.split.ours)}</b></div>
+        {self === 'seller' && <div className="tiny muted">{T('{p} от нашей части — до вычета прочих долей по сделке', { p: pct(lang, cond?.seller_share_pct || 0) })}</div>}
         {self === 'agent' && <div className="tiny muted">{T('Фикс {f} от итоговой цены + остаток вашей части пула после скидки', { f: pct(lang, cond?.agent_fix_pct || 0) })}</div>}</details>}
       <div className="tiny muted">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(lang, fx.date) }) : ''}</div>
     </div>

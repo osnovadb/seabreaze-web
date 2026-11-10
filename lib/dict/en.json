@@ -2544,5 +2544,12 @@
 "мин. {p}": "min {p}",
 "не суммируется": "not combined",
 "от, %": "from, %",
-"по этапам застройщика": "by developer milestones"
+"по этапам застройщика": "by developer milestones",
+"Срок рассрочки у застройщика не задан — расчёт ориентировочный.": "The developer has not set an instalment term — this is an estimate.",
+"Рассрочка и платежи": "Instalments and payments",
+"Ваш бонус по сделке": "Your bonus on the deal",
+"{p} от нашей части — до вычета прочих долей по сделке": "{p} of our share — before other shares on the deal",
+"Срок не длиннее {m} мес.": "Term at most {m} months",
+"Ступень с таким взносом уже есть — измените её": "A step with this down payment already exists — edit it",
+"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Check the scale: a bigger down payment has a smaller discount than a smaller one"
 }

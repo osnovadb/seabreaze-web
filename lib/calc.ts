@@ -47,20 +47,39 @@ export function activeGrid(grid: DownStep[] = [], today: string, buildingId?: st
 // Скидка застройщика по взносу: лучшая ступень, до которой взнос дотягивает
 export const gridDiscount = (grid: DownStep[], downPct: number) => grid.filter((g) => downPct + 1e-9 >= Number(g.from_pct)).reduce((m, g) => Math.max(m, Number(g.discount_pct) || 0), 0)
 
+export const MAX_FREE_MONTHS = 120
+// Какой план застройщика подходит под взнос и срок: 100 % — полная оплата; иначе рассрочка, в рамки которой укладываемся
+// (взнос не меньше её минимума, срок не длиннее максимума); не укладываемся ни в одну — ближайшая (меньший минимум, длиннее срок), её рамки подправят ввод
+export function pickPlan(plans: Plan[], downPct: number, months: number, preferId?: string | null): Plan | null {
+  if (!plans.length) return null
+  const fullP = plans.find(isFull)
+  const inst = plans.filter((p) => !isFull(p))
+  if (downPct >= 100 && fullP) return fullP
+  if (!inst.length) return fullP || null
+  const fits = (p: Plan) => downPct + 1e-9 >= Number(p.down_payment_pct || 0) && (!p.months || months <= Number(p.months))
+  const ok = inst.filter(fits)
+  if (ok.length) return ok.find((p) => p.id === preferId) || ok[0]
+  return [...inst].sort((a, b) => Number(a.down_payment_pct || 0) - Number(b.down_payment_pct || 0) || Number(b.months || 9999) - Number(a.months || 9999))[0]
+}
+
 export function calcVariant(i: CalcIn): CalcOut {
   const today = i.today || new Date().toISOString().slice(0, 10)
-  const plan = i.plans.find((p) => p.id === i.planId) || i.plans[0] || null
-  const approx = !plan
   const clamped: string[] = []
-  // рамки плана: взнос не меньше минимума, срок не длиннее максимума; «100 %» — только полная оплата
+  const reqDown = clamp(Number(i.downPct) || 0, 0, 100)
+  const reqMonths = Math.max(0, Math.round(Number(i.months) || 0))
+  // QA 10.11: план выбирается сам по взносу и сроку (60 % / 12 мес. — это план «30 % / 24», а не ошибка); 100 % — план полной оплаты
+  const plan = pickPlan(i.plans, reqDown, reqMonths, i.planId)
   const full = !!plan && isFull(plan)
   const minDown = full ? 100 : plan ? Number(plan.down_payment_pct || 0) : 0
-  const maxMonths = full ? 0 : plan?.months ? Number(plan.months) : null
-  let downPct = clamp(Number(i.downPct) || 0, 0, 100)
+  // срок: максимум плана; без плана или у плана без срока — до 120 мес. (QA: в поле можно было ввести 200)
+  const maxMonths = full ? 0 : plan?.months ? Number(plan.months) : MAX_FREE_MONTHS
+  let downPct = reqDown
   if (downPct < minDown) { downPct = minDown; clamped.push('Первый взнос не меньше {p} — по плану застройщика') }
-  let months = Math.max(0, Math.round(Number(i.months) || 0))
+  let months = reqMonths
   if (downPct >= 100) months = 0
-  if (maxMonths !== null && months > maxMonths) { months = maxMonths; clamped.push('Срок не длиннее {m} мес. — по плану застройщика') }
+  if (months > maxMonths) { months = maxMonths; clamped.push(plan?.months ? 'Срок не длиннее {m} мес. — по плану застройщика' : 'Срок не длиннее {m} мес.') }
+  // ориентировочно: планов нет или у плана застройщика срок не задан, а срок выбран
+  const approx = !plan || (!full && !plan.months && !plan.schedule?.length && months > 0)
   // свой график застройщика (этапы) — только если параметры как в плане
   const fixed = !!plan?.schedule?.some((m) => Number(m.pct) > 0) && downPct === minDown && !i.months
   // скидка застройщика: сетка + «скидка за 100 %» плана полной оплаты
@@ -98,6 +117,7 @@ export function calcVariant(i: CalcIn): CalcOut {
 }
 
 // Начальные параметры от плана: его взнос и срок
+export const startPlan = (plans: Plan[]) => plans.find((p) => !isFull(p)) || plans[0] || null
 export function fromPlan(p: Plan | null | undefined) {
   if (!p) return { downPct: 30, months: 24 }
   if (isFull(p)) return { downPct: 100, months: 0 }

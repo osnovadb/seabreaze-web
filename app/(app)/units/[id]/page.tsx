@@ -54,7 +54,7 @@ export default async function UnitPage(
   if (fp) imgs.splice(1, 0, ['floor', T('На этаже')])
   const cur = imgs.some(([k]) => k === searchParams.img) ? searchParams.img! : 'plan'
   const cs = clientScope(c.user)
-  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 100`, cs.params)
+  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') and cl.anonymized_at is null order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 100`, cs.params)
   const simOffers = await offersFor(u.project_id) // «Похожие свободные» — тоже с ценой по акции, как сверху
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
   const hist = ext ? [] : await unitHistory(u.id, 12)
@@ -68,7 +68,7 @@ export default async function UnitPage(
   const calcCond = await conditionsFor(u.project_id, c.user)
   const grid = activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)
   const role = c.user.role
-  const calcSelf: 'agent' | 'ours' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : null
+  const calcSelf: 'agent' | 'ours' | 'seller' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : role === 'seller' ? 'seller' : null
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]

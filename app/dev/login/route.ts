@@ -13,5 +13,7 @@ export async function GET(req: Request) {
   if (!u) return new Response('no user', { status: 404 })
   await signSession(u.id)
   const to = new URL(req.url).searchParams.get('to') || '/'
-  return NextResponse.redirect(new URL(to.startsWith('/') ? to : '/', req.url))
+  const res = NextResponse.redirect(new URL(to.startsWith('/') ? to : '/', req.url))
+  res.cookies.set('ge_show', '', { path: '/', maxAge: 0 }) // QA 10.11: из режима показа на QA-экземпляре нельзя было выйти без PIN
+  return res
 }
