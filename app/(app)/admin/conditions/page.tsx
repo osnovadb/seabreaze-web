@@ -61,7 +61,7 @@ export default async function Conditions(props: { searchParams: Promise<{ p?: st
             <div className="label mt16">{T('Уровни')}</div>
             <div className="tiny muted">{T('Договор застройщика → проект → блок → квартира. В MVP условия задаются на проект; блоки и квартиры — следующий шаг.')}</div>
           </div>
-          {(cur || canEditConditions(c.user.role)) && <CondForm lang={L} projectId={p.id} cur={cur || fresh()} canEdit={canEditConditions(c.user.role)} example={ex ? { no: `${ex.block}-${ex.number}`, usd: ex.usd! } : null} />}
+          {(cur || canEditConditions(c.user.role)) && <CondForm key={p.id} lang={L} projectId={p.id} cur={cur || fresh()} canEdit={canEditConditions(c.user.role)} example={ex ? { no: `${ex.block}-${ex.number}`, usd: ex.usd! } : null} />}
         </div>
       </div>
     </>

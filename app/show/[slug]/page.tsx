@@ -57,7 +57,7 @@ export default async function ShowProject(
           {facade && <div className="chips mt16"><Link href={qs({ view: '' })} className={'chip' + (searchParams.view !== 'facade' ? ' on' : '')}>{T('Шахматка')}</Link><Link href={qs({ view: 'facade' })} className={'chip' + (searchParams.view === 'facade' ? ' on' : '')}>{T('Фасад')}</Link></div>}
           <div className="chess-wrap mt16">
             {facade && searchParams.view === 'facade' ? <FacadeView facade={facade} units={units} viewer={null} mode="show" selected={sel?.id} hrefFor={(u) => qs({ u: u.id })} /> : <Chess units={units} viewer={null} mode="show" lang={L} cellMode="price" rooms={rooms} selected={sel?.id} hrefFor={(u) => qs({ u: u.id })} />}
-            {sel ? <UnitPanel u={sel} code="F" lang={L} mode="show" closeHref={qs({ u: '' })} />
+            {sel ? <UnitPanel key={sel.id} u={sel} code="F" lang={L} mode="show" closeHref={qs({ u: '' })} />
               : <div className="card upanel small muted">{T('Нажмите на квартиру в шахматке — она откроется здесь.')}</div>}
           </div>
         </>

@@ -42,7 +42,7 @@ export default async function Facade(
         {f ? (
           <div className="chess-wrap mt16">
             <FacadeView facade={f} units={units} viewer={c.user} mode={mode} selected={sel?.id} hrefFor={(u) => qs({ u: u.id })} />
-            {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient} />
+            {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient} />
               : <div className="card upanel small muted">{T('Нажмите на окно квартиры — она откроется здесь.')}</div>}
           </div>
         ) : <div className="card muted mt16">{T('Фасад этого дома ещё не размечен — смотрите шахматку.')} <Link className="bronze" href={`/projects/${p.slug}/chess?b=${b.id}`}>{T('Шахматка')} →</Link></div>}

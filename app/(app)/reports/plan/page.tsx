@@ -54,7 +54,7 @@ export default async function PlanFact(
           <span className="muted">·</span>
           {periodKeys(kind).slice(0, 8).map((k) => <Link key={k} href={`?kind=${kind}&p=${k}`} className={'chip' + (period.key === k ? ' on' : '')}>{k}</Link>)}
         </div>
-        <ActionForm action={savePlans} lang={L} className="stack" okText={T('План сохранён')}>
+        <ActionForm key={`${kind}:${searchParams.p || ''}:${proj?.id || ''}`} action={savePlans} lang={L} className="stack" okText={T('План сохранён')}>
           <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={period.key} />
           <Table title={T('По рынкам')} rows={lines.market} />
           <Table title={T('По менеджерам')} rows={lines.user} />

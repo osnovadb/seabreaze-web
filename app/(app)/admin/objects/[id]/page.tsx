@@ -185,7 +185,7 @@ export default async function ObjectCard(
           </div>
           {owner && <ChessImport lang={L} projectId={p!.id} action={importChess} />}
           {owner && (
-            <ActionForm action={copyFloor} lang={L} className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
+            <ActionForm key={'copy:' + b.id} action={copyFloor} lang={L} className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Копировать этаж')}</div>
               <input type="hidden" name="project" value={p!.id} />
               <label className="field"><span>{T('Блок')}</span><select key={`building:${String(b.id)}`} className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -197,7 +197,7 @@ export default async function ObjectCard(
             </ActionForm>
           )}
           {owner && (
-            <ActionForm action={generateUnits} lang={L} reset className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
+            <ActionForm key={'gen:' + b.id} action={generateUnits} lang={L} reset className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Добавить квартиры')}</div>
               <input type="hidden" name="project" value={p!.id} />
               <label className="field"><span>{T('Блок')}</span><select key={`building:${String(b.id)}`} className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -464,7 +464,7 @@ export default async function ObjectCard(
     return (
       <div className="stack">
         <div className="chips">{blocks.map((x) => <Link key={x.id} href={`?tab=orient&b=${x.id}`} className={'chip' + (x.id === b.id ? ' on' : '')}>{x.name}</Link>)}</div>
-        <ActionForm action={saveRisers} lang={L} className="card stack" style={{ gap: 6 }} okText={T('Сохранено · квартир обновлено')}>
+        <ActionForm key={'risers:' + b.id} action={saveRisers} lang={L} className="card stack" style={{ gap: 6 }} okText={T('Сохранено · квартир обновлено')}>
           <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="building" value={b.id} />
           <div className="objhead" style={{ gridTemplateColumns: '.6fr 1.4fr 1.2fr .8fr 1.6fr' }}>{['Стояк', 'Квартиры', 'Вид из окон', 'Сторона', 'Примечание'].map((h) => <span key={h}>{T(h)}</span>)}</div>
           {rs.map((r) => { const xs = us.filter((u) => riserOf(u) === r); const i = info.find((x) => x.riser === r); const areas = xs.map((x) => x.area || 0).filter(Boolean); const own = xs.filter((x) => x.view_side && x.view_side !== (i?.view_side ?? null)).map((x) => x.floor).sort((a, b2) => a - b2); return (

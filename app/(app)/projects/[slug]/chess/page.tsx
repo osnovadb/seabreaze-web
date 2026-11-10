@@ -86,7 +86,7 @@ export default async function ChessPage(
           <ChessBoard units={shown} lang={L} team={mode === 'team'} selected={sel?.id} hrefFor={Object.fromEntries(shown.map((u) => [u.id, qs({ u: u.id, side: side || undefined })]))} views={views} layouts={layouts}
             clients={clients} projectId={p.id} canPick={clients.length > 0 || editor} initial={searchParams.l ? { l: searchParams.l } : undefined}
             bulk={{ toSelection: addManyToSelection, ...(editor ? { status: bulkStatus } : {}), ...(c.user.role === 'owner' ? { hide: bulkHide } : {}) }} />
-          {sel ? <UnitPanel u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
+          {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
             : null}
         </div>
         <div className="row mt16 small muted">
