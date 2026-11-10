@@ -14,6 +14,6 @@ export async function GET(req: Request) {
   await signSession(u.id)
   const to = new URL(req.url).searchParams.get('to') || '/'
   const res = NextResponse.redirect(new URL(to.startsWith('/') ? to : '/', req.url))
-  res.cookies.set('ge_show', '', { path: '/', maxAge: 0 }) // QA 10.11: из режима показа на QA-экземпляре нельзя было выйти без PIN
+  res.cookies.delete('ge_show') // QA 10.11: из режима показа на QA-экземпляре нельзя было выйти без PIN
   return res
 }

@@ -2551,5 +2551,21 @@
 "{p} от нашей части — до вычета прочих долей по сделке": "{p} von unserem Anteil — vor anderen Anteilen am Abschluss",
 "Срок не длиннее {m} мес.": "Laufzeit höchstens {m} Monate",
 "Ступень с таким взносом уже есть — измените её": "Eine Stufe mit dieser Anzahlung gibt es schon — bitte bearbeiten",
-"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Staffel prüfen: höhere Anzahlung hat einen kleineren Rabatt als eine niedrigere"
+"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Staffel prüfen: höhere Anzahlung hat einen kleineren Rabatt als eine niedrigere",
+"Название варианта": "Name der Variante",
+"Клиент (необязательно)": "Kunde (optional)",
+"Сохранить вариант": "Variante speichern",
+"Вариант сохранён": "Variante gespeichert",
+"Сохранённые варианты": "Gespeicherte Varianten",
+"без клиента": "ohne Kunde",
+"Цена изменилась: было {a}": "Preis geändert: vorher {a}",
+"ориентировочно": "zur Orientierung",
+"скидка согласована": "Rabatt freigegeben",
+"нужно согласование": "Freigabe nötig",
+"Взнос {p}% · {m}": "Anzahlung {p} % · {m}",
+"Не больше {n} вариантов на квартиру — удалите лишние": "Höchstens {n} Varianten pro Wohnung — bitte einige löschen",
+"Квартира недоступна": "Wohnung nicht verfügbar",
+"Только просмотр": "Nur Ansicht",
+"Скидка в варианте «{n}» согласована": "Rabatt in der Variante „{n}“ freigegeben",
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Variante mit {d} % Rabatt wartet auf Freigabe: {n}"
 }

@@ -2551,5 +2551,21 @@
 "{p} от нашей части — до вычета прочих долей по сделке": "{p} of our share — before other shares on the deal",
 "Срок не длиннее {m} мес.": "Term at most {m} months",
 "Ступень с таким взносом уже есть — измените её": "A step with this down payment already exists — edit it",
-"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Check the scale: a bigger down payment has a smaller discount than a smaller one"
+"Проверьте сетку: за больший взнос скидка меньше, чем за меньший": "Check the scale: a bigger down payment has a smaller discount than a smaller one",
+"Название варианта": "Option name",
+"Клиент (необязательно)": "Client (optional)",
+"Сохранить вариант": "Save option",
+"Вариант сохранён": "Option saved",
+"Сохранённые варианты": "Saved options",
+"без клиента": "no client",
+"Цена изменилась: было {a}": "Price changed: was {a}",
+"ориентировочно": "estimate",
+"скидка согласована": "discount approved",
+"нужно согласование": "needs approval",
+"Взнос {p}% · {m}": "Down {p}% · {m}",
+"Не больше {n} вариантов на квартиру — удалите лишние": "At most {n} options per unit — delete some",
+"Квартира недоступна": "Unit not available",
+"Только просмотр": "View only",
+"Скидка в варианте «{n}» согласована": "Discount in option “{n}” approved",
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Payment option with {d}% discount awaits approval: {n}"
 }

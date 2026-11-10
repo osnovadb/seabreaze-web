@@ -14,7 +14,7 @@ export function middleware(req: NextRequest) {
   if (p === '/b24' || p === '/b24/install') return NextResponse.next()
   if (!req.cookies.get('ge_s')) return NextResponse.redirect(to(req, '/login'))
   // В режиме показа клиенту рабочие разделы недоступны
-  if (req.cookies.get('ge_show') && !p.startsWith('/show')) return NextResponse.redirect(to(req, '/show'))
+  if (req.cookies.get('ge_show')?.value && !p.startsWith('/show')) return NextResponse.redirect(to(req, '/show'))
   // путь — в заголовке запроса: макет закрывает рекомендателю всё, кроме его кабинета
   const h = new Headers(req.headers)
   h.set('x-path', p)

@@ -383,3 +383,5 @@ summary.btn::-webkit-details-marker { display: none; }
 .vcalc__kpis { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .vcalc__kpis .v { white-space: nowrap; }
 .vcalc input[type=range] { width: 100%; }
+/* Сравнение сохранённых вариантов — колонками */
+.vcalc__cmp { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
