@@ -69,12 +69,12 @@ export default async function ObjectCard(
       <ActionForm action={saveProject} lang={L} className="card stack" style={{ gap: 10, maxWidth: 640 }}>
         <input type="hidden" name="id" value={p!.id} />
         <label className="field"><span>{T('Название')}</span><input className="in" name="name" defaultValue={p!.name} required /></label>
-        <label className="field"><span>{T('Застройщик')}</span><select className="in" name="developer" defaultValue={p!.developer_id}>{devs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}<option value="new">+ {T('новый застройщик')}</option></select></label>
+        <label className="field"><span>{T('Застройщик')}</span><select key={`developer:${String(p!.developer_id)}`} className="in" name="developer" defaultValue={p!.developer_id}>{devs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}<option value="new">+ {T('новый застройщик')}</option></select></label>
         <label className="field"><span>{T('Новый застройщик (если выбран «новый»)')}</span><input className="in" name="developer_name" /></label>
         <div className="grid g3">
           <label className="field"><span>{T('Город')}</span><input className="in" name="city" defaultValue={p!.city || ''} /></label>
-          <DeliveryPicker lang={L} value={p!.delivery} label="Сдача проекта (пусто — по блокам)" />
-          <label className="field"><span>{T('Стройка')}</span><select className="in" name="status" defaultValue={p!.status}><option value="planned">{T('проект')}</option><option value="under_construction">{T('строится')}</option><option value="completed">{T('сдан')}</option></select></label>
+          <DeliveryPicker lang={L} value={p!.delivery} label="Сдача проекта" hint="пусто — по блокам" />
+          <label className="field"><span>{T('Стройка')}</span><select key={`status:${String(p!.status)}`} className="in" name="status" defaultValue={p!.status}><option value="planned">{T('проект')}</option><option value="under_construction">{T('строится')}</option><option value="completed">{T('сдан')}</option></select></label>
         </div>
         <div className="grid g2">
           <label className="field"><span>{T('Расположение')}</span><input className="in" name="location" defaultValue={p!.location || ''} /></label>
@@ -95,7 +95,7 @@ export default async function ObjectCard(
         <input type="hidden" name="project" value={p!.id} />{b && <input type="hidden" name="id" value={b.id} />}
         <input className="in" name="name" defaultValue={b?.name} placeholder={T('Название блока')} required />
         <input className="in" name="code" defaultValue={b?.external_id || ''} placeholder={T('Код (A, B…)')} />
-        <select className="in" name="kind" defaultValue={b?.kind || 'block'}><option value="block">{T('блок')}</option><option value="tower">{T('башня')}</option><option value="villa_cluster">{T('виллы')}</option></select>
+        <select key={`kind:${String(b?.kind || 'block')}`} className="in" name="kind" defaultValue={b?.kind || 'block'}><option value="block">{T('блок')}</option><option value="tower">{T('башня')}</option><option value="villa_cluster">{T('виллы')}</option></select>
         <input className="in" name="floors" type="number" defaultValue={b?.floors_total ?? ''} placeholder={T('этажей')} />
         <DeliveryPicker lang={L} value={b?.delivery || null} compact />
         <input className="in" name="sort" type="number" defaultValue={b?.sort ?? 0} title={T('Порядок')} />
@@ -120,7 +120,7 @@ export default async function ObjectCard(
         <input type="hidden" name="project" value={p!.id} />{l && <input type="hidden" name="id" value={l.id} />}
         {l?.plan_file ? <a href={planUrl(l.plan_file)!} target="_blank"><img src={planUrl(l.plan_file)!} alt="" style={{ width: 56, height: 40, objectFit: 'contain', background: '#fff', border: '1px solid var(--line)', borderRadius: 4 }} /></a> : <span className="tiny muted">{T('нет плана')}</span>}
         <input className="in" name="code" defaultValue={l?.code} placeholder={T('Код')} required />
-        <select className="in" name="unit_type" defaultValue={l?.unit_type || '2br'}>{TYPES.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+        <select key={`unit_type:${String(l?.unit_type || '2br')}`} className="in" name="unit_type" defaultValue={l?.unit_type || '2br'}>{TYPES.map((x) => <option key={x} value={x}>{x}</option>)}</select>
         <input className="in" name="name" defaultValue={l?.name || ''} placeholder={T('Название')} />
         <input className="in" name="bedrooms" type="number" defaultValue={l?.bedrooms ?? ''} placeholder={T('спален')} />
         <input className="in" name="total" defaultValue={l?.total_area_m2 ?? ''} placeholder={T('общая, м²')} />
@@ -164,14 +164,14 @@ export default async function ObjectCard(
               <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="id" value={u.id} /><input type="hidden" name="building" value={b.id} />
               {owner ? <input className="in" name="number" defaultValue={u.number} /> : <b className="small">{unitNo({ block: b.external_id || '', number: u.number })}</b>}
               {owner ? <input className="in" name="floor" type="number" defaultValue={u.floor ?? ''} /> : <span className="small">{u.floor}</span>}
-              {owner && <select className="in" name="layout" defaultValue={u.layout_id || ''}><option value="">—</option>{layouts.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select>}
+              {owner && <select key={`layout:${String(u.layout_id || '')}`} className="in" name="layout" defaultValue={u.layout_id || ''}><option value="">—</option>{layouts.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select>}
               {owner && <input className="in" name="area" defaultValue={u.area_total_m2 ?? ''} />}
               {owner && <input className="in" name="ext_area" defaultValue={u.area_external_m2 ?? u.plot_area_m2 ?? ''} />}
               <div><input className="in" name="price" defaultValue={u.price_list ?? ''} />{u.locked.includes('price_list') && <div className="tiny warnc" title={T('Ручная правка: синхронизация не перезапишет цену')}>🔒 {T('замок')}</div>}</div>
-              <select className="in" name="currency" defaultValue={u.price_currency}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
-              <select className="in" name="status" defaultValue={u.status}>{Object.entries(ST).map(([k, v]) => <option key={k} value={k}>{T(v)}</option>)}</select>
-              {owner && <select className="in" name="published" defaultValue={u.published ? '1' : '0'}><option value="1">{T('да')}</option><option value="0">{T('нет')}</option></select>}
-              {owner && <span><input type="hidden" name="hidden_set" value="1" /><select className="in" name="hidden" defaultValue={u.hidden ? '1' : '0'}><option value="0">—</option><option value="1">{T('скрыть')}</option></select></span>}
+              <select key={`currency:${String(u.price_currency)}`} className="in" name="currency" defaultValue={u.price_currency}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x} value={x}>{x}</option>)}</select>
+              <select key={`status:${String(u.status)}`} className="in" name="status" defaultValue={u.status}>{Object.entries(ST).map(([k, v]) => <option key={k} value={k}>{T(v)}</option>)}</select>
+              {owner && <select key={`published:${String(u.published ? '1' : '0')}`} className="in" name="published" defaultValue={u.published ? '1' : '0'}><option value="1">{T('да')}</option><option value="0">{T('нет')}</option></select>}
+              {owner && <span><input type="hidden" name="hidden_set" value="1" /><select key={`hidden:${String(u.hidden ? '1' : '0')}`} className="in" name="hidden" defaultValue={u.hidden ? '1' : '0'}><option value="0">—</option><option value="1">{T('скрыть')}</option></select></span>}
               <button className="btn btn--sm">{T('Сохранить')}</button>
             </ActionForm>
           ))}
@@ -188,7 +188,7 @@ export default async function ObjectCard(
             <ActionForm action={copyFloor} lang={L} className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Копировать этаж')}</div>
               <input type="hidden" name="project" value={p!.id} />
-              <label className="field"><span>{T('Блок')}</span><select className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              <label className="field"><span>{T('Блок')}</span><select key={`building:${String(b.id)}`} className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
               <div className="row"><label className="field" style={{ flex: 1 }}><span>{T('Этаж-образец')}</span><input className="in" name="source" type="number" defaultValue={fl ?? ''} required /></label>
                 <label className="field" style={{ flex: 1 }}><span>{T('На этажи с')}</span><input className="in" name="floor_from" type="number" required /></label><label className="field" style={{ flex: 1 }}><span>{T('по')}</span><input className="in" name="floor_to" type="number" required /></label></div>
               <label className="check"><input type="checkbox" name="prices" value="1" /> <span>{T('Скопировать цены (иначе — «не в продаже» без цены)')}</span></label>
@@ -200,7 +200,7 @@ export default async function ObjectCard(
             <ActionForm action={generateUnits} lang={L} reset className="card stack" style={{ gap: 8 }} okText={T('Создано квартир')}>
               <div className="h3" style={{ margin: 0 }}>{T('Добавить квартиры')}</div>
               <input type="hidden" name="project" value={p!.id} />
-              <label className="field"><span>{T('Блок')}</span><select className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              <label className="field"><span>{T('Блок')}</span><select key={`building:${String(b.id)}`} className="in" name="building" defaultValue={b.id}>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
               <div className="row"><label className="field" style={{ flex: 1 }}><span>{T('Этажи с')}</span><input className="in" name="floor_from" type="number" required /></label><label className="field" style={{ flex: 1 }}><span>{T('по')}</span><input className="in" name="floor_to" type="number" required /></label></div>
               <label className="field"><span>{T('Позиции на этаже (через запятую)')}</span><input className="in" name="positions" placeholder="01, 02, 03, 04" required /></label>
               <div className="row"><label className="field" style={{ flex: 2 }}><span>{T('Планировка')}</span><select className="in" name="layout"><option value="">—</option>{layouts.map((l) => <option key={l.id} value={l.id}>{l.code}</option>)}</select></label>
@@ -225,8 +225,8 @@ export default async function ObjectCard(
           <input type="hidden" name="project" value={p!.id} />{pl && <input type="hidden" name="id" value={pl.id} />}
           <div className="grid g3">
             <label className="field"><span>{T('Название')}</span><input className="in" name="name" defaultValue={pl?.name} placeholder={T('Рассрочка 24 мес.')} required /></label>
-            <label className="field"><span>{T('Тип')}</span><select className="in" name="kind" defaultValue={full ? 'full' : 'installment'}><option value="installment">{T('Первый взнос + N месяцев')}</option><option value="full">{T('100% сразу')}</option></select></label>
-            <label className="field"><span>{T('Где действует')}</span><select className="in" name="building" defaultValue={pl?.building_id || ''}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            <label className="field"><span>{T('Тип')}</span><select key={`kind:${String(full ? 'full' : 'installment')}`} className="in" name="kind" defaultValue={full ? 'full' : 'installment'}><option value="installment">{T('Первый взнос + N месяцев')}</option><option value="full">{T('100% сразу')}</option></select></label>
+            <label className="field"><span>{T('Где действует')}</span><select key={`building:${String(pl?.building_id || '')}`} className="in" name="building" defaultValue={pl?.building_id || ''}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
           </div>
           <div className="grid g4">
             <label className="field"><span>{T('Первый взнос, %')}</span><input className="in" name="down" inputMode="decimal" defaultValue={full ? '' : pl?.down_payment_pct ?? ''} /></label>
@@ -269,10 +269,10 @@ export default async function ObjectCard(
         <div className="grid g3">
           <label className="field"><span>{T('Название')}</span><input className="in" name="name" defaultValue={o?.name} placeholder={T('Осенняя акция')} required /></label>
           <label className="field"><span>{T('Бейдж')}</span><input className="in" name="badge" defaultValue={o?.badge || ''} placeholder="−5%" /></label>
-          <label className="field"><span>{T('Где действует')}</span><select className="in" name="building" defaultValue={o?.building_id || ''}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+          <label className="field"><span>{T('Где действует')}</span><select key={`building:${String(o?.building_id || '')}`} className="in" name="building" defaultValue={o?.building_id || ''}><option value="">{T('Весь проект')}</option>{blocks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
         </div>
         <div className="grid g4">
-          <label className="field"><span>{T('Тип')}</span><select className="in" name="kind" defaultValue={o?.kind || 'pct'}><option value="pct">{T('Процент')}</option><option value="fixed">{T('Сумма')}</option></select></label>
+          <label className="field"><span>{T('Тип')}</span><select key={`kind:${String(o?.kind || 'pct')}`} className="in" name="kind" defaultValue={o?.kind || 'pct'}><option value="pct">{T('Процент')}</option><option value="fixed">{T('Сумма')}</option></select></label>
           <label className="field"><span>{T('Скидка')}</span><input className="in" name="value" inputMode="decimal" defaultValue={o?.value ?? ''} required /></label>
           <label className="field"><span>{T('Валюта суммы')}</span><input className="in" name="currency" defaultValue={o?.currency || cur} /></label>
           <label className="field"><span>{T('Квартиры (номера)')}</span><input className="in" name="units" defaultValue={o?.nums || ''} placeholder={T('пусто — все')} /></label>
@@ -290,7 +290,7 @@ export default async function ObjectCard(
         <ActionForm action={savePromoMode} lang={L} className="card stack" style={{ gap: 8, maxWidth: 640 }}>
           <input type="hidden" name="project" value={p!.id} />
           <div className="h3" style={{ margin: 0 }}>{T('Как акция складывается со скидками')}</div>
-          <select className="in" name="mode" defaultValue={mode}>{MODES.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+          <select key={`mode:${String(mode)}`} className="in" name="mode" defaultValue={mode}>{MODES.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
           <div className="tiny muted">{T('Скидка за 100% и акция уменьшают цену до раздела денег: фикс и пул считаются от неё. Скидки и суммы — в валюте проекта.')}</div>
           <div><button className="btn btn--sm">{T('Сохранить правило')}</button></div>
         </ActionForm>
@@ -314,14 +314,14 @@ export default async function ObjectCard(
         <div className="row" style={{ gap: 6 }}>
           <label className="field" style={{ flex: 3 }}><span>{T('Название')}</span><input className="in" name="title" defaultValue={o?.title} required placeholder={T('Кухня и шкафы под ключ')} /></label>
           <label className="field" style={{ flex: 2 }}><span>{T('Цена')}</span><input className="in" name="price" inputMode="decimal" defaultValue={o?.price} required /></label>
-          <label className="field" style={{ flex: 1 }}><span>{T('Валюта')}</span><select className="in" name="currency" defaultValue={o?.currency || 'USD'}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Валюта')}</span><select key={`currency:${String(o?.currency || 'USD')}`} className="in" name="currency" defaultValue={o?.currency || 'USD'}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select></label>
         </div>
         {blocks.length > 1 && <div className="chips">{blocks.map((b) => <label key={b.id} className="chip chk"><input type="checkbox" name="buildings" value={b.id} defaultChecked={o?.building_ids.includes(b.id)} /> {b.name}</label>)}</div>}
         {types.length > 1 && <div className="chips">{types.map((x) => <label key={x} className="chip chk"><input type="checkbox" name="types" value={x} defaultChecked={o?.unit_types.includes(x)} /> {T(TYPE_NAME[x] || x)}</label>)}</div>}
         <label className="field"><span>{T('Только квартиры (номера через запятую, пусто — все подходящие)')}</span><input className="in" name="units" defaultValue={o?.units.join(', ')} placeholder="A-101, A-102" /></label>
         <div className="row" style={{ gap: 6 }}>
           <label className="field" style={{ flex: 3 }}><span>{T('Пояснение для партнёра')}</span><input className="in" name="note" defaultValue={o?.note || ''} /></label>
-          <label className="field" style={{ flex: 1 }}><span>{T('Показывать')}</span><select className="in" name="active" defaultValue={o && !o.active ? '0' : '1'}><option value="1">{T('да')}</option><option value="0">{T('нет')}</option></select></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Показывать')}</span><select key={`active:${String(o && !o.active ? '0' : '1')}`} className="in" name="active" defaultValue={o && !o.active ? '0' : '1'}><option value="1">{T('да')}</option><option value="0">{T('нет')}</option></select></label>
           <label className="field" style={{ flex: 1 }}><span>{T('Порядок')}</span><input className="in" name="sort" type="number" defaultValue={o?.sort ?? 0} /></label>
         </div>
         <div className="row" style={{ gap: 6 }}><button className="btn btn--p btn--sm">{o ? T('Сохранить') : T('Добавить опцию')}</button>{o && <button className="btn btn--sm" name="delete" value="1">{T('Удалить')}</button>}</div>
@@ -442,7 +442,7 @@ export default async function ObjectCard(
               <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="building" value={b.id} />
               <b className="small">{b.name}</b>
               {SIDES.map((k) => <div key={k} className="stack" style={{ gap: 4 }}><span className="tiny muted">{T(SIDE_NAME[k])}</span>
-                <select className="in" name={'k_' + k} defaultValue={sd[k]?.kind || ''}><option value="">—</option>{Object.entries(MARKS).map(([m, [ic, n]]) => <option key={m} value={m}>{ic} {T(n)}</option>)}</select>
+                <select key={`k_${k}:${String(sd[k]?.kind || '')}`} className="in" name={'k_' + k} defaultValue={sd[k]?.kind || ''}><option value="">—</option>{Object.entries(MARKS).map(([m, [ic, n]]) => <option key={m} value={m}>{ic} {T(n)}</option>)}</select>
                 <input className="in" name={'l_' + k} defaultValue={sd[k]?.label || ''} placeholder={T('подпись')} maxLength={40} /></div>)}
               <button className="btn btn--sm">{T('Сохранить')}</button>
             </ActionForm>
@@ -471,8 +471,8 @@ export default async function ObjectCard(
             <div key={r} className="objrow" style={{ gridTemplateColumns: '.6fr 1.4fr 1.2fr .8fr 1.6fr' }}>
               <b>{r}</b>
               <span className="tiny muted">{xs.length} · {xs[0]?.unit_type}{areas.length ? ` · ${Math.min(...areas)}–${Math.max(...areas)} m²` : ''}{own.length ? <><br />{T('свой вид: этажи {f}', { f: own.join(', ') })}</> : null}</span>
-              <select className="in" name={'v_' + r} defaultValue={i?.view_side || ''}>{VIEWS.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
-              <select className="in" name={'d_' + r} defaultValue={i?.direction || ''}>{DIRS.map((k) => <option key={k} value={k}>{k || '—'}</option>)}</select>
+              <select key={`v_${r}:${String(i?.view_side || '')}`} className="in" name={'v_' + r} defaultValue={i?.view_side || ''}>{VIEWS.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+              <select key={`d_${r}:${String(i?.direction || '')}`} className="in" name={'d_' + r} defaultValue={i?.direction || ''}>{DIRS.map((k) => <option key={k} value={k}>{k || '—'}</option>)}</select>
               <input className="in" name={'n_' + r} defaultValue={i?.note || ''} placeholder={T('угловая, вид на бассейн…')} />
             </div>
           ) })}

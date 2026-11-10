@@ -46,7 +46,7 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
                 <form action={setUserActive} className="stack" style={{ gap: 8 }}>
                   <input type="hidden" name="id" value={u.id} /><input type="hidden" name="active" value="0" />
                   {(work!.clients > 0 || work!.bookings > 0) && <label className="field"><span>{T('Клиенты в работе: {c}, активные брони: {b}. Передать:', { c: work!.clients, b: work!.bookings })}</span>
-                    <select className="in" name="transfer_to" defaultValue={u.curator_id || ''}><option value="">{T('не передавать')}</option>{curators.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+                    <select key={`transfer_to:${String(u.curator_id || '')}`} className="in" name="transfer_to" defaultValue={u.curator_id || ''}><option value="">{T('не передавать')}</option>{curators.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
                   <button className="btn">{T('Отключить')}</button>
                   <div className="tiny muted">{T('Доступ закрывается сразу. Комиссия по уже подписанным сделкам выплачивается по договору.')}</div>
                 </form>

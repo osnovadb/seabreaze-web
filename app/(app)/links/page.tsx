@@ -21,8 +21,8 @@ export default async function Links() {
       {l && <input type="hidden" name="id" value={l.id} />}
       <div className="grid g3">
         <label className="field"><span>{T('Название (для вас)')}</span><input className="in" name="title" defaultValue={l?.title || ''} placeholder={T('Например: Instagram, весна')} /></label>
-        <label className="field"><span>{T('Язык страницы')}</span><select className="in" name="lang" defaultValue={l?.lang || (c.user.market === 'IL' ? 'he' : 'de')}>{['de', 'en', 'ru', 'he'].map((x) => <option key={x} value={x}>{x.toUpperCase()}</option>)}</select></label>
-        <label className="field"><span>{T('Цены')}</span><select className="in" name="price_mode" defaultValue={l?.price_mode || 'from'}><option value="from">{T('«цена от»')}</option><option value="none">{T('без цен')}</option></select></label>
+        <label className="field"><span>{T('Язык страницы')}</span><select key={`lang:${String(l?.lang || (c.user.market === 'IL' ? 'he' : 'de'))}`} className="in" name="lang" defaultValue={l?.lang || (c.user.market === 'IL' ? 'he' : 'de')}>{['de', 'en', 'ru', 'he'].map((x) => <option key={x} value={x}>{x.toUpperCase()}</option>)}</select></label>
+        <label className="field"><span>{T('Цены')}</span><select key={`price_mode:${String(l?.price_mode || 'from')}`} className="in" name="price_mode" defaultValue={l?.price_mode || 'from'}><option value="from">{T('«цена от»')}</option><option value="none">{T('без цен')}</option></select></label>
       </div>
       <div className="chips">{projects.map((p) => <label key={p.id} className="chip"><input type="checkbox" name="project" value={p.id} defaultChecked={l ? l.project_ids.includes(p.id) : true} /> {p.name}</label>)}</div>
       <div><button className="btn btn--p btn--sm">{l ? T('Сохранить') : T('Создать ссылку')}</button></div>

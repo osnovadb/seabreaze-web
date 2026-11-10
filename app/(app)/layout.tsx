@@ -89,7 +89,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {c.real.role === 'owner' && (
             <form action={impersonate} className="stack" style={{ gap: 6 }}>
               <span className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Войти как (тест ролей)')}</span>
-              <select name="user" className="in" defaultValue={u.id} style={{ height: 32, background: 'var(--deep-2)', color: '#fff', borderColor: '#1F5D5B', fontSize: 12.5 }}>
+              <select key={`user:${String(u.id)}`} name="user" className="in" defaultValue={u.id} style={{ height: 32, background: 'var(--deep-2)', color: '#fff', borderColor: '#1F5D5B', fontSize: 12.5 }}>
                 {users.map((x) => <option key={x.id} value={x.id}>{x.name} · {T(ROLE_NAMES[x.role as keyof typeof ROLE_NAMES])}</option>)}
               </select>
               <button className="btn btn--sm">{T('Переключить')}</button>

@@ -56,7 +56,7 @@ export default async function Application(props: { params: Promise<{ id: string 
           <form action={reviewApplication} className="card stack" style={{ gap: 8 }}>
             <div className="h3" style={{ margin: 0 }}>{T('Решение')}</div>
             <input type="hidden" name="id" value={a.id} />
-            <select className="in" name="status" defaultValue={a.status}>{Object.entries(ST).map(([k, [l]]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+            <select key={`status:${String(a.status)}`} className="in" name="status" defaultValue={a.status}>{Object.entries(ST).map(([k, [l]]) => <option key={k} value={k}>{T(l)}</option>)}</select>
             <textarea className="in" name="note" rows={3} defaultValue={a.note || ''} placeholder={T('Итог созвона, проверка лицензии, причина отказа…')} />
             <button className="btn btn--p">{T('Сохранить')}</button>
             {a.reviewer && <div className="tiny muted">{T('Проверял')}: {a.reviewer}</div>}

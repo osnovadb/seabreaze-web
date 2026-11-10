@@ -21,7 +21,7 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
         <div className="grid g2">
           {F('name', 'Имя и фамилия *')}{F('country', 'Страна')}
           {F('phone', 'Телефон', 'tel')}{F('email', 'E-mail', 'email')}
-          <label className="field"><span>{T('Язык общения')}</span><select className="in" name="language" defaultValue={lang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+          <label className="field"><span>{T('Язык общения')}</span><select key={`language:${String(lang)}`} className="in" name="language" defaultValue={lang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
           {F('budget', 'Бюджет', 'text', '$150–200 тыс.')}
           {F('goal', 'Цель', 'text', 'для себя, отдых, сдача')}{F('timeline', 'Срок покупки')}
         </div>

@@ -50,7 +50,7 @@ export default async function News(props: { searchParams: Promise<{ all?: string
             <div className="h3" style={{ margin: 0 }}>{T('Новая запись')}</div>
             <div className="grid g2">
               <label className="field"><span>{T('Тип')}</span><select className="in" name="kind"><option value="news">{T('Новость')}</option><option value="banner">{T('Баннер (сверху ленты)')}</option></select></label>
-              <label className="field"><span>{T('Язык')}</span><select className="in" name="lang" defaultValue={L}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+              <label className="field"><span>{T('Язык')}</span><select key={`lang:${String(L)}`} className="in" name="lang" defaultValue={L}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
             </div>
             <label className="field"><span>{T('Заголовок')}</span><input className="in" name="title" required /></label>
             <label className="field"><span>{T('Текст')}</span><textarea className="in" name="body" rows={5} /></label>

@@ -15,7 +15,7 @@ export function NewAgent({ lang }: { lang: Lang }) {
       <div className="row">
         <label className="field" style={{ flex: 2 }}><span>{T('Имя и фамилия')}</span><input className="in" name="name" required /></label>
         <label className="field" style={{ flex: 2 }}><span>E-mail</span><input className="in" name="email" type="email" required /></label>
-        <label className="field" style={{ flex: 1 }}><span>{T('Язык')}</span><select className="in" name="locale" defaultValue={lang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+        <label className="field" style={{ flex: 1 }}><span>{T('Язык')}</span><select key={`locale:${String(lang)}`} className="in" name="locale" defaultValue={lang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
       </div>
       <button className="btn btn--p">{T('Создать')}</button>
       <div className="tiny muted">{T('Сотрудник видит только своих клиентов; вы видите клиентов и брони всех сотрудников. Комиссия платится агентству.')}</div>

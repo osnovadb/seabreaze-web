@@ -24,7 +24,7 @@ export function LinkLeadForm({ lang, code, projects, project, brand }: { lang: L
         <label className="field"><span>E-mail</span><input className="in" name="email" type="email" autoComplete="email" /></label>
       </div>
       <label className="field"><span>{T('Страна проживания')}</span><input className="in" name="country" autoComplete="country-name" /></label>
-      {projects.length > 1 && <label className="field"><span>{T('Проект')}</span><select className="in" name="project" defaultValue={project || ''}><option value="">{T('Помогите выбрать')}</option>{projects.map((p) => <option key={p}>{p}</option>)}</select></label>}
+      {projects.length > 1 && <label className="field"><span>{T('Проект')}</span><select key={`project:${String(project || '')}`} className="in" name="project" defaultValue={project || ''}><option value="">{T('Помогите выбрать')}</option>{projects.map((p) => <option key={p}>{p}</option>)}</select></label>}
       {projects.length === 1 && <input type="hidden" name="project" value={projects[0]} />}
       <label className="field"><span>{T('Комментарий')}</span><textarea className="in" name="comment" rows={2} /></label>
       <label className="check small"><input type="checkbox" name="consent" required /> <span>{T('Согласен на обработку моих данных и их передачу застройщикам для подбора и регистрации, включая застройщиков, с которыми работа начнётся позже')} * <a className="bronze" href={`/legal/privacy?lang=${lang}`} target="_blank" rel="noopener">{T('Политика конфиденциальности')}</a></span></label>

@@ -44,7 +44,7 @@ export default async function Objects() {
               <div className="h3" style={{ margin: 0 }}>{T('Новый проект')}</div>
               <label className="field"><span>{T('Название')}</span><input className="in" name="name" required /></label>
               <label className="field"><span>{T('Адрес в портале (латиницей)')}</span><input className="in" name="slug" placeholder="marina-village" /></label>
-              <label className="field"><span>{T('Застройщик')}</span><select className="in" name="developer" defaultValue={devs[0]?.id}>{devs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}<option value="new">+ {T('новый застройщик')}</option></select></label>
+              <label className="field"><span>{T('Застройщик')}</span><select key={`developer:${String(devs[0]?.id)}`} className="in" name="developer" defaultValue={devs[0]?.id}>{devs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}<option value="new">+ {T('новый застройщик')}</option></select></label>
               <label className="field"><span>{T('Новый застройщик (если выбран «новый»)')}</span><input className="in" name="developer_name" /></label>
               <div className="row"><label className="field" style={{ flex: 1 }}><span>{T('Город')}</span><input className="in" name="city" defaultValue="Баку" /></label><DeliveryPicker lang={L} value={null} label="Сдача" /></div>
               <button className="btn btn--p">{T('Создать черновик')}</button>

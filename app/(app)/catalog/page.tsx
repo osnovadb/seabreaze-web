@@ -64,9 +64,9 @@ export default async function Catalog(
           {view === 'table' && <input type="hidden" name="view" value="table" />}
           {sp.s && <input type="hidden" name="s" value={sp.s} />}
           <label className="field"><span>{T('Проект')}</span>
-            <select className="in" name="p" defaultValue={p?.slug || ''}><option value="">{T('Все проекты')}</option>{ps.map((x) => <option key={x.id} value={x.slug}>{x.name} · {x.free}</option>)}</select></label>
+            <select key={`p:${String(p?.slug || '')}`} className="in" name="p" defaultValue={p?.slug || ''}><option value="">{T('Все проекты')}</option>{ps.map((x) => <option key={x.id} value={x.slug}>{x.name} · {x.free}</option>)}</select></label>
           {p && blocks.length > 1 && <label className="field"><span>{T('Корпус')}</span>
-            <select className="in" name="b" defaultValue={sp.b || ''}><option value="">{T('Все корпуса')}</option>{blocks.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select></label>}
+            <select key={`b:${String(sp.b || '')}`} className="in" name="b" defaultValue={sp.b || ''}><option value="">{T('Все корпуса')}</option>{blocks.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select></label>}
           {types.length > 1 && <div className="field"><span>{T('Тип')}</span><div className="chips">{types.map((x) => <label key={x} className="chip chk"><input type="checkbox" name="t" value={x} defaultChecked={chk('t', x)} /> {T(TYPE_NAME[x] || x)}</label>)}</div></div>}
           <div className="field"><span>{T('Комнат')}</span><div className="chips">{[1, 2, 3, 4].map((r) => <label key={r} className="chip chk"><input type="checkbox" name="r" value={r} defaultChecked={roomsOn.includes(String(r))} /> {r === 4 ? '4+' : r}</label>)}</div></div>
           <div className="field"><span>{T('Цена, тыс. $')}{prices.length ? <i className="tiny muted"> · <bdi dir="ltr">{Math.floor(Math.min(...prices) / 1000)}–{Math.ceil(Math.max(...prices) / 1000)}</bdi></i> : null}</span>
@@ -76,7 +76,7 @@ export default async function Catalog(
           <div className="field"><span>{T('Этаж')}</span>
             <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input className="in" name="fmin" inputMode="numeric" placeholder={T('от')} defaultValue={sp.fmin} /><input className="in" name="fmax" inputMode="numeric" placeholder={T('до')} defaultValue={sp.fmax} /></div></div>
           {views.length > 0 && <label className="field"><span>{T('Вид из окон')}</span>
-            <select className="in" name="v" defaultValue={sp.v || ''}><option value="">{T('любой')}</option>{views.map((v) => <option key={v} value={v}>{T(VIEW_NAME[v] || v)}</option>)}</select></label>}
+            <select key={`v:${String(sp.v || '')}`} className="in" name="v" defaultValue={sp.v || ''}><option value="">{T('любой')}</option>{views.map((v) => <option key={v} value={v}>{T(VIEW_NAME[v] || v)}</option>)}</select></label>}
           <div className="stack" style={{ gap: 4 }}>
             <label className="check"><input type="radio" name="o" value="" defaultChecked={!sp.o} /> <span>{T('Сад или терраса — неважно')}</span></label>
             <label className="check"><input type="radio" name="o" value="g" defaultChecked={sp.o === 'g'} /> <span>{T('С садом')}</span></label>

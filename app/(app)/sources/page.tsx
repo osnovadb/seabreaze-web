@@ -65,7 +65,7 @@ export default async function Sources() {
           <div className="tiny muted">{T('Новый статус застройщика без сопоставления считается «не в продаже». Базовые статусы Profitbase сопоставлены сразу.')}</div>
           <input type="hidden" name="source" value={smap[0].source_id} />
           <div className="grid g4">{smap.map((m) => <label key={m.source_id + m.external_status} className="field"><span>{m.source_id} · {m.external_status}</span>
-            <select className="in" name={'st:' + m.external_status} defaultValue={m.status} disabled={!owner}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select></label>)}</div>
+            <select key={`st:${m.external_status}:${String(m.status)}`} className="in" name={'st:' + m.external_status} defaultValue={m.status} disabled={!owner}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select></label>)}</div>
           {owner && <div><button className="btn btn--sm">{T('Сохранить')}</button></div>}
         </form>}
         {outbox.length > 0 && <div className="card mt16">
@@ -101,8 +101,8 @@ function PbForm({ v }: { v?: { id: string; name: string; active: boolean; config
       <div className="row" style={{ gap: 6 }}>
         <input className="in" name="reserve_status" defaultValue={v?.config.reserve_status || 'BOOKED'} placeholder="BOOKED" style={{ flex: 1 }} />
         <input className="in" name="sold_status" defaultValue={v?.config.sold_status || 'SOLD'} placeholder="SOLD" style={{ flex: 1 }} />
-        <select className="in" name="currency" defaultValue={v?.config.currency || 'USD'} style={{ flex: 1 }}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select>
-        <select className="in" name="active" defaultValue={v && !v.active ? '0' : '1'} style={{ flex: 1 }}><option value="1">on</option><option value="0">off</option></select>
+        <select key={`currency:${String(v?.config.currency || 'USD')}`} className="in" name="currency" defaultValue={v?.config.currency || 'USD'} style={{ flex: 1 }}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select>
+        <select key={`active:${String(v && !v.active ? '0' : '1')}`} className="in" name="active" defaultValue={v && !v.active ? '0' : '1'} style={{ flex: 1 }}><option value="1">on</option><option value="0">off</option></select>
       </div>
       <div><button className="btn btn--sm btn--p">Сохранить</button></div>
       <div className="tiny muted">Ключ API — только в настройках сервера (portal.env), здесь — имя переменной. Дома сопоставляются по external_id корпуса или по названию; квартиры — по id Profitbase, в первый раз по номеру.</div>

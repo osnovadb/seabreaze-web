@@ -20,7 +20,7 @@ export function TourForm({ lang, clientId, clientLang }: { lang: Lang; clientId:
         </div>
         <div className="row" style={{ gap: 6 }}>
           <label className="field" style={{ flex: 1 }}><span>{T('Человек')}</span><input className="in" type="number" name="people" min={1} defaultValue={2} /></label>
-          <label className="field" style={{ flex: 1 }}><span>{T('Язык')}</span><select className="in" name="lang" defaultValue={clientLang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Язык')}</span><select key={`lang:${String(clientLang)}`} className="in" name="lang" defaultValue={clientLang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
         </div>
         <input className="in" name="note" placeholder={T('Трансфер, отель, пожелания…')} />
         <div><button className="btn btn--sm">{T('Запросить тур')}</button></div>

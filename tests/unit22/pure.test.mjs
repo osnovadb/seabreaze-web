@@ -74,7 +74,7 @@ test('срок сдачи: разбор прежних записей и кан�
   for (const v of ['2027-Q4', '2030', '2025-done']) assert.match(v.slice(0, 4), /^\d{4}$/)
 })
 test('срок сдачи: из формы и вывод на четырёх языках', () => {
-  assert.equal(deliveryFromForm('4', '2027'), '2027-Q4'); assert.equal(deliveryFromForm('', '2027'), '2027'); assert.equal(deliveryFromForm('4', ''), null); assert.equal(deliveryFromForm('done', '2025'), '2025-done'); assert.equal(deliveryFromForm('', ''), null)
+  assert.equal(deliveryFromForm('4', '2027'), '2027-Q4'); assert.equal(deliveryFromForm('', '2027'), '2027'); assert.equal(deliveryFromForm('4', ''), null); assert.equal(deliveryFromForm('done', '2025'), '2025-done'); assert.equal(deliveryFromForm('done', ''), null); assert.equal(deliveryFromForm('', ''), null)
   assert.equal(fmtDelivery('ru', '2027-Q4'), 'IV кв. 2027'); assert.equal(fmtDelivery('en', '2027-Q4'), 'Q4 2027'); assert.equal(fmtDelivery('de', '2027-Q4'), 'Q4 2027'); assert.equal(fmtDelivery('he', '2027-Q4'), 'רבעון 4 2027')
   assert.equal(fmtDelivery('ru', '2030'), '2030'); assert.equal(fmtDelivery('de', '2025-done'), 'fertiggestellt · 2025'); assert.equal(fmtDelivery('ru', 'уточняется'), 'уточняется')
   assert.equal(fmtDelivery('ru', 'IV кв. 2027'), 'IV кв. 2027', 'прежняя запись выводится в том же виде')

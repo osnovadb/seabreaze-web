@@ -32,7 +32,7 @@ export function canonDelivery(d: Delivery | null): string | null {
 // Из формы: quarter = '' | '1'..'4' | 'done', year = '' | 'YYYY'
 export function deliveryFromForm(quarter: string, year: string): string | null {
   const y = /^\d{4}$/.test(year) ? Number(year) : null
-  if (quarter === 'done') return canonDelivery({ year: y, q: null, done: true })
+  if (quarter === 'done') return y ? canonDelivery({ year: y, q: null, done: true }) : null // «сдан» — только с годом: сайты берут первые 4 символа
   return canonDelivery({ year: y, q: y ? asQ(quarter) : null, done: false })
 }
 

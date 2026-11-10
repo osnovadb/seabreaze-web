@@ -28,7 +28,7 @@ export async function PayoutProfile({ userId, lang }: { userId: string; lang: La
       <PayoutGapNote userId={userId} lang={lang} />
       <div className="small muted">{T('Компания или ИП — счёт против нашего акта; физлицо — акт и налоговый номер. Без документа выплата переносится на следующий месяц.')}</div>
       <div className="grid g3">
-        <label className="field"><span>{T('Форма')}</span><select className="in" name="partner_form" defaultValue={prof?.partner_form || ''}><option value="">—</option><option value="company">{T('Компания')}</option><option value="sole">{T('ИП')}</option><option value="individual">{T('Физлицо')}</option></select></label>
+        <label className="field"><span>{T('Форма')}</span><select key={`partner_form:${String(prof?.partner_form || '')}`} className="in" name="partner_form" defaultValue={prof?.partner_form || ''}><option value="">—</option><option value="company">{T('Компания')}</option><option value="sole">{T('ИП')}</option><option value="individual">{T('Физлицо')}</option></select></label>
         <label className="field"><span>{T('Налоговый номер')}</span><input className="in" name="tax_no" defaultValue={prof?.tax_no || ''} /></label>
         <label className="field"><span>{T('Страна налогового резидентства (код)')}</span><input className="in" name="tax_country" maxLength={2} defaultValue={prof?.tax_country || ''} placeholder="DE" /></label>
         <label className="field"><span>{T('Сертификат резидентства действует до')}</span><input className="in" type="date" name="tax_cert_until" defaultValue={prof?.tax_cert_until || ''} /></label>

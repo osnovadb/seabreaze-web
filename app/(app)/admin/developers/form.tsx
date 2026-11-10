@@ -21,10 +21,10 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
           <label className="field"><span>{T('Контакты для регистраций и броней')}</span><input className="in" name="contacts" defaultValue={cur.contacts || ''} disabled={!canEdit} /></label></div>
         <div className="label mt16">{T('Регистрация клиента')}</div>
         <div className="grid g3 mt8">
-          <label className="field"><span>{T('Как регистрируем')}</span><select className="in" name="reg_method" defaultValue={cur.reg_method} disabled={!canEdit}><option value="email">{T('письмом')}</option><option value="crm">{T('в CRM застройщика')}</option><option value="api">{T('через API')}</option><option value="file">{T('файлом')}</option></select></label>
+          <label className="field"><span>{T('Как регистрируем')}</span><select key={`reg_method:${String(cur.reg_method)}`} className="in" name="reg_method" defaultValue={cur.reg_method} disabled={!canEdit}><option value="email">{T('письмом')}</option><option value="crm">{T('в CRM застройщика')}</option><option value="api">{T('через API')}</option><option value="file">{T('файлом')}</option></select></label>
           <label className="field"><span>{T('Почта для регистраций')}</span><input className="in" name="reg_email" defaultValue={cur.reg_email || ''} disabled={!canEdit} /></label>
           {N('reg_response_days', 'Срок ответа', 'р. дней')}
-          <label className="field"><span>{T('Молчание застройщика')}</span><select className="in" name="silence_rule" defaultValue={cur.silence_rule} disabled={!canEdit}><option value="confirm">{T('= подтверждение (по договору)')}</option><option value="remind">{T('только напоминание бэк-офису')}</option></select></label>
+          <label className="field"><span>{T('Молчание застройщика')}</span><select key={`silence_rule:${String(cur.silence_rule)}`} className="in" name="silence_rule" defaultValue={cur.silence_rule} disabled={!canEdit}><option value="confirm">{T('= подтверждение (по договору)')}</option><option value="remind">{T('только напоминание бэк-офису')}</option></select></label>
           {N('silence_extra_days', 'Плюс к сроку ответа', 'р. дней')}
           {N('protect_months', 'Защита регистрации', 'мес.')}
           {N('protect_months_sub', 'Для клиентов саб-агентов', 'мес., если иначе')}
@@ -36,15 +36,15 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
         <div className="label mt16">{T('Комиссия')}</div>
         <div className="grid g3 mt8">{N('commission_pct', 'Фикс от цены договора', '%')}
           {['DE', 'IL', 'GLOBAL'].map((m) => <label key={m} className="field"><span>{T('Ставка для рынка сделки {m}', { m })}</span><input className="in" name={'rate_' + m} defaultValue={cur.rates_by_market?.[m] ?? ''} placeholder={T('как фикс')} disabled={!canEdit} /></label>)}
-          <label className="field"><span>{T('Комиссия и НДС')}</span><select className="in" name="vat_mode" defaultValue={cur.vat_mode} disabled={!canEdit}><option value="over">{T('сверх НДС')}</option><option value="incl">{T('включая НДС')}</option></select></label>
-          <label className="field"><span>{T('Когда платит')}</span><select className="in" name="pay_timing" defaultValue={cur.pay_timing} disabled={!canEdit}><option value="after_first_payment">{T('после первого взноса')}</option><option value="proportional">{T('пропорционально платежам')}</option><option value="deposit_35">{T('сразу при задатке от 35%')}</option></select></label>
+          <label className="field"><span>{T('Комиссия и НДС')}</span><select key={`vat_mode:${String(cur.vat_mode)}`} className="in" name="vat_mode" defaultValue={cur.vat_mode} disabled={!canEdit}><option value="over">{T('сверх НДС')}</option><option value="incl">{T('включая НДС')}</option></select></label>
+          <label className="field"><span>{T('Когда платит')}</span><select key={`pay_timing:${String(cur.pay_timing)}`} className="in" name="pay_timing" defaultValue={cur.pay_timing} disabled={!canEdit}><option value="after_first_payment">{T('после первого взноса')}</option><option value="proportional">{T('пропорционально платежам')}</option><option value="deposit_35">{T('сразу при задатке от 35%')}</option></select></label>
           <label className="field"><span>{T('Курс пересчёта')}</span><input className="in" name="fx_rule" defaultValue={cur.fx_rule || ''} placeholder={T('ЦБА на дату платежа')} disabled={!canEdit} /></label>
           {N('payment_wait_days', 'Ждём поступление', 'р. дней')}
         </div>
         <div className="mt8">{C('options_in_base', 'Опции входят в базу комиссии (257)')}</div>
         <div className="label mt16">{T('Клаубэк и продажи')}</div>
         <div className="grid g3 mt8">{N('clawback_months', 'Окно клаубэка', 'мес.')}
-          <label className="field"><span>{T('Зачёт')}</span><select className="in" name="clawback_offset" defaultValue={cur.clawback_offset} disabled={!canEdit}><option value="any">{T('против любых следующих выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
+          <label className="field"><span>{T('Зачёт')}</span><select key={`clawback_offset:${String(cur.clawback_offset)}`} className="in" name="clawback_offset" defaultValue={cur.clawback_offset} disabled={!canEdit}><option value="any">{T('против любых следующих выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
           <div className="stack" style={{ gap: 6, alignSelf: 'center' }}>{C('sells_to_az', 'Можно продавать клиентам из АЗ')}{C('active', 'Работаем с застройщиком')}</div>
         </div>
         <label className="field mt16"><span>{T('Заметка по договору')}</span><input className="in" name="note" defaultValue={cur.note || ''} disabled={!canEdit} /></label>

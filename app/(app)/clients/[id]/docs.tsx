@@ -18,7 +18,7 @@ export function MakeDoc({ lang, clientId, clientLang, bookings, fixations, commi
       <input type="hidden" name="client" value={clientId} />
       <div className="row" style={{ gap: 6 }}>
         <select className="in" name="kind" value={kind} onChange={(e) => setKind(e.target.value)} style={{ flex: 2 }}>{kinds.map((k) => <option key={k} value={k}>{T(NAMES[k])}</option>)}</select>
-        <select className="in" name="lang" defaultValue={['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en'} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
+        <select key={`lang:${String(['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en')}`} className="in" name="lang" defaultValue={['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en'} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
       </div>
       {byBooking
         ? <select className="in" name="booking" required>{bookings.length === 0 && <option value="">{T('У клиента нет броней')}</option>}{bookings.map((b) => <option key={b.id} value={b.id}>{T('Бронь {u}', { u: b.unit })}</option>)}</select>

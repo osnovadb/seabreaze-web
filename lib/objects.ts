@@ -17,6 +17,8 @@ import { UNIT_TYPES, riser } from './catalog'
 import { readXlsx } from './xlsx'
 import { parseChess, bareNo } from './chessImport'
 
+// квартал или «сдан» выбраны, а год нет — ошибка, а не тихий сброс (и «сдан» без года сайты прочли бы как «done»)
+const dlvMissingYear = (f: FormData) => !!String(f.get('delivery_q') || '') && !/^\d{4}$/.test(String(f.get('delivery_y') || ''))
 const keepLegacy = (raw: string) => (raw && !parseDelivery(raw) ? raw : null) // сброс обоих списков очищает срок; нераспознанную старую запись не теряем
 // Срок сдачи из формы: квартал + год → «2027-Q4»; ничего не выбрано — прежнее значение (в т.ч. нераспознанное) не теряем
 const dlv = (f: FormData) => f.has('delivery_q') || f.has('delivery_y') ? deliveryFromForm(String(f.get('delivery_q') || ''), String(f.get('delivery_y') || '')) ?? keepLegacy(String(f.get('delivery_raw') || '').trim()) : (String(f.get('delivery') || '').trim() || null)
@@ -54,6 +56,7 @@ export async function saveProject(_: unknown, f: FormData) {
   const c = await owner()
   const name = s(f, 'name')
   if (!name) return { error: t(c.lang, 'Нужно название') }
+  if (dlvMissingYear(f)) return { error: t(c.lang, 'Укажите год сдачи') } // QA 10.11: квартал без года молча стирал срок
   let dev = s(f, 'developer')
   if (dev === 'new') {
     if (!s(f, 'developer_name')) return { error: t(c.lang, 'Укажите застройщика') }
@@ -95,6 +98,7 @@ export async function saveProject(_: unknown, f: FormData) {
 export async function saveBuilding(_: unknown, f: FormData) {
   const c = await owner()
   const pid = s(f, 'project'), id = s(f, 'id')
+  if (!s(f, 'delete') && dlvMissingYear(f)) return { error: t(c.lang, 'Укажите год сдачи') }
   if (s(f, 'delete')) {
     const n = await one<{ n: number }>('select count(*)::int n from units where building_id = $1', [id])
     if (n!.n) return { error: t(c.lang, 'В блоке есть квартиры — сначала удалите или перенесите их') }

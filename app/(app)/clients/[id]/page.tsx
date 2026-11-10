@@ -101,7 +101,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               <input type="hidden" name="client" value={cl.id} />
               {cl.attach_status === 'candidate' && <div className="tiny muted">{T('Обязательно для закрепления: цель, бюджет, срок, страна проживания, язык')}</div>}
               {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['country', 'Страна проживания'], ['language', 'Язык'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span>{k === 'language'
-                ? <select className="in" name="language" defaultValue={cl.language || ''}><option value="">—</option>{[['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['he', 'עברית']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>
+                ? <select key={`language:${String(cl.language || '')}`} className="in" name="language" defaultValue={cl.language || ''}><option value="">—</option>{[['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['he', 'עברית']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>
                 : <input className="in" name={k} defaultValue={cl[k] || ''} />}</label>)}
               <button className="btn btn--p">{T(cl.attach_status === 'candidate' ? 'Сохранить и закрепить клиента' : 'Сохранить квалификацию')}</button>
             </form>
@@ -195,7 +195,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                   <label className="field" style={{ flex: 1 }}><span>{T('Налоговое резидентство')}</span><input className="in" name="tax_residence" defaultValue={cl.kyc_tax_residence || ''} disabled={kycLocked} /></label>
                 </div>
                 <label className="field"><span>{T('Публичное должностное лицо (PEP)')}</span>
-                  <select className="in" name="pep" defaultValue={cl.kyc_pep == null ? '' : cl.kyc_pep ? 'yes' : 'no'} disabled={kycLocked}><option value="">—</option><option value="no">{T('нет')}</option><option value="yes">{T('да')}</option></select></label>
+                  <select key={`pep:${String(cl.kyc_pep == null ? '' : cl.kyc_pep ? 'yes' : 'no')}`} className="in" name="pep" defaultValue={cl.kyc_pep == null ? '' : cl.kyc_pep ? 'yes' : 'no'} disabled={kycLocked}><option value="">—</option><option value="no">{T('нет')}</option><option value="yes">{T('да')}</option></select></label>
                 {!kycLocked && <div><button className="btn btn--sm">{T('Сохранить анкету')}</button></div>}
               </form>
               {cl.kyc_status === 'rejected' && cl.kyc_note && <div className="err small">{T('Причина отказа')}: {cl.kyc_note}</div>}
@@ -219,7 +219,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               <form action={transferClient} className="card stack" style={{ gap: 8 }}>
                 <div className="h3" style={{ margin: 0 }}>{T('Передать клиента')}</div>
                 <input type="hidden" name="client" value={cl.id} />
-                <div className="row"><select className="in" name="owner" defaultValue={cl.owner_id} style={{ flex: 1 }}>{owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select><button className="btn">{T('Передать')}</button></div>
+                <div className="row"><select key={`owner:${String(cl.owner_id)}`} className="in" name="owner" defaultValue={cl.owner_id} style={{ flex: 1 }}>{owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select><button className="btn">{T('Передать')}</button></div>
               </form>
             )}
           </div>

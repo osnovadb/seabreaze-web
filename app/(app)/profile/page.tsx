@@ -27,7 +27,7 @@ export default async function Profile() {
             {me?.curator && <div className="kv"><span>{T('Куратор')}</span><span>{me.curator}</span></div>}
             <div className="kv"><span>{T('Последний вход')}</span><span className="small">{dateTime(L, me?.last_login_at || null)}</span></div>
             <form action={setOwnLocale} className="row mt8">
-              <select className="in" name="locale" defaultValue={u.locale} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
+              <select key={`locale:${String(u.locale)}`} className="in" name="locale" defaultValue={u.locale} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
               <button className="btn">{T('Язык по умолчанию')}</button>
             </form>
             <div className="tiny muted">{T('Сменить e-mail, роль или агентство может администратор.')}</div>

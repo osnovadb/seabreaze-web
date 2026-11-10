@@ -110,7 +110,7 @@ export default async function Units(
                 ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
                 : <div className="small muted">{T('«Договор подписан» — после пройденного KYC')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></div>)}
               {['confirmed', 'converted'].includes(u.status!) && office && staff.length > 0 && <form action={setEscort} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.booking_id!} />
-                <label className="field"><span>{T('Сопровождающий в Баку')}</span><select name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                <label className="field"><span>{T('Сопровождающий в Баку')}</span><select key={`escort:${String(u.escort_id || '')}`} name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 <button className="btn btn--sm">{T('Сохранить')}</button></form>}
               {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
               {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)

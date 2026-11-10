@@ -19,7 +19,7 @@ export function EditContacts({ lang, cl }: { lang: Lang; cl: { id: string; name:
         <label className="field"><span>E-mail</span><input className="in" name="email" type="email" defaultValue={cl.email || ''} /></label>
         <div className="row" style={{ gap: 6 }}>
           <label className="field" style={{ flex: 1 }}><span>{T('Страна')}</span><input className="in" name="country" defaultValue={cl.country || ''} /></label>
-          <label className="field" style={{ flex: 1 }}><span>{T('Язык общения')}</span><select className="in" name="language" defaultValue={cl.language || 'de'}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Язык общения')}</span><select key={`language:${String(cl.language || 'de')}`} className="in" name="language" defaultValue={cl.language || 'de'}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
         </div>
         <div><button className="btn btn--sm">{T('Сохранить')}</button></div>
       </form>

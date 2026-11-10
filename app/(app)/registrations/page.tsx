@@ -37,7 +37,7 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
   const active = KEYS.filter((k) => k !== 'f' && searchParams[k]).length
   const projOpts = projects.filter((p) => !searchParams.d || p.developer_id === searchParams.d)
   const sel = (name: string, label: string, opts: [string, string][], all = 'все') => (
-    <label className="field"><span>{T(label)}</span><select className="in in--sm" name={name} defaultValue={searchParams[name as keyof RegParams] || ''}><option value="">{T(all)}</option>{opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>)
+    <label className="field"><span>{T(label)}</span><select key={`name:${String(searchParams[name as keyof RegParams] || '')}`} className="in in--sm" name={name} defaultValue={searchParams[name as keyof RegParams] || ''}><option value="">{T(all)}</option>{opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>)
   return (
     <>
       <Top title={T('Регистрации у застройщиков')} sub={T('Пакет на сегодня собирается в 9:00 по Баку; SLA передачи — 1 рабочий день, для массовой регистрации — 10')} />
