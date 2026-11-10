@@ -52,14 +52,16 @@ SALES = ['Selection', 'Developer registration', 'Reservation request', 'Reserved
 PIPELINES = []
 for m in MARKETS:
     PIPELINES.append(('Sales ' + m, SALES, 'Won', 'Lost', []))
+# «Правила работы» гл. 10 (решение 345, 10.11): воронок 10 — заявки партнёров в одной воронке рынка (тип — полем Partner type),
+# рассрочка — не воронка, а список платежей в портале и поля в Aftercare
 for m in MARKETS:
-    PIPELINES.append(('Agencies ' + m, ['New application', 'Contacted', 'Documents', 'Agreement sent', 'Agreement signed', 'Access granted', 'First client'], 'Active', 'Rejected', ['Inactive', 'Blocked']))
-for m in MARKETS:
-    PIPELINES.append(('Sub-agents ' + m, ['New application', 'Contacted', 'Documents', 'Agreement sent', 'Agreement signed', 'Access granted', 'First client'], 'Active', 'Rejected', ['Inactive', 'Blocked']))
+    PIPELINES.append(('Partners ' + m, ['New application', 'Contacted', 'Documents', 'Agreement sent', 'Agreement signed', 'Access granted', 'First client'], 'Active', 'Rejected', ['Inactive', 'Blocked']))
 for m in MARKETS:
     PIPELINES.append(('Partner clients ' + m, SALES, 'Won', 'Lost', []))
-PIPELINES.append(('Installments', ['Paying', 'Overdue'], 'Paid in full', 'Terminated', []))
 PIPELINES.append(('Aftercare', ['Construction', 'Handover', 'Ownership registered', 'Services'], 'Done', 'Cancelled', []))
+# Прежние воронки: сделки переезжают в Partners рынка (стадия — по имени, тип — в поле), пустая воронка удаляется.
+# В Installments — только тестовые сделки: удаляются лишь с «TEST» в названии, иначе шаг останавливается.
+RETIRE = [('Agencies ' + m, 'Partners ' + m, 'Agency') for m in MARKETS] + [('Sub-agents ' + m, 'Partners ' + m, None) for m in MARKETS] + [('Installments', None, None)]
 
 LEAD_STATUSES = [  # (STATUS_ID системный или новый, имя, семантика)
     ('NEW', 'New', None), ('GE_CANDIDATE', 'Candidate', None), ('IN_PROCESS', 'In progress', None),
@@ -107,12 +109,12 @@ DEAL = [
     ('GE_SIGNING', 'Signing', E('In person', 'Remote', 'Power of attorney')), ('GE_COBUYERS', 'Co-buyers', S), ('GE_BUYER_CO', 'Buyer company', S),
     ('GE_DISPUTE', 'Ownership dispute', B), ('GE_SEL_LINK', 'Selection link', U), ('GE_PORTAL_LINK', 'Portal link', U),
     ('GE_LOST', 'Lost reason', E(*LOST)),
-    # Installments / Aftercare
+    # Aftercare: оплата клиента — полями (рассрочка — в портале)
     ('GE_SCHEDULE', 'Schedule', S), ('GE_NEXT_PAY', 'Next payment', D), ('GE_OVERDUE', 'Payment overdue', B), ('GE_PAID_PCT', 'Paid %', N),
     ('GE_DEV_DELAY', 'Developer delay', B), ('GE_CLAWBACK', 'Clawback', B), ('GE_RESALE', 'Resale', B),
     ('GE_RESIDENCE', 'Residence permit', E('Not needed', 'Interested', 'In progress', 'Done')),
     ('GE_RENTAL', 'Rental management', E('Not needed', 'Interested', 'Active')),
-    # Agencies / Sub-agents
+    # Partners: заявки агентств, саб-агентов и рекомендателей
     ('GE_PARTNER_TYPE', 'Partner type', E('Agency', 'Sub-agent', 'Referrer')), ('GE_PARTNER_FORM', 'Partner form', E('Company', 'Sole trader', 'Individual')),
     ('GE_OUR_ENTITY', 'Our entity', E('GetsEstate GmbH (DE)', 'GetsEstate IL Ltd (IL)', 'Caspian (AZ)')), ('GE_RATE', 'Rate', S),
     ('GE_AGREEMENT', 'Agreement form', E('Paper', 'Offer', 'E-sign')), ('GE_DOCS', 'Documents link', U), ('GE_PARTNER_ID', 'Portal partner ID', S),
@@ -182,6 +184,50 @@ def ensure_stages(cat_id, process, won, lost, extra_fail):
            {'fields': {'ENTITY_ID': ent, 'STATUS_ID': pref + 'GEF%d' % (j + 1), 'NAME': name, 'SORT': 920 + j * 10, 'SEMANTICS': 'F'}})
 
 
+def stage_by_name(cat_id):
+    return {st['NAME']: st['STATUS_ID'] for st in call('crm.status.list', {'filter': {'ENTITY_ID': stages_entity(cat_id)}}).get('result', [])}
+
+
+def enum_id(entity, field, value):
+    for f in call('crm.%s.userfield.list' % entity, {'filter': {'FIELD_NAME': field}}).get('result', []):
+        for it in f.get('LIST', []):
+            if it['VALUE'] == value:
+                return it['ID']
+    return None
+
+
+def retire(by_name):
+    for old, new, ptype in RETIRE:
+        if old not in by_name:
+            continue
+        oid = by_name[old]
+        deals = call('crm.deal.list', {'filter': {'CATEGORY_ID': oid}, 'select': ['ID', 'TITLE', 'STAGE_ID', 'UF_CRM_GE_PARTNER_TYPE']}).get('result', [])
+        if new and deals:
+            nid = by_name.get(new)
+            if nid is None:
+                print('  ! нет воронки %s — переезд %s пропущен' % (new, old)); continue
+            ost = {v: k for k, v in stage_by_name(oid).items()}
+            nst = stage_by_name(nid)
+            for d in deals:
+                name = ost.get(d['STAGE_ID'])
+                kind = ptype or ('Referrer' if d['TITLE'].startswith('Referrer') else 'Sub-agent')
+                fields = {'categoryId': nid, 'stageId': nst.get(name) or next(iter(nst.values()))}
+                eid = enum_id('deal', 'UF_CRM_GE_PARTNER_TYPE', kind)
+                if eid and not d.get('UF_CRM_GE_PARTNER_TYPE'):
+                    fields['ufCrmGePartnerType'] = eid
+                do('сделка %s «%s» → %s · %s (%s)' % (d['ID'], d['TITLE'], new, name, kind), 'crm.item.update', {'entityTypeId': 2, 'id': int(d['ID']), 'fields': fields})
+        elif not new and deals:
+            bad = [d for d in deals if 'TEST' not in d['TITLE']]
+            if bad:
+                print('  ! в %s есть нетестовые сделки (%s) — воронку не трогаю' % (old, ', '.join(d['ID'] for d in bad))); continue
+            for d in deals:
+                do('удалить тестовую сделку %s «%s»' % (d['ID'], d['TITLE']), 'crm.deal.delete', {'id': int(d['ID'])})
+        left = call('crm.deal.list', {'filter': {'CATEGORY_ID': oid}, 'select': ['ID']}).get('result', []) if APPLY else []
+        if APPLY and left:
+            print('  ! %s не пуста (%d) — не удаляю' % (old, len(left))); continue
+        do('удалить воронку ' + old, 'crm.category.delete', {'entityTypeId': 2, 'id': oid})
+
+
 def main():
     print('Режим:', 'ПРИМЕНЕНИЕ' if APPLY else 'план (ничего не меняю)')
     # 1. воронки сделок
@@ -200,6 +246,8 @@ def main():
     for name, process, won, lost, extra in PIPELINES:
         if name in by_name:
             ensure_stages(by_name[name], process, won, lost, extra)
+    # 2б. прежние воронки → Partners, Installments убрать (гл. 10, 12)
+    retire(by_name)
     # 3. статусы лидов и источники
     cur = {s['STATUS_ID']: s for s in call('crm.status.list', {'filter': {'ENTITY_ID': 'STATUS'}}).get('result', [])}
     for i, (sid, name, sem) in enumerate(LEAD_STATUSES):

@@ -1,5 +1,5 @@
 // QA 2.2 · 11 Обмен с Bitrix24 (§13, только исходящий): кандидат → лид Candidate; квалификация → контакт, сделка Partner clients, задача, лид Qualified;
-// бронь → стадии; «Договор подписан» → SPA signed; оплата → Won + Installments + Aftercare; согласия → поля; удаление → лид удалён.
+// бронь → стадии; «Договор подписан» → SPA signed; оплата → Won + Aftercare (оплата — полем, без Installments); согласия → поля; удаление → лид удалён.
 // Запуск только на отдельном экземпляре с вебхуком (QA_URL=:3044, B24_WEBHOOK задан). Всё созданное в Bitrix24 удаляется в конце.
 import { test, after, before } from 'node:test'
 import assert from 'node:assert/strict'
@@ -54,7 +54,7 @@ test('квалификация → контакт, сделка Partner clients 
   assert.equal((await b24('crm.lead.get', { id: c.b24_lead_id })).STATUS_ID, 'CONVERTED')
   sale = r.result.id
 })
-test('бронь → Reservation request → Reserved → KYC → SPA signed → Won; Installments и Aftercare', { skip }, async () => {
+test('бронь → Reservation request → Reserved → KYC → SPA signed → Won; Aftercare с долей оплаты (без Installments)', { skip }, async () => {
   const u = await freeUnit()
   await act(P, 'createBooking', { unit: u.id, client: sale, discount: 0 })
   const c = await client(sale)
@@ -73,11 +73,11 @@ test('бронь → Reservation request → Reserved → KYC → SPA signed →
   await act(FI, 'dealPaid', { id: d.id, paid: 30 })
   assert.equal(await stageName(c.b24_deal_id), 'Won')
   const pd = await one('select b24_inst_id, b24_after_id from portal.deals where id = $1', [d.id])
-  assert.ok(pd.b24_inst_id && pd.b24_after_id, 'Installments или Aftercare не созданы')
-  made.deal.add(Number(pd.b24_inst_id)); made.deal.add(Number(pd.b24_after_id))
-  assert.equal(await stageName(pd.b24_inst_id), 'Paying')
+  assert.ok(pd.b24_after_id, 'Aftercare не создана'); assert.ok(!pd.b24_inst_id, 'создана сделка Installments — её больше нет (гл. 12)')
+  made.deal.add(Number(pd.b24_after_id))
+  assert.equal(Number((await b24('crm.deal.get', { id: pd.b24_after_id })).UF_CRM_GE_PAID_PCT), 30, 'доля оплаты не в поле Aftercare')
   await act(FI, 'dealPaid', { id: d.id, paid: 100 })
-  assert.equal(await stageName(pd.b24_inst_id), 'Paid in full')
+  assert.equal(Number((await b24('crm.deal.get', { id: pd.b24_after_id })).UF_CRM_GE_PAID_PCT), 100, 'полная оплата не в поле Aftercare')
 })
 test('согласие клиента → поля контакта; Do not contact', { skip }, async () => {
   const c = await client(sale)
@@ -106,4 +106,16 @@ test('удаление по запросу: лид без сделки удал�
 test('очередь обмена: ошибок нет', { skip }, async () => {
   const bad = await q(`select kind, last_error from portal.b24_jobs where status in ('error','dead') and created_at > now() - interval '30 minutes'`)
   assert.equal(bad.length, 0, JSON.stringify(bad))
+})
+test('заявка партнёра → сделка в воронке Partners рынка, тип — полем (гл. 10, без Agencies / Sub-agents)', { skip }, async () => {
+  const email = `qa-apply-${Date.now().toString(36)}@qa.test`
+  await act(null, 'applyAgent', { kind: 'agency', name: 'QA Apply TEST', company: 'QA Apply TEST GmbH', email, phone: '+49 151 ' + String(Date.now()).slice(-7), market: 'DE', consent: 'on', lang: 'de' })
+  const a = await one('select id, b24_deal_id, b24_contact_id from portal.agent_applications where email = $1', [email])
+  assert.ok(a?.b24_deal_id, 'сделка заявки не создана')
+  made.deal.add(Number(a.b24_deal_id)); if (a.b24_contact_id) made.contact.add(Number(a.b24_contact_id))
+  const d = await b24('crm.deal.get', { id: a.b24_deal_id })
+  const cats = (await b24('crm.category.list', { entityTypeId: 2 })).categories
+  assert.equal(cats.find((c) => String(c.id) === String(d.CATEGORY_ID))?.name, 'Partners DE')
+  assert.ok(d.UF_CRM_GE_PARTNER_TYPE, 'тип партнёра не заполнен')
+  assert.ok(!cats.some((c) => /^(Agencies|Sub-agents) |^Installments$/.test(c.name)), 'остались прежние воронки')
 })
