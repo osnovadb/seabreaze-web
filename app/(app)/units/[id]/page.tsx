@@ -44,7 +44,8 @@ export default async function UnitPage(
   // QA 10.11 (строка 11 свода, этап 3 калькулятора): чужая бронь партнёру — не 404, а «бронь» с листом ожидания; его варианты и подборки остаются доступны.
   // Кто бронирует и по какой цене — по-прежнему только команде (блок «Только для команды»)
   const raw = codeFor(u, c.user, mode)
-  const code = raw === 'X' && mode === 'agent' && !u.hidden && !u.deal_id && !!u.booking_id && u.status !== 'sold' ? 'O' : raw
+  // QA 10.11: проданная (наша сделка или продано у застройщика) — «Продано», бронь застройщика — «Бронь застройщика», а не 404 (квартира бывает в подборке партнёра)
+  const code = raw !== 'X' || mode !== 'agent' || u.hidden ? raw : u.deal_id || u.status === 'sold' ? 'S' : u.booking_id ? 'O' : u.status === 'reserved' ? 'B' : raw
   if (code === 'X') notFound()
   const proj = (await q<{ slug: string; name: string }>('select slug, name from projects where id = $1', [u.project_id]))[0]
   const ext = isExternal(c.user.role)

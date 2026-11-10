@@ -8,6 +8,7 @@ import { offersFor, promoOf, promoMode } from '@/lib/promo'
 import { fxFor } from '@/lib/fx'
 import { ScheduleTable } from '@/components/Calculator'
 import { openedSelection, likeSelVariant } from '@/lib/actions'
+import { getCtx } from '@/lib/auth'
 import { selectionVariants, clientVisible, clientCalc } from '@/lib/selVariants'
 import { DESIGN } from '@/components/ui'
 
@@ -22,7 +23,8 @@ export default async function PublicSelection(
     `select s.id, s.lang, cl.name client, cl.market, u.name agent, u.email agent_email, s.title, u.role in ('agent','agency_head') partner, a.name agency
      from portal.selections s join portal.clients cl on cl.id = s.client_id join portal.users u on u.id = s.user_id left join portal.agencies a on a.id = u.agency_id where s.token = $1`, [params.token])
   if (!s) notFound()
-  if (!searchParams.preview) await openedSelection(params.token)
+  // QA 10.11: сотрудник под своим входом — не клиент: «открывал» не растёт, автору не пишем
+  if (!searchParams.preview && !(await getCtx())) await openedSelection(params.token)
   const L = s.lang, T = (x: string, v?: Record<string, string | number>) => t(L, x, v)
   const items = await q<{ unit_id: string; note: string | null; plan_id: string | null }>('select unit_id, note, plan_id from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
@@ -61,7 +63,7 @@ export default async function PublicSelection(
                     <div className="h2">{T('Квартира {n}', { n: unitNo(u) })}</div>
                     <div className="muted">{pr?.name} · {u.building} · {T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
                     {free && promoBy(u).promo && <div className="mt16"><span className="pill pill--ok">{promoBy(u).promo!.badge || T('Акция')}</span> <span className="small muted">{promoBy(u).promo!.name}</span></div>}
-                    <div className="big mt16">{free && u.usd ? (promoBy(u).promo ? <>{usd(L, priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T('Уже забронирована')}</div>
+                    <div className="big mt16">{free && u.usd ? (promoBy(u).promo ? <>{usd(L, priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T(u.status === 'sold' || u.deal_id ? 'Уже продана' : 'Уже забронирована')}</div>
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
                     {(u.finish === 'shell' || img) && <div className="small muted mt8">{[u.finish === 'shell' ? T('Сдаётся без ремонта') : '', img ? T('на фото — пример дизайна застройщика') : ''].filter(Boolean).join('; ')}.</div>}
                   </div>
@@ -70,9 +72,9 @@ export default async function PublicSelection(
                 {free && u.usd && (sv.get(u.id) || []).some((v) => calcs.has(v.variant_id)) && (
                   <div style={{ padding: '0 20px 20px' }}>
                     <div className="label">{T('Варианты оплаты')}</div>
-                    <div className="vcalc__cmp mt8">{(sv.get(u.id) || []).filter((v) => calcs.has(v.variant_id)).map((v) => { const r = calcs.get(v.variant_id)!
+                    <div className="vcalc__cmp mt8">{(sv.get(u.id) || []).filter((v) => calcs.has(v.variant_id)).map((v, vi) => { const r = calcs.get(v.variant_id)!
                       return <div key={v.variant_id} className="card card--tight stack" style={{ gap: 4 }}>
-                        <b className="small">{v.name}</b>
+                        <b className="small">{T('Вариант {n}', { n: vi + 1 })}</b>{/* QA 10.11: внутреннее название варианта клиенту не показываем */}
                         <div className="kv small"><span>{T('Цена')}</span><b>{usd(L, r.total)}</b></div>
                         <div className="kv small"><span>{T('Первый взнос')}</span><span>{usd(L, r.down)} · {pct(L, r.downPct)}</span></div>
                         <div className="kv small"><span>{T('Платёж в месяц')}</span><span>{r.monthly ? `${usd(L, r.monthly)} × ${r.months}` : '—'}</span></div>

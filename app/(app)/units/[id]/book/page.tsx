@@ -26,7 +26,7 @@ export default async function Book(
   const cond = await conditionsFor(u.project_id, ext ? c.user : null)
   if (!cond) return <><Top title={T('Бронь {n}', { n: unitNo(u) })} /><div className="page"><div className="note">{T('Для проекта не заведены условия')}. {T('Брони откроются, когда владелец опубликует коммерческие условия проекта.')}</div></div></>
   const cs = clientScope(c.user)
-  const clients = await q<{ id: string; name: string; reg_no: string }>(`select id, name, reg_no from portal.clients cl where ${cs.sql} and stage not in ('handed') and (protected_until is null or protected_until >= current_date) order by last_activity_at desc`, cs.params)
+  const clients = await q<{ id: string; name: string; reg_no: string }>(`select id, name, reg_no from portal.clients cl where ${cs.sql} and stage not in ('handed') and cl.anonymized_at is null and (protected_until is null or protected_until >= current_date) order by last_activity_at desc`, cs.params)
   const proj = (await q<{ name: string }>('select name from projects where id = $1', [u.project_id]))[0]
   const plans = await plansFor(u.project_id, u.building_id)
   const fx = await fxFor(c.user.market, L)
@@ -35,7 +35,7 @@ export default async function Book(
   // Этап 3 калькулятора: бронь из варианта — переносим план, скидку, взнос и срок; несогласованный вариант не переносим
   const vr = searchParams.variant && /^[0-9a-f-]{36}$/.test(searchParams.variant) ? await one<{ id: string; name: string; params: VariantParams; client_id: string | null }>(
     `select id, name, params, client_id from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null)
-       and (author_id = $3 or $4 or client_id in (select id from portal.clients cl where ${cs.sql.replace(/\$(\d+)/g, (_, n) => '$' + (Number(n) + 4))}))`, [searchParams.variant, u.id, c.user.id, ['owner', 'market_head'].includes(c.user.role), ...cs.params]) : null
+       and (author_id = $3 or $4 or (not $5 and client_id in (select id from portal.clients cl where ${cs.sql.replace(/\$(\d+)/g, (_, n) => '$' + (Number(n) + 5))})))`, [searchParams.variant, u.id, c.user.id, ['owner', 'market_head'].includes(c.user.role), ext, ...cs.params]) : null
   // Активные брони тех же клиентов — к ним можно добавить эту квартиру пакетом (одним договором)
   const pkgs = clients.length ? await q<{ id: string; client_id: string; unit: string }>(`select b.id, b.client_id, portal.unit_no(bl.external_id, un.number) unit from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id
     where b.client_id = any($1) and b.status in ('requested','confirmed') and b.unit_id <> $2 order by b.created_at`, [clients.map((x) => x.id), u.id]) : []

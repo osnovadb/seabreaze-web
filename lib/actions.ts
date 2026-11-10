@@ -449,7 +449,9 @@ export async function createBooking(_: unknown, f: FormData) {
   const cl = await stageGuard(c, clientId).catch(() => null)
   if (!cl) return { error: 'Этот клиент не закреплён за вами' }
   // §10: кандидата застройщикам не передаём — сначала квалификация
-  if ((await one<{ a: string }>('select attach_status a from portal.clients where id = $1', [clientId]))?.a === 'candidate') return { error: 'Сначала квалифицируйте клиента: цель, бюджет, срок, страна и язык' }
+  const st = await one<{ a: string; anon: boolean }>('select attach_status a, anonymized_at is not null anon from portal.clients where id = $1', [clientId])
+  if (st?.anon) return { error: 'Данные клиента удалены по запросу — бронь невозможна' } // QA 10.11
+  if (st?.a === 'candidate') return { error: 'Сначала квалифицируйте клиента: цель, бюджет, срок, страна и язык' }
   // §7 п.1: свой холд превращается в запрос; чужой холд блокирует запрос на 24 часа — можно встать в лист ожидания
   const myHold = unit.booking_status === 'hold' && unit.booking_agent === c.user.id
   if (unit.booking_status === 'hold' && !myHold) return { error: 'Квартиру придержал другой — запрос станет доступен после снятия холда; можно встать в лист ожидания' }
@@ -470,8 +472,8 @@ export async function createBooking(_: unknown, f: FormData) {
   // Этап 3 калькулятора: бронь из варианта — согласованная (или не требовавшая согласования) скидка варианта второй раз не согласуется
   const vid = s(f, 'variant')
   const vr = /^[0-9a-f-]{36}$/.test(vid) ? await one<{ id: string; name: string; params: { downPct: number; months: number; disc: number; start?: string; planId?: string | null } }>(
-    `select id, name, params from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null) and (author_id = $3 or client_id = $4 or $5)`,
-    [vid, unit.id, c.user.id, clientId, ['owner', 'market_head'].includes(c.user.role)]) : null
+    `select id, name, params from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null) and (author_id = $3 or (client_id = $4 and not $6) or $5)`,
+    [vid, unit.id, c.user.id, clientId, ['owner', 'market_head'].includes(c.user.role), extReq]) : null
   const byVariant = !!vr && disc <= Number(vr.params.disc || 0) + 1e-9
   if (extReq && disc > cap && !f.get('ask') && !byVariant) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
   // QA 10.11 (Ревью): партнёрский запрос — до нейтрального потолка, не равного пулу (иначе перебором находится размер пула); отказ — за руководителем рынка
@@ -706,7 +708,7 @@ export async function selectionUpdate(f: FormData) {
   for (const unit of f.getAll('vunit').map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x))) {
     const want = f.getAll(`vars:${unit}`).map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x))
     const ok = want.length ? (await q<{ id: string }>(`select id from portal.calc_variants where id = any($1::uuid[]) and unit_id = $2
-        and (author_id = $3 or client_id = $4 or $5) and (not needs_approval or approved_at is not null)`, [want, unit, c.user.id, selCl, ['owner', 'market_head'].includes(c.user.role)])).map((r) => r.id) : []
+        and (author_id = $3 or (client_id = $4 and not $6) or $5) and (not needs_approval or approved_at is not null)`, [want, unit, c.user.id, selCl, ['owner', 'market_head'].includes(c.user.role), isExternal(c.user.role)])).map((r) => r.id) : []
     const keep = want.filter((x) => ok.includes(x)).slice(0, MAX_SEL_VARIANTS)
     await q('delete from portal.selection_variants where selection_id = $1 and unit_id = $2 and not (variant_id = any($3::uuid[]))', [id, unit, keep])
     for (const [i, vid] of keep.entries()) await q(`insert into portal.selection_variants (selection_id, unit_id, variant_id, sort, created_by) values ($1,$2,$3,$4,$5)
@@ -733,7 +735,7 @@ export async function openedSelection(token: string) {
   if (!r) return
   const cl = await one<{ name: string }>('select name from portal.clients where id = $1', [r.client_id])
   await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Клиент открыл подборку (раз: {n})',$2)`, [r.client_id, { n: r.opened }])
-  await notify(r.user_id, 'selection', '{c} открыл подборку — хороший момент позвонить', `/clients/${r.client_id}`, { c: cl?.name || '' })
+  await notify(r.user_id, 'selection', 'Подборку открыли: {c} — хороший момент позвонить', `/clients/${r.client_id}`, { c: cl?.name || '' })
 }
 
 /* ── Заявка агента (публичная) и проверка ── */

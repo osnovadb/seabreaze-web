@@ -9,7 +9,12 @@ const to = (req: NextRequest, path: string) => {
 }
 export function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname
-  if (PUBLIC.some((x) => p.startsWith(x))) return NextResponse.next()
+  if (PUBLIC.some((x) => p.startsWith(x))) {
+    // QA 10.11 (WCAG, р. 273): у страницы подборки <html lang> — язык подборки; макету нужен путь
+    if (!p.startsWith('/s/')) return NextResponse.next()
+    const h = new Headers(req.headers); h.set('x-path', p)
+    return NextResponse.next({ request: { headers: h } })
+  }
   // Bitrix24: обработчик приложения и установки принимают POST без нашей cookie — сотрудника проверяем через user.current
   if (p === '/b24' || p === '/b24/install') return NextResponse.next()
   if (!req.cookies.get('ge_s')) return NextResponse.redirect(to(req, '/login'))

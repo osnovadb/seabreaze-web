@@ -5,6 +5,7 @@ import { q, one, audit, notify } from './db'
 import { requireCtx } from './auth'
 import { t } from './i18n'
 import { projectVisible } from './catalog'
+import { clientScope } from './scope'
 import { calcInputs, runVariant, snapshotOf, type VariantParams } from './variants'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
@@ -45,6 +46,9 @@ export async function saveVariant(_: unknown, f: FormData) {
     const n = await one<{ n: number }>('select count(*)::int n from portal.calc_variants where unit_id = $1 and author_id = $2', [unitId, c.user.id])
     if (n!.n >= MAX_PER_UNIT) return { error: t(c.lang, 'Не больше {n} вариантов на квартиру — удалите лишние', { n: MAX_PER_UNIT }) }
     const client = s(f, 'client') || null
+    // QA 10.11: вариант — только на своего (видимого) клиента, не на обезличенного
+    const cs = clientScope(c.user)
+    if (client && !(await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and cl.anonymized_at is null and ${cs.sql}`, [...cs.params, client]))) return { error: t(c.lang, 'Клиент недоступен') }
     await q(`insert into portal.calc_variants (unit_id, author_id, client_id, name, params, snapshot, needs_approval) values ($1,$2,$3,$4,$5,$6,$7)`,
       [unitId, c.user.id, client, name, params, snapshotOf(r, inp.base.list), r.needsApproval])
   }

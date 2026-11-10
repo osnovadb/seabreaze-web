@@ -107,7 +107,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         {self === 'agent' && <div className="tiny muted">{T('Фикс {f} от итоговой цены + остаток вашей части пула после скидки', { f: pct(lang, cond?.agent_fix_pct || 0) })}</div>}</details>}
       {unitId && !client && <form action={saveAct} className="row noprint" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }} onSubmit={() => setVname('')}>
         <input type="hidden" name="unit" value={unitId} /><input type="hidden" name="params" value={params} />
-        <label className="field" style={{ flex: '1 1 220px' }}><span>{T('Название варианта')}</span><input className="in" name="name" value={vname} onChange={(e) => setVname(e.target.value)} placeholder={T('Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки') })} maxLength={80} /></label>
+        <label className="field" style={{ flex: '1 1 220px' }}><span title={T('Клиент видит «Вариант 1–3»')}>{T('Название варианта (только для вас)')}</span><input className="in" name="name" value={vname} onChange={(e) => setVname(e.target.value)} placeholder={T('Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки') })} maxLength={80} /></label>
         {clients.length > 0 && <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Клиент (необязательно)')}</span><select className="in" name="client" defaultValue=""><option value="">—</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
         {ask && ceiling > 0 && (!asking
           ? <button type="button" className="btn" onClick={() => setAsking(true)}>{T('Попросить больше')}</button>

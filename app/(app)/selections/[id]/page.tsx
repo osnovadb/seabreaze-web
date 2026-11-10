@@ -11,6 +11,7 @@ import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
 import { needUuid } from '@/lib/ids'
+import { isExternal } from '@/lib/perm'
 import { selectionVariants, MAX_SEL_VARIANTS } from '@/lib/selVariants'
 import type { Snapshot } from '@/lib/variants'
 
@@ -30,9 +31,12 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
   // Этап 3 калькулятора: варианты расчёта по квартирам подборки — свои, на этого клиента или (руководителю) все
   const attached = await selectionVariants(s.id)
   const head = ['owner', 'market_head'].includes(c.user.role)
+  // QA 10.11: менять подборку может автор или владелец (selectionUpdate) — остальным кнопку не показываем
+  const canEdit = (s.user_id === c.user.id || c.user.role === 'owner') && !c.impersonating
+  const author = canEdit ? null : (await one<{ name: string }>('select name from portal.users where id = $1', [s.user_id]))?.name
   const avail = items.length ? await q<{ id: string; unit_id: string; name: string; snapshot: Snapshot; needs_approval: boolean; approved_at: string | null; author: string; mine: boolean }>(
     `select v.id, v.unit_id, v.name, v.snapshot, v.needs_approval, v.approved_at, a.name author, v.author_id = $2 mine from portal.calc_variants v join portal.users a on a.id = v.author_id
-     where v.unit_id = any($1::uuid[]) and (v.author_id = $2 or v.client_id = $3 or $4) order by v.created_at`, [items.map((i) => i.unit_id), c.user.id, s.client_id, head]) : []
+     where v.unit_id = any($1::uuid[]) and (v.author_id = $2 or ((v.client_id = $3 and not $5) or $4)) order by v.created_at`, [items.map((i) => i.unit_id), c.user.id, s.client_id, head, isExternal(c.user.role)]) : []
   const host = (await headers()).get('x-forwarded-host') || (await headers()).get('host')
   const proto = (await headers()).get('x-forwarded-proto') || 'http'
   const link = `${proto}://${host}/s/${s.token}`
@@ -85,7 +89,8 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
               </div>
             )
           })}
-          <button className="btn">{T('Сохранить заметки, графики и варианты')}</button>
+          {canEdit ? <button className="btn">{T('Сохранить заметки, графики и варианты')}</button>
+            : <div className="note small">{T('Менять подборку может её автор ({a}) или владелец', { a: author || '—' })}</div>}
         </form>
         <div className="stack">
           <form action={selectionUpdate} className="card stack" style={{ gap: 10 }}>

@@ -10,6 +10,7 @@ import { bookingAction } from '@/lib/actions'
 
 type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
+const PAGE = 200 // QA 10.11: «Все» у руководителя рынка — тысяча строк одним списком
 export default async function Bookings(
   props: { searchParams: Promise<{ f?: string; created?: string; s?: string; contract?: string }> }
 ) {
@@ -40,7 +41,7 @@ export default async function Bookings(
     from projects p where exists (select 1 from portal.conditions x where x.project_id = p.id and x.status = 'published') order by p.sort, p.name`)
   return (
     <>
-      <Top title={T('Брони')} sub={ext ? T('Ваши брони. Лимит — в условиях проекта.') : T('Активные брони по всем проектам. Лимит у застройщика: Premium — до 10 одновременно.')} />
+      <Top title={T('Брони')} sub={ext ? T('Ваши брони. Лимит — в условиях проекта.') : T('Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.')} />
       <div className="page">
         {searchParams.created && <div className="okbox" style={{ marginBottom: 16 }}>{rows.find((r) => r.id === searchParams.created)?.approval === 'pending' ? T('Бронь поставлена. Скидка сверх вашего порога ушла на согласование; после решения офис в Баку подтвердит бронь у застройщика.') : T('Бронь поставлена. Офис в Баку подтвердит её у застройщика — вы получите уведомление.')}</div>}
         <div className="grid g4">
@@ -55,7 +56,7 @@ export default async function Bookings(
             <thead><tr>{['Квартира', 'Клиент', ext ? '' : 'Агент / продавец', 'Цена', 'Срок', 'Осталось', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
             <tbody>
               {shown.length === 0 && <tr><td colSpan={8} className="muted">{T('Нет броней')}</td></tr>}
-              {shown.map((r) => {
+              {shown.slice(0, PAGE).map((r) => {
                 const left = Math.ceil((new Date(r.ends_at).getTime() - now) / 86400000)
                 const total = Math.max(1, Math.ceil((new Date(r.ends_at).getTime() - new Date(r.starts_at).getTime()) / 86400000))
                 const live = ['requested', 'confirmed'].includes(r.status)
@@ -92,6 +93,7 @@ export default async function Bookings(
             </tbody>
           </table>
         </div>
+        {shown.length > PAGE && <div className="small muted mt8">{T('Показаны первые {n} из {t} — уточните поиск или вкладку', { n: PAGE, t: shown.length })}</div>}
       </div>
     </>
   )

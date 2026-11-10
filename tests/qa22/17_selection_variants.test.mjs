@@ -35,11 +35,24 @@ test('в подборку — до трёх вариантов; несоглас
   const at2 = (await q('select variant_id from portal.selection_variants where selection_id = $1 and unit_id = $2', [sel.id, u.id])).map((x) => x.variant_id)
   assert.deepEqual(at2.sort(), [over.id, vs[0].id].sort(), 'снятые галочки не сняли варианты или согласованный не прикрепился')
 })
+test('чужую подборку не меняют: сейлз не автор — заметка и варианты не сохраняются', async () => {
+  const S2 = await user('seller')
+  await act(S2, 'selectionUpdate', { id: sel.id, [`note:${u.id}`]: 'QA чужая заметка', vunit: u.id })
+  assert.notEqual((await one('select note from portal.selection_items where selection_id = $1 and unit_id = $2', [sel.id, u.id])).note, 'QA чужая заметка', 'не автор поменял заметку')
+  assert.ok((await one('select count(*)::int n from portal.selection_variants where selection_id = $1', [sel.id])).n > 0, 'не автор снял варианты')
+})
 test('страница клиента: варианты на языке подборки, без комиссий; «Мне подходит» → консультанту уведомление', async () => {
   await act(S, 'selectionUpdate', { id: sel.id, lang: 'en' })
   const p = await page(null, `/s/${sel.token}?preview=1`)
   assert.equal(p.status, 200)
-  assert.ok(p.html.includes('QA вариант 1') && p.html.includes('Payment options'), 'вариантов нет на странице клиента или не по-английски')
+  assert.ok(p.html.includes('Option 1') && p.html.includes('Payment options'), 'вариантов нет на странице клиента или не по-английски')
+  assert.ok(!p.html.includes('QA вариант') && !p.html.includes('QA скидка'), 'клиенту видно внутреннее название варианта')
+  assert.match(p.html, /<html lang="en"/, 'язык страницы не совпадает с языком подборки')
+  // сотрудник со своим входом — не клиент: «открывал» не растёт
+  const { cookie, BASE } = await import('./h.mjs')
+  const before = (await one('select opened from portal.selections where id = $1', [sel.id])).opened
+  await fetch(`${BASE}/s/${sel.token}`, { headers: { host: 'portal.pdna.pro', cookie: `ge_s=${await cookie(S)}` } })
+  assert.equal((await one('select opened from portal.selections where id = $1', [sel.id])).opened, before, 'сотрудник засчитан как клиент, открывший подборку')
   assert.ok(!/commission|комисс|pool|пул/i.test(p.html.replace(/<script[\s\S]*?<\/script>/g, '')), 'на странице клиента — комиссия или пул')
   const v1 = await one(`select variant_id from portal.selection_variants where selection_id = $1 and sort = (select min(sort) from portal.selection_variants where selection_id = $1)`, [sel.id])
   await act(null, 'likeSelVariant', { token: sel.token, variant: v1.variant_id })
