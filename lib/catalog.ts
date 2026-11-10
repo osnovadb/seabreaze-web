@@ -173,6 +173,9 @@ export const isLiving = (t: string) => !['commercial', 'parking', 'storage'].inc
 export const VIEW_NAME: Record<string, string> = { sea: 'на море', marina: 'на марину', park: 'на парк', yard: 'во двор', city: 'на улицу', mixed: 'на две стороны' }
 export const DIR_NAME: Record<string, string> = { N: 'север', NE: 'северо-восток', E: 'восток', SE: 'юго-восток', S: 'юг', SW: 'юго-запад', W: 'запад', NW: 'северо-запад' }
 
+// Сетка скидок застройщика за первый взнос (калькулятор вариантов): все ступени проекта — даты и блок фильтрует lib/calc activeGrid
+export const downGridFor = (projectId: string) => q<{ from_pct: number; discount_pct: number; building_id: string | null; valid_from: string | null; valid_to: string | null }>(
+  `select from_pct::float, discount_pct::float, building_id, valid_from::text, valid_to::text from portal.down_discounts where project_id = $1 order by from_pct`, [projectId])
 // Планы оплаты квартиры: весь проект или её блок, действующие сегодня
 export const plansFor = (projectId: string, buildingId: string | null) => q<Plan>(`select ${PLAN_COLS} from payment_plans
   where project_id = $1 and (building_id is null or building_id = $2) and (valid_from is null or valid_from <= current_date) and (valid_to is null or valid_to >= current_date) order by sort, name`, [projectId, buildingId])

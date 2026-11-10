@@ -267,6 +267,21 @@ export const savePlan = safe(async (_: unknown, f: FormData) => {
   return { ok: true }
 })
 
+/* ── Сетка скидок за первый взнос (калькулятор вариантов, 10.11) ── */
+export const saveDownDiscount = safe(async (_: unknown, f: FormData) => {
+  const c = await owner()
+  const pid = s(f, 'project'), id = s(f, 'id')
+  if (s(f, 'delete')) { await q('delete from portal.down_discounts where id = $1 and project_id = $2', [id, pid]); await log(c, 'object.down_discount_delete', 'project', pid); done(pid); return { ok: true } }
+  const from = num(f, 'from_pct'), disc = num(f, 'discount_pct')
+  if (from == null || from <= 0 || from > 100) return { error: t(c.lang, 'Первый взнос — от 1 до 100 %') }
+  if (disc == null || disc < 0 || disc >= 100) return { error: t(c.lang, 'Скидка — от 0 до 99 %') }
+  const vals = [s(f, 'building') || null, from, disc, s(f, 'valid_from') || null, s(f, 'valid_to') || null, s(f, 'note') || null]
+  if (id) await q(`update portal.down_discounts set building_id = $2, from_pct = $3, discount_pct = $4, valid_from = $5, valid_to = $6, note = $7 where id = $1 and project_id = $8`, [id, ...vals, pid])
+  else await q(`insert into portal.down_discounts (building_id, from_pct, discount_pct, valid_from, valid_to, note, project_id, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [...vals, pid, c.user.id])
+  await log(c, id ? 'object.down_discount_update' : 'object.down_discount_create', 'project', pid, { from, disc }); done(pid)
+  return { ok: true }
+})
+
 /* ── Видимость ── */
 export const saveAccess = safe(async (_: unknown, f: FormData) => {
   const c = await owner()

@@ -1,16 +1,18 @@
 import { cookies } from 'next/headers'
+import { activeGrid } from '@/lib/calc'
+import { VariantCalc } from '@/components/VariantCalc'
 import { fmtDelivery } from '@/lib/delivery'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import { t, usd, m2, date, dateTime, num } from '@/lib/i18n'
-import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, riserInfo, orientOf, orientText, riser } from '@/lib/catalog'
+import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, downGridFor, conditionsFor, riserInfo, orientOf, orientText, riser } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
 import { promoForUnit, offersFor, promoOf } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
-import { canBook, seesSource, isExternal } from '@/lib/perm'
+import { canBook, seesSource, isExternal, maxDiscount, discountCeiling } from '@/lib/perm'
 import { unitHistory } from '@/lib/unitEvents'
 import { polyStr } from '@/lib/geom'
 import { optionsFor } from '@/lib/options'
@@ -62,6 +64,11 @@ export default async function UnitPage(
   const opts = await optionsFor(u)
   const fx = await fxFor(c.user.market, L)
   const { promo, mode: promoMode } = await promoForUnit(u)
+  // калькулятор вариантов: сетка скидок за взнос (по блоку и датам), предел и порог скидки роли, доход «для себя»
+  const calcCond = await conditionsFor(u.project_id, c.user)
+  const grid = activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)
+  const role = c.user.role
+  const calcSelf: 'agent' | 'ours' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : null
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = CODE_NAME[code]
@@ -138,7 +145,7 @@ export default async function UnitPage(
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>
             )}
           </div>
-          {u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} />}
+          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? discountCeiling(role, calcCond) : 0} self={calcSelf} />}
           {!ext && (
             <div className="card card--sand">
               <div className="label" style={{ color: 'var(--bronze)' }}>{T('Только для команды')}</div>

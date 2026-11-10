@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import { activeGrid } from '@/lib/calc'
+import { VariantCalc } from '@/components/VariantCalc'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one } from '@/lib/db'
 import { t, usd, m2 } from '@/lib/i18n'
-import { unitById, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
+import { unitById, codeFor, planUrl, unitNo, projectVisible, plansFor, downGridFor } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
 import { promoForUnit } from '@/lib/promo'
@@ -54,7 +56,7 @@ export default async function ShowUnit(
         )}
         <div className="tiny muted mt16">{T('Квартиры сдаются без ремонта; на фото — пример дизайна застройщика.')}</div>
       </div>
-      {free && u.usd && <Calculator plans={plans} price={u.usd} lang={L} fx={fx} promo={promo} mode={mode} />}
+      {free && u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)} lang={L} fx={fx} promo={promo} mode={mode} />}
       </div>
     </div>
   )

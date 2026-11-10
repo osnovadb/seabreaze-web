@@ -18,11 +18,12 @@ function rowLabel(T: (s: string, v?: Record<string, string | number>) => string,
 }
 
 // Таблица графика: без состояния, поэтому годится и для подборки на сервере
-export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand }: {
-  plan: Plan; price: number; lang: Lang; fx: FxView; start?: string; expanded?: boolean; onExpand?: () => void
+export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand, rows: given }: {
+  plan?: Plan; price: number; lang: Lang; fx: FxView; start?: string; expanded?: boolean; onExpand?: () => void; rows?: Row[]
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
-  const rows = paymentRows(plan, price, start ? new Date(start + 'T00:00:00Z') : undefined)
+  // rows — уже посчитанный график (калькулятор вариантов); иначе — по плану
+  const rows = given || paymentRows(plan!, price, start ? new Date(start + 'T00:00:00Z') : undefined)
   const hidden = rows.length > SHOW + 2 && !expanded ? rows.length - SHOW - 1 : 0
   return (
     <div className="tbl-wrap mt8">
