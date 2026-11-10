@@ -17,9 +17,10 @@ import * as A10 from '@/lib/postActions'
 import * as A11 from '@/lib/devActions'
 import * as A12 from '@/lib/b24Actions'
 import * as A13 from '@/lib/b24ListActions'
+import * as A14 from '@/lib/variantActions'
 
 export const dynamic = 'force-dynamic'
-const ALL: Record<string, unknown> = { ...A1, ...A2, ...A3, ...A4, ...A5, ...A6, ...A7, ...A8, ...A9, ...A10, ...A11, ...A12, ...A13 }
+const ALL: Record<string, unknown> = { ...A1, ...A2, ...A3, ...A4, ...A5, ...A6, ...A7, ...A8, ...A9, ...A10, ...A11, ...A12, ...A13, ...A14 }
 
 export async function POST(req: Request) {
   if (process.env.QA_MODE !== '1') return NextResponse.json({ error: 'not found' }, { status: 404 })
