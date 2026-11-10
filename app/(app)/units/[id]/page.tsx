@@ -41,7 +41,10 @@ export default async function UnitPage(
   const u = await unitById(params.id)
   if (!u || (isExternal(c.user.role) && !(await projectVisible(u.project_id, c.user)))) notFound()
   const mode = viewMode(c.user, false)
-  const code = codeFor(u, c.user, mode)
+  // QA 10.11 (строка 11 свода, этап 3 калькулятора): чужая бронь партнёру — не 404, а «бронь» с листом ожидания; его варианты и подборки остаются доступны.
+  // Кто бронирует и по какой цене — по-прежнему только команде (блок «Только для команды»)
+  const raw = codeFor(u, c.user, mode)
+  const code = raw === 'X' && mode === 'agent' && !u.hidden && !u.deal_id && !!u.booking_id && u.status !== 'sold' ? 'O' : raw
   if (code === 'X') notFound()
   const proj = (await q<{ slug: string; name: string }>('select slug, name from projects where id = $1', [u.project_id]))[0]
   const ext = isExternal(c.user.role)
@@ -71,10 +74,10 @@ export default async function UnitPage(
   const role = c.user.role
   const calcSelf: 'agent' | 'ours' | 'seller' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : role === 'seller' ? 'seller' : null
   // этап 2: сохранённые варианты квартиры (свои; владельцу и руководителю рынка — все, для согласования)
-  const variants = (await variantsOf(u.id, c.user)).map((v) => ({ id: v.id, name: v.name, author: v.author, client: v.client, mine: v.author_id === c.user.id, needs_approval: v.needs_approval, approved_at: v.approved_at, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
+  const variants = (await variantsOf(u.id, c.user)).map((v) => ({ id: v.id, name: v.name, author: v.author, client: v.client, client_id: v.client_id, mine: v.author_id === c.user.id, needs_approval: v.needs_approval, approved_at: v.approved_at, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
-  const [cn, ck] = CODE_NAME[code]
+  const [cn, ck] = ext && code === 'O' ? (['Забронирована', 'warn'] as const) : CODE_NAME[code]
   // Лист ожидания (М12): на занятую, но не проданную квартиру
   const waitable = ['B', 'O', 'D', 'SB', 'N'].includes(code) && u.status !== 'sold'
   const myWait = waitable ? await q<{ client: string | null; pos: number }>(`select cl.name client, (select count(*)::int from portal.waitlist w2 where w2.unit_id = w.unit_id and w2.active and w2.created_at <= w.created_at) pos
@@ -100,7 +103,7 @@ export default async function UnitPage(
           {cur === 'floor' ? <div className="small muted mt8">{myCell ? T('Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.') : T('План этажа — квартира на нём ещё не размечена.')}</div> : cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
         </div>
           {/* калькулятор вариантов — под планировкой, на всю ширину левой колонки (место для сравнения вариантов) */}
-          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? (ext ? maxDiscount(role, calcCond) : discountCeiling(role, calcCond)) : 0} ask={ext} self={calcSelf} unitId={u.id} variants={variants} clients={clients.map((x) => ({ id: x.id, name: x.name }))} canApprove={['owner', 'market_head'].includes(role)} />}
+          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? (ext ? maxDiscount(role, calcCond) : discountCeiling(role, calcCond)) : 0} ask={ext} self={calcSelf} unitId={u.id} variants={variants} clients={clients.map((x) => ({ id: x.id, name: x.name }))} canApprove={['owner', 'market_head'].includes(role)} ownerView={c.user.role === 'owner'} bookable={code === 'F' && canBook(c.user.role) && u.sales_status === 'sales'} />}
         </div>
         <div className="stack">
           <div className="card">

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, dateTime } from '@/lib/i18n'
+import { t, usd, m2, dateTime, pct } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
 import { planLabel, type Plan } from '@/lib/plans'
 import { clientScope } from '@/lib/scope'
@@ -11,6 +11,8 @@ import { Top, Pill } from '@/components/ui'
 import { selectionUpdate } from '@/lib/actions'
 import { joinWaitlist } from '@/lib/waitActions'
 import { needUuid } from '@/lib/ids'
+import { selectionVariants, MAX_SEL_VARIANTS } from '@/lib/selVariants'
+import type { Snapshot } from '@/lib/variants'
 
 export default async function SelectionEdit(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -25,6 +27,12 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
   const plansBy = new Map<string, Plan[]>()
   for (const u of units.values()) { const k = u.project_id + ':' + (u.building_id || ''); if (!plansBy.has(k)) plansBy.set(k, await plansFor(u.project_id, u.building_id)) }
+  // Этап 3 калькулятора: варианты расчёта по квартирам подборки — свои, на этого клиента или (руководителю) все
+  const attached = await selectionVariants(s.id)
+  const head = ['owner', 'market_head'].includes(c.user.role)
+  const avail = items.length ? await q<{ id: string; unit_id: string; name: string; snapshot: Snapshot; needs_approval: boolean; approved_at: string | null; author: string; mine: boolean }>(
+    `select v.id, v.unit_id, v.name, v.snapshot, v.needs_approval, v.approved_at, a.name author, v.author_id = $2 mine from portal.calc_variants v join portal.users a on a.id = v.author_id
+     where v.unit_id = any($1::uuid[]) and (v.author_id = $2 or v.client_id = $3 or $4) order by v.created_at`, [items.map((i) => i.unit_id), c.user.id, s.client_id, head]) : []
   const host = (await headers()).get('x-forwarded-host') || (await headers()).get('host')
   const proto = (await headers()).get('x-forwarded-proto') || 'http'
   const link = `${proto}://${host}/s/${s.token}`
@@ -50,6 +58,21 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
                   <div className="small muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
                   <div className="mt8"><b>{u.usd ? usd(L, u.usd) : ''}</b></div>
                   <input className="in mt8" name={`note:${u.id}`} defaultValue={i.note || ''} placeholder={T('Заметка для клиента…')} />
+                  {(() => {
+                    const vs = avail.filter((v) => v.unit_id === u.id), on = new Set((attached.get(u.id) || []).map((x) => x.variant_id))
+                    return <div className="mt8">
+                      <input type="hidden" name="vunit" value={u.id} />
+                      <div className="label">{T('Варианты расчёта для клиента — до {n}', { n: MAX_SEL_VARIANTS })}</div>
+                      {vs.length === 0 && <div className="tiny muted">{T('Нет сохранённых вариантов.')} <Link className="bronze" href={`/units/${u.id}`}>{T('Рассчитать в калькуляторе →')}</Link></div>}
+                      {vs.map((v) => { const blocked = v.needs_approval && !v.approved_at, liked = (attached.get(u.id) || []).find((x) => x.variant_id === v.id)?.liked_at
+                        return <label key={v.id} className="kv check small" style={{ alignItems: 'center' }}>
+                          <span><input type="checkbox" name={`vars:${u.id}`} value={v.id} defaultChecked={on.has(v.id)} disabled={blocked && !on.has(v.id)} /> <b>{v.name}</b>{!v.mine && <span className="muted"> · {v.author}</span>}
+                            <div className="tiny muted">{usd(L, v.snapshot.total)} · {T('взнос {p}', { p: pct(L, v.snapshot.downPct) })}{v.snapshot.months ? ' · ' + T('{m} мес.', { m: v.snapshot.months }) : ''}{v.snapshot.disc > 0 ? ' · ' + T('скидка {p}', { p: pct(L, v.snapshot.disc) }) : ''}</div>
+                            {blocked && <div className="tiny warnc">{T('ждёт согласования скидки — клиенту не уйдёт')}</div>}{liked && <div className="tiny okc">♥ {T('клиенту подходит')}</div>}</span>
+                          {free && !blocked && <Link className="btn btn--sm" href={`/units/${u.id}/book?client=${s.client_id}&variant=${v.id}`}>{T('Запросить бронь')}</Link>}
+                        </label> })}
+                    </div>
+                  })()}
                   {(plansBy.get(u.project_id + ':' + (u.building_id || '')) || []).length > 0 && (
                     <label className="field mt8"><span>{T('График платежей для клиента')}</span>
                       <select key={`plan:${u.id}:${String(i.plan_id || '')}`} className="in" name={`plan:${u.id}`} defaultValue={i.plan_id || ''}>
@@ -62,7 +85,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
               </div>
             )
           })}
-          <button className="btn">{T('Сохранить заметки и графики')}</button>
+          <button className="btn">{T('Сохранить заметки, графики и варианты')}</button>
         </form>
         <div className="stack">
           <form action={selectionUpdate} className="card stack" style={{ gap: 10 }}>

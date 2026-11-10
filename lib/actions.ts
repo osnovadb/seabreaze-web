@@ -26,6 +26,7 @@ import { grantAccess, invite, noPassword } from './partnerAccess'
 import { computeShares, buildTranches } from './money22'
 import { requestConsent } from './consent'
 import { priceNegotiation } from './dict'
+import { MAX_SEL_VARIANTS } from './selVariants'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -437,6 +438,7 @@ export async function holdUnit(f: FormData) {
   back(`/units/${unit.id}`, { held: '1' })
 }
 
+const PARTNER_ASK_MAX = 50 // % — нейтральный потолок запроса скидки партнёром
 export async function createBooking(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canBook(c.user.role)) return { error: 'Нет прав на бронь' }
@@ -465,11 +467,18 @@ export async function createBooking(_: unknown, f: FormData) {
   const cap = maxDiscount(c.user.role, cond), ceiling = discountCeiling(c.user.role, cond)
   // 10.11 (Денис): партнёру ползунок — до его части пула; больше — только «Попросить больше» (ask=1), без показа нашей части и всего пула
   const extReq = isExternal(c.user.role)
-  if (extReq && disc > cap && !f.get('ask')) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
-  if (disc > ceiling) return { error: extReq ? t(c.lang, 'Такую скидку согласовать нельзя — уменьшите запрос') : t(c.lang, 'Скидка больше {p}% — только по запросу', { p: ceiling }) }
+  // Этап 3 калькулятора: бронь из варианта — согласованная (или не требовавшая согласования) скидка варианта второй раз не согласуется
+  const vid = s(f, 'variant')
+  const vr = /^[0-9a-f-]{36}$/.test(vid) ? await one<{ id: string; name: string; params: { downPct: number; months: number; disc: number; start?: string; planId?: string | null } }>(
+    `select id, name, params from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null) and (author_id = $3 or client_id = $4 or $5)`,
+    [vid, unit.id, c.user.id, clientId, ['owner', 'market_head'].includes(c.user.role)]) : null
+  const byVariant = !!vr && disc <= Number(vr.params.disc || 0) + 1e-9
+  if (extReq && disc > cap && !f.get('ask') && !byVariant) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
+  // QA 10.11 (Ревью): партнёрский запрос — до нейтрального потолка, не равного пулу (иначе перебором находится размер пула); отказ — за руководителем рынка
+  if (extReq ? disc > PARTNER_ASK_MAX : disc > ceiling) return { error: extReq ? t(c.lang, 'Скидка больше {p}% не запрашивается', { p: PARTNER_ASK_MAX }) : t(c.lang, 'Скидка больше {p}% — только по запросу', { p: ceiling }) }
   const askNote = String(f.get('ask_note') || '').trim().slice(0, 500)
   // Сверх своего порога — бронь ставится, но ждёт согласования владельца или руководителя рынка (офис не подтверждает до решения)
-  const approval = disc > cap ? 'pending' : null
+  const approval = disc > cap && !byVariant ? 'pending' : null
   const active = await one<{ cl: number; ag: number; tot: number }>(`select
       count(*) filter (where client_id = $1)::int cl, count(*) filter (where agent_id = $2)::int ag, count(*)::int tot
     from portal.bookings where project_id = $3 and status in ('requested','confirmed')`, [clientId, c.user.id, unit.project_id])
@@ -510,7 +519,8 @@ export async function createBooking(_: unknown, f: FormData) {
       status, queued_at, queue_until, developer_id, tour_from, tour_to, signing, comment)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18,
       $19, case when $19 = 'queued' then now() end, case when $19 = 'queued' then now() + interval '7 days' end, $20, $21, $22, $23, $24) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null,
+      variant: vr ? { id: vr.id, name: vr.name, downPct: vr.params.downPct, months: vr.params.months, disc: vr.params.disc, start: vr.params.start || null } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
       queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
     .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e }) // одновременный второй запрос на ту же квартиру
   if (!b) return { error: 'Квартира уже недоступна — встаньте в лист ожидания' }
@@ -518,6 +528,7 @@ export async function createBooking(_: unknown, f: FormData) {
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: unitNo(unit), d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
+  if (vr) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь по варианту «{n}»: взнос {p}%, срок {m} мес.',$3)`, [clientId, c.user.id, { n: vr.name, p: vr.params.downPct, m: vr.params.months }])
   const u = unitNo(unit)
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
@@ -689,7 +700,33 @@ export async function selectionUpdate(f: FormData) {
   for (const [k, v] of f.entries()) if (k.startsWith('note:')) await q('update portal.selection_items set note = $3 where selection_id = $1 and unit_id = $2', [id, k.slice(5), String(v) || null])
   // План оплаты у квартиры подборки — по нему клиент видит график платежей (М7)
   for (const [k, v] of f.entries()) if (k.startsWith('plan:')) await q('update portal.selection_items set plan_id = $3 where selection_id = $1 and unit_id = $2', [id, k.slice(5), /^[0-9a-f-]{36}$/.test(String(v)) ? String(v) : null])
+  // Этап 3 калькулятора: до трёх вариантов расчёта на квартиру. Только свои, на этого клиента или (руководителю) любые;
+  // клиенту уходит вариант без согласования или согласованный — несогласованный не прикрепляется
+  const selCl = (await one<{ client_id: string }>('select client_id from portal.selections where id = $1', [id]))!.client_id
+  for (const unit of f.getAll('vunit').map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x))) {
+    const want = f.getAll(`vars:${unit}`).map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x))
+    const ok = want.length ? (await q<{ id: string }>(`select id from portal.calc_variants where id = any($1::uuid[]) and unit_id = $2
+        and (author_id = $3 or client_id = $4 or $5) and (not needs_approval or approved_at is not null)`, [want, unit, c.user.id, selCl, ['owner', 'market_head'].includes(c.user.role)])).map((r) => r.id) : []
+    const keep = want.filter((x) => ok.includes(x)).slice(0, MAX_SEL_VARIANTS)
+    await q('delete from portal.selection_variants where selection_id = $1 and unit_id = $2 and not (variant_id = any($3::uuid[]))', [id, unit, keep])
+    for (const [i, vid] of keep.entries()) await q(`insert into portal.selection_variants (selection_id, unit_id, variant_id, sort, created_by) values ($1,$2,$3,$4,$5)
+      on conflict (selection_id, variant_id) do update set sort = excluded.sort`, [id, unit, vid, i, c.user.id])
+  }
   revalidatePath(`/selections/${id}`)
+}
+
+// Клиент на странице подборки отмечает вариант «подходит» (ещё раз — снимает); консультанту — уведомление
+export async function likeSelVariant(f: FormData) {
+  const token = s(f, 'token'), vid = s(f, 'variant')
+  const r = await one<{ liked: boolean; client_id: string; user_id: string; name: string; unit: string }>(`update portal.selection_variants sv set liked_at = case when sv.liked_at is null then now() end
+    from portal.selections se, portal.calc_variants v where se.id = sv.selection_id and v.id = sv.variant_id and se.token = $1 and sv.variant_id = $2::uuid
+    returning sv.liked_at is not null liked, se.client_id, se.user_id, v.name, (select portal.unit_no(bl.external_id, u.number) from units u join buildings bl on bl.id = u.building_id where u.id = sv.unit_id) unit`, [token, /^[0-9a-f-]{36}$/.test(vid) ? vid : null])
+  if (!r) return
+  if (r.liked) {
+    await q(`insert into portal.activities (client_id, kind, text, vars) values ($1,'system','Клиенту подходит вариант «{n}» по квартире {u}',$2)`, [r.client_id, { n: r.name, u: r.unit }])
+    await notify(r.user_id, 'selection', 'Клиенту подходит вариант «{n}» по квартире {u} — можно запросить бронь', `/clients/${r.client_id}`, { n: r.name, u: r.unit })
+  }
+  revalidatePath(`/s/${token}`)
 }
 export async function openedSelection(token: string) {
   const r = await one<{ id: string; client_id: string; user_id: string; opened: number }>(`update portal.selections set opened = opened + 1, last_opened_at = now() where token = $1 returning id, client_id, user_id, opened`, [token])

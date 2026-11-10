@@ -13,16 +13,16 @@ import { t, usd, pct, num, date, type Lang } from '@/lib/i18n'
 import { ScheduleTable, type FxView } from './Calculator'
 
 // Сохранённый вариант (этап 2): настройки + снимок сумм на момент сохранения; текущие суммы пересчитываем здесь же
-export type VariantView = { id: string; name: string; author: string; client: string | null; mine: boolean; needs_approval: boolean; approved_at: string | null; created_at: string
+export type VariantView = { id: string; name: string; author: string; client: string | null; client_id?: string | null; mine: boolean; needs_approval: boolean; approved_at: string | null; created_at: string
   params: { downPct: number; months: number; disc: number; start?: string; options?: string[]; planId?: string | null }; snapshot: { total: number; down: number; monthly: number; months: number } }
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date())
 const SIGN = { EUR: '€', ILS: '₪' } as const
 
-export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false, ask = false }: {
+export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false, ownerView = false, ask = false, bookable = false }: {
   list: number; plans: Plan[]; grid?: DownStep[]; promo?: PromoView | null; mode?: PromoMode; options?: Opt[]; fx: FxView; lang: Lang
   cond?: SplitCond | null; ext?: boolean; cap?: number; ceiling?: number; self?: 'agent' | 'ours' | 'seller' | null; title?: string; client?: boolean
-  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean; ask?: boolean
+  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean; ownerView?: boolean; ask?: boolean; bookable?: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   // старт — с плана рассрочки (QA: открывался на «100% сразу»); дальше план выбирается сам по взносу и сроку, чип — только подсказка-пресет
@@ -135,8 +135,10 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
             {v.needs_approval && <span className={'pill ' + (v.approved_at ? 'pill--ok' : 'pill--warn')}>{T(v.approved_at ? 'скидка согласована' : 'нужно согласование')}</span>}
             <div className="row noprint" style={{ gap: 4, marginTop: 4 }}>
               <button type="button" className="btn btn--sm" onClick={() => load(v)}>{T('Открыть')}</button>
+              {bookable && unitId && (!v.needs_approval || v.approved_at) && <a className="btn btn--sm btn--p" href={`/units/${unitId}/book?variant=${v.id}${v.client_id ? '&client=' + v.client_id : ''}`}>{T('Запросить бронь')}</a>}
               {canApprove && v.needs_approval && !v.approved_at && <form action={approveVariant}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--p">{T('Согласовать')}</button></form>}
-              {(v.mine || canApprove) && <form action={deleteVariant}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--ghost" title={T('Удалить')}>×</button></form>}
+              {/* QA 10.11: удалить может автор или владелец — руководителю рынка «×» не показываем (было: молча не срабатывало) */}
+              {(v.mine || ownerView) && <form action={deleteVariant}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--ghost" title={T('Удалить')}>×</button></form>}
             </div>
           </div> })}</div>
       </div>}

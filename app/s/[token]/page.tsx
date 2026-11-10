@@ -1,13 +1,14 @@
 import { PrintButton } from '@/components/PrintButton'
 import { notFound } from 'next/navigation'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, date, isRtl, type Lang } from '@/lib/i18n'
+import { t, usd, m2, date, pct, isRtl, type Lang } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
 import { priceChain, planLabel } from '@/lib/plans'
 import { offersFor, promoOf, promoMode } from '@/lib/promo'
 import { fxFor } from '@/lib/fx'
 import { ScheduleTable } from '@/components/Calculator'
-import { openedSelection } from '@/lib/actions'
+import { openedSelection, likeSelVariant } from '@/lib/actions'
+import { selectionVariants, clientVisible, clientCalc } from '@/lib/selVariants'
 import { DESIGN } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +36,10 @@ export default async function PublicSelection(
   // План, выбранный консультантом, и только если он ещё действует для этой квартиры
   const planOf = new Map<string, Awaited<ReturnType<typeof plansFor>>[number]>()
   for (const i of items) { const u = units.get(i.unit_id); if (u && i.plan_id) { const p = (await plansFor(u.project_id, u.building_id)).find((x) => x.id === i.plan_id); if (p) planOf.set(i.unit_id, p) } }
+  // Этап 3 калькулятора: варианты расчёта консультанта — только без согласования или согласованные; суммы — по действующей цене
+  const sv = await selectionVariants(s.id)
+  const calcs = new Map<string, NonNullable<Awaited<ReturnType<typeof clientCalc>>>>()
+  for (const list of sv.values()) for (const v of list.filter(clientVisible)) { const r = await clientCalc(v.unit_id, v.params); if (r) calcs.set(v.variant_id, r) }
   return (
     <div dir={isRtl(L) ? 'rtl' : 'ltr'} style={{ background: 'var(--sand)', minHeight: '100vh' }}>
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 20px 64px' }}>
@@ -62,7 +67,26 @@ export default async function PublicSelection(
                   </div>
                   {planUrl(u.plan_file) && <div className="planbox"><img src={planUrl(u.plan_file)!} alt="" /></div>}
                 </div>
-                {free && u.usd && planOf.get(u.id) && (() => { const p = planOf.get(u.id)!; return (
+                {free && u.usd && (sv.get(u.id) || []).some((v) => calcs.has(v.variant_id)) && (
+                  <div style={{ padding: '0 20px 20px' }}>
+                    <div className="label">{T('Варианты оплаты')}</div>
+                    <div className="vcalc__cmp mt8">{(sv.get(u.id) || []).filter((v) => calcs.has(v.variant_id)).map((v) => { const r = calcs.get(v.variant_id)!
+                      return <div key={v.variant_id} className="card card--tight stack" style={{ gap: 4 }}>
+                        <b className="small">{v.name}</b>
+                        <div className="kv small"><span>{T('Цена')}</span><b>{usd(L, r.total)}</b></div>
+                        <div className="kv small"><span>{T('Первый взнос')}</span><span>{usd(L, r.down)} · {pct(L, r.downPct)}</span></div>
+                        <div className="kv small"><span>{T('Платёж в месяц')}</span><span>{r.monthly ? `${usd(L, r.monthly)} × ${r.months}` : '—'}</span></div>
+                        <div className="kv small"><span>{T('Последний платёж')}</span><span>{r.last ? date(L, r.last) : '—'}</span></div>
+                        {r.disc > 0 && <div className="kv small"><span>{T('Скидка')}</span><span>{pct(L, r.disc)}</span></div>}
+                        {r.devAmt > 0 && <div className="kv small"><span>{T('Скидка застройщика за взнос')}</span><span>−{usd(L, r.devAmt)}</span></div>}
+                        {r.optionTitles.length > 0 && <div className="tiny muted">{T('Опции')}: {r.optionTitles.join(', ')}</div>}
+                        {r.approx && <span className="tiny muted">{T('ориентировочно')}</span>}
+                        <form action={likeSelVariant} className="noprint"><input type="hidden" name="token" value={params.token} /><input type="hidden" name="variant" value={v.variant_id} />
+                          <button className={'btn btn--sm' + (v.liked_at ? ' btn--p' : '')} disabled={!!searchParams.preview}>{v.liked_at ? '♥ ' + T('Подходит') : T('Мне подходит')}</button></form>
+                      </div> })}</div>
+                    <div className="tiny muted mt8">{T('Расчёт предварительный: даты — ориентир от первого взноса; точный график и суммы — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
+                  </div>)}
+                {free && u.usd && planOf.get(u.id) && !(sv.get(u.id) || []).some((v) => calcs.has(v.variant_id)) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
                     <div className="label">{T('График платежей')} · {planLabel(T, p.name)}</div>
                     <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).base} lang={L} fx={fx} />

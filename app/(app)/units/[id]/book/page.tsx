@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
-import { q } from '@/lib/db'
+import { q, one } from '@/lib/db'
+import type { VariantParams } from '@/lib/variants'
 import { t, m2 } from '@/lib/i18n'
 import { unitById, conditionsFor, viewMode, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
 import { isExternal, maxDiscount, canBook, discountCeiling } from '@/lib/perm'
@@ -13,7 +14,7 @@ import { promoForUnit } from '@/lib/promo'
 import { optionsFor } from '@/lib/options'
 
 export default async function Book(
-  props: { params: Promise<{ id: string }>; searchParams: Promise<{ client?: string }> }
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ client?: string; variant?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
@@ -31,6 +32,10 @@ export default async function Book(
   const fx = await fxFor(c.user.market, L)
   const { promo, mode } = await promoForUnit(u)
   const options = await optionsFor(u)
+  // Этап 3 калькулятора: бронь из варианта — переносим план, скидку, взнос и срок; несогласованный вариант не переносим
+  const vr = searchParams.variant && /^[0-9a-f-]{36}$/.test(searchParams.variant) ? await one<{ id: string; name: string; params: VariantParams; client_id: string | null }>(
+    `select id, name, params, client_id from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null)
+       and (author_id = $3 or $4 or client_id in (select id from portal.clients cl where ${cs.sql.replace(/\$(\d+)/g, (_, n) => '$' + (Number(n) + 4))}))`, [searchParams.variant, u.id, c.user.id, ['owner', 'market_head'].includes(c.user.role), ...cs.params]) : null
   // Активные брони тех же клиентов — к ним можно добавить эту квартиру пакетом (одним договором)
   const pkgs = clients.length ? await q<{ id: string; client_id: string; unit: string }>(`select b.id, b.client_id, portal.unit_no(bl.external_id, un.number) unit from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id
     where b.client_id = any($1) and b.status in ('requested','confirmed') and b.unit_id <> $2 order by b.created_at`, [clients.map((x) => x.id), u.id]) : []
@@ -41,7 +46,8 @@ export default async function Book(
       <div className="page split-l">
         <div className="card">{planUrl(u.plan_file) ? <div className="planbox" style={{ border: 0 }}><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="muted">{T('План появится позже')}</div>}</div>
         <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct }}
-          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || (await cookies()).get('ge_client')?.value} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
+          days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || vr?.client_id || (await cookies()).get('ge_client')?.value}
+          variant={vr ? { id: vr.id, name: vr.name, disc: Number(vr.params.disc) || 0, planId: vr.params.planId || null, downPct: vr.params.downPct, months: vr.params.months, start: vr.params.start || null } : null} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
       </div>
     </>
   );

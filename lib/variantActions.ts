@@ -30,8 +30,10 @@ export async function saveVariant(_: unknown, f: FormData) {
   const ext = !!inp.base.ext, askPct = Number(s(f, 'ask_pct').replace(',', '.')) || 0, askNote = s(f, 'ask_note').slice(0, 500)
   if (ext && askPct > p.disc) p.disc = askPct
   if (ext && p.disc > inp.base.cap && !(askPct > 0)) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
-  if (ext && p.disc > inp.base.ceiling) return { error: t(c.lang, 'Такую скидку согласовать нельзя — уменьшите запрос') }
-  const r = runVariant(inp, p) // суммы — на сервере, по действующей цене
+  // QA 10.11: нейтральный потолок запроса (не размер пула); отказ — за руководителем рынка
+  if (ext && p.disc > 50) return { error: t(c.lang, 'Скидка больше {p}% не запрашивается', { p: 50 }) }
+  // суммы — на сервере, по действующей цене; запрос партнёра не обрезаем по пулу (размер пула ему не раскрываем)
+  const r = runVariant(ext && askPct > 0 ? { ...inp, base: { ...inp.base, ceiling: 50 } } : inp, p)
   const name = s(f, 'name').slice(0, 80) || t(c.lang, 'Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? t(c.lang, '{m} мес.', { m: r.months }) : t(c.lang, 'без рассрочки') })
   const id = s(f, 'id')
   const params: VariantParams & { ask_note?: string } = { ...p, downPct: r.downPct, months: r.months, disc: r.disc, planId: r.plan?.id || null, ...(askNote ? { ask_note: askNote } : {}) }
@@ -47,7 +49,8 @@ export async function saveVariant(_: unknown, f: FormData) {
       [unitId, c.user.id, client, name, params, snapshotOf(r, inp.base.list), r.needsApproval])
   }
   // скидка выше порога — руководителю рынка автора (нет — владельцу) уходит запрос на согласование
-  if (r.needsApproval) for (const h of await q<{ id: string }>(`select id from portal.users where active and ((role = 'market_head' and market = $1) or role = 'owner') order by role = 'market_head' desc limit 2`, [c.user.market || '']))
+  // QA 10.11: всем руководителям рынка автора и владельцам (было limit 2 — второй руководитель рынка не получал)
+  if (r.needsApproval) for (const h of await q<{ id: string }>(`select id from portal.users where active and ((role = 'market_head' and market = $1) or role = 'owner')`, [c.user.market || '']))
     await notify(h.id, 'booking', askNote ? 'Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»' : 'Вариант расчёта со скидкой {d}% ждёт согласования: {n}', `/units/${unitId}`, { d: r.disc, n: name, c: askNote })
   await audit(c.real.id, id ? 'variant.update' : 'variant.create', 'unit', unitId, { name, downPct: r.downPct, months: r.months, disc: r.disc, approval: r.needsApproval })
   revalidatePath(`/units/${unitId}`)
