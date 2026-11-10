@@ -40,10 +40,13 @@ test('партнёр: скидка — до своей части пула; бо
   const v = await one(`select * from portal.calc_variants where unit_id = $1 and author_id = $2 order by created_at desc limit 1`, [u.id, H.id])
   assert.ok(v && v.needs_approval && Number(v.params.disc) === over, 'запрос «Попросить больше» не сохранил вариант на согласование: ' + JSON.stringify(v?.params))
   // QA 10.11 (Ревью): запрос сверх всего пула принимается на согласование — граница «нельзя» не раскрывает размер пула; отказ — за руководителем рынка
-  await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: 0 }), ask_pct: String(cond.pool + 5) })
+  // 373: при неотданной своей части запрос не принимается
+  const r0 = await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: 0 }), ask_pct: String(cond.pool + 5) })
+  assert.match(JSON.stringify(r0.result || r0), /Сначала отдайте/, '«Попросить больше» при неотданной своей части принят')
+  await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: cond.own }), ask_pct: String(cond.pool + 5) })
   const v2 = await one(`select * from portal.calc_variants where unit_id = $1 and author_id = $2 order by created_at desc limit 1`, [u.id, H.id])
   assert.ok(v2.needs_approval && Number(v2.params.disc) === cond.pool + 5, 'запрос сверх пула обрезан или не ушёл на согласование: ' + JSON.stringify(v2.params))
-  const r3 = await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: 0 }), ask_pct: '55' })
+  const r3 = await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: cond.own }), ask_pct: '55' })
   assert.match(JSON.stringify(r3.result || r3), /не запрашивается/, 'запрос сверх нейтрального потолка принят')
   assert.ok(!JSON.stringify(r3.result || r3).includes(String(cond.pool)), 'в ответе партнёру виден размер пула')
   // бронь: сверх своей части без ask — отказ
