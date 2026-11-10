@@ -58,7 +58,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
               <div key={i.unit_id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto', gap: 16, borderBottom: '1px solid var(--line-2)', paddingBottom: 12 }}>
                 <div className="planbox" style={{ padding: 4, height: 110 }}>{planUrl(u.plan_file) && <img src={planUrl(u.plan_file)!} alt="" style={{ maxHeight: 100 }} />}</div>
                 <div>
-                  <div className="row"><b>{unitNo(u)}</b>{!free && <Pill kind="bad">{T('уже занята')}</Pill>}{!free && u.status !== 'sold' && <button className="btn btn--sm" formAction={joinWaitlist} name="unit" value={u.id}>{T('Ждать освобождения')}</button>}{i.liked && <Pill kind="warn">♥ {T('понравилась на встрече')}</Pill>}</div>
+                  <div className="row"><b>{unitNo(u)}</b>{!free && <Pill kind="bad">{T(u.status === 'sold' || u.deal_id ? 'продана' : 'уже занята')}</Pill>}{!free && u.status !== 'sold' && <button className="btn btn--sm" formAction={joinWaitlist} name="unit" value={u.id}>{T('Ждать освобождения')}</button>}{i.liked && <Pill kind="warn">♥ {T('понравилась на встрече')}</Pill>}</div>
                   <div className="small muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })} · {u.building}</div>
                   <div className="mt8"><b>{u.usd ? usd(L, u.usd) : ''}</b></div>
                   <input className="in mt8" name={`note:${u.id}`} defaultValue={i.note || ''} placeholder={T('Заметка для клиента…')} />
@@ -70,7 +70,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
                       {vs.length === 0 && <div className="tiny muted">{T('Нет сохранённых вариантов.')} <Link className="bronze" href={`/units/${u.id}`}>{T('Рассчитать в калькуляторе →')}</Link></div>}
                       {vs.map((v) => { const blocked = v.needs_approval && !v.approved_at, liked = (attached.get(u.id) || []).find((x) => x.variant_id === v.id)?.liked_at
                         return <label key={v.id} className="kv check small" style={{ alignItems: 'center' }}>
-                          <span><input type="checkbox" name={`vars:${u.id}`} value={v.id} defaultChecked={on.has(v.id)} disabled={blocked && !on.has(v.id)} /> <b>{v.name}</b>{!v.mine && <span className="muted"> · {v.author}</span>}
+                          <span><input type="checkbox" name={`vars:${u.id}`} value={v.id} defaultChecked={on.has(v.id)} disabled={!canEdit || (blocked && !on.has(v.id))} /> <b>{v.name}</b>{!v.mine && <span className="muted"> · {v.author}</span>}
                             <div className="tiny muted">{usd(L, v.snapshot.total)} · {T('взнос {p}', { p: pct(L, v.snapshot.downPct) })}{v.snapshot.months ? ' · ' + T('{m} мес.', { m: v.snapshot.months }) : ''}{v.snapshot.disc > 0 ? ' · ' + T('скидка {p}', { p: pct(L, v.snapshot.disc) }) : ''}</div>
                             {blocked && <div className="tiny warnc">{T('ждёт согласования скидки — клиенту не уйдёт')}</div>}{liked && <div className="tiny okc">♥ {T('клиенту подходит')}</div>}</span>
                           {free && !blocked && <Link className="btn btn--sm" href={`/units/${u.id}/book?client=${s.client_id}&variant=${v.id}`}>{T('Запросить бронь')}</Link>}
