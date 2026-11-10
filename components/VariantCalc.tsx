@@ -36,11 +36,11 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   // ступени сетки — подсказка «ещё N % взноса — скидка M %»
   const next = grid.filter((g) => g.from_pct > r.downPct).sort((a, b) => a.from_pct - b.from_pct)[0]
   return (
-    <div className="card stack" style={{ gap: 12 }}>
+    <div className="card stack vcalc" style={{ gap: 12 }}>
       <div className="h3" style={{ margin: 0 }}>{title ?? T('Калькулятор вариантов')}</div>
       {plans.length > 0 && <div className="chips noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === r.plan?.id ? ' on' : '')} onClick={() => pickPlan(p)}>{planLabel(T, p.name)}</button>)}</div>}
       {r.approx && <div className="note small">{T('Условия рассрочки у застройщика не заданы — расчёт ориентировочный.')}</div>}
-      <div className="grid g2 noprint" style={{ gap: 12 }}>
+      <div className="vcalc__ctrls noprint">
         <label className="field"><span>{T('Первый взнос')} · <b>{pct(lang, r.downPct)}</b>{r.minDown > 0 && r.minDown < 100 ? <span className="tiny muted"> · {T('мин. {p}', { p: pct(lang, r.minDown) })}</span> : null}</span>
           <input type="range" className="disc" min={0} max={100} step={1} value={downPct} onChange={(e) => setDownPct(Number(e.target.value))} />
           <span className="row" style={{ gap: 6 }}>
@@ -59,7 +59,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         <label key={o.id} className="kv check" style={{ cursor: 'pointer' }}><span><input type="checkbox" checked={picked.includes(o.id)} onChange={(e) => setPicked((a) => (e.target.checked ? [...a, o.id] : a.filter((x) => x !== o.id)))} /> {o.title}</span><span className="small">+{usd(lang, o.usd)}</span></label>))}</div>}
       {r.clamped.map((k) => <div key={k} className="tiny warnc">{T(k, { p: pct(lang, r.minDown), m: r.maxMonths ?? 0, c: pct(lang, ceiling) })}</div>)}
       {r.needsApproval && <div className="note small">{T('Скидка сверх {p} — вариант требует согласования владельца или руководителя рынка', { p: pct(lang, cap) })}</div>}
-      <div className="grid g4" style={{ gap: 8 }}>
+      <div className="vcalc__kpis">
         {[[T('Цена для клиента'), usd(lang, r.total), fx ? '≈ ' + fxs(r.total) : ''],
           [T('Первый взнос'), usd(lang, r.down), pct(lang, r.downPct)],
           [T('Платёж в месяц'), r.monthly ? usd(lang, r.monthly) : '—', r.months ? T('{m} мес.', { m: r.months }) : r.fixed ? T('по этапам застройщика') : ''],
