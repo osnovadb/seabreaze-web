@@ -43,7 +43,7 @@ test('партнёр: скидка — до своей части пула; бо
   assert.match(JSON.stringify(r3.result || r3), /согласовать нельзя/, 'запрос сверх всего пула принят')
   assert.ok(!JSON.stringify(r3.result || r3).includes(String(cond.pool)), 'в ответе партнёру виден размер пула')
   // бронь: сверх своей части без ask — отказ
-  const cl = (await register(H)).result?.id
+  const cl = (await register(H, { fields: { goal: 'invest', budget: '200-300k', timeline: '3m' } })).result?.id
   const b = await act(H, 'createBooking', { unit: u.id, client: cl, discount: String(over) })
-  assert.match(JSON.stringify(b.result || b), /Попросить больше/, 'бронь со скидкой сверх своей части прошла без запроса')
+  assert.match(JSON.stringify(b.result || b), /Попросить больше/, 'бронь со скидкой сверх своей части прошла без запроса: ' + JSON.stringify(b).slice(0, 300))
 })
