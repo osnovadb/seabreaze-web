@@ -80,7 +80,6 @@ export default async function PublicSelection(
                         <div className="kv small"><span>{T('Платёж в месяц')}</span><span>{r.monthly ? `${usd(L, r.monthly)} × ${r.months}` : '—'}</span></div>
                         <div className="kv small"><span>{T('Последний платёж')}</span><span>{r.last ? date(L, r.last) : '—'}</span></div>
                         {r.disc > 0 && <div className="kv small"><span>{T('Скидка')}</span><span>{pct(L, r.disc)}</span></div>}
-                        {r.devAmt > 0 && <div className="kv small"><span>{T('Скидка застройщика за взнос')}</span><span>−{usd(L, r.devAmt)}</span></div>}
                         {r.optionTitles.length > 0 && <div className="tiny muted">{T('Опции')}: {r.optionTitles.join(', ')}</div>}
                         {r.approx && <span className="tiny muted">{T('ориентировочно')}</span>}
                         <form action={likeSelVariant} className="noprint"><input type="hidden" name="token" value={params.token} /><input type="hidden" name="variant" value={v.variant_id} />

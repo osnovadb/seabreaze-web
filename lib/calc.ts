@@ -1,11 +1,13 @@
 // 2.2 · Калькулятор вариантов (запрос Дениса 10.11): расчёт по квартире с регулировками — первый взнос, срок, скидка из пула,
 // дата первого взноса, опции. Рамки — из планов застройщика, если они есть; без планов — свободный расчёт с пометкой «ориентировочно».
-// Скидка застройщика за больший взнос — сетка «взнос от X % → скидка N %» (настройка объекта); прежняя «скидка за 100 %» плана — её частный случай.
+// 361 (Денис 11.11): по договорам застройщик отдельной скидки за взнос не даёт. Сетка «взнос от X % и срок до N мес. → скидка» (Приложение 1)
+// и «скидка за 100 %» плана — это максимум скидки (пул плана), которым распоряжаемся мы; клиенту автоматически ничего не вычитается.
+// Цена клиента = прайс (после акции застройщика) минус скидка в пределах пула плана и порога роли; опции сверху.
 // Чистые функции: сервер, браузер, юнит-тесты.
 import { paymentRows, isFull, type Plan, type Row, type PromoView, type PromoMode } from './plans.ts'
-import { split, type SplitCond } from './money.ts'
+import { split, planCond, type SplitCond } from './money.ts'
 
-export type DownStep = { from_pct: number; discount_pct: number; building_id?: string | null; valid_from?: string | null; valid_to?: string | null }
+export type DownStep = { from_pct: number; discount_pct: number; max_months?: number | null; building_id?: string | null; valid_from?: string | null; valid_to?: string | null }
 export type CalcIn = {
   list: number                       // прайс квартиры, USD
   plans: Plan[]                      // действующие планы застройщика (могут отсутствовать)
@@ -20,13 +22,17 @@ export type CalcIn = {
   cap?: number                       // порог скидки без согласования
   ceiling?: number                   // предел скидки роли
   cond?: SplitCond | null; ext?: boolean
+  poolPct?: number                   // пул проекта (conditions.pool_pct), если сетка не задана; по умолчанию — из cond
+  askMax?: number                    // партнёр «Попросить больше»: запрос сверх своей части — до этого нейтрального предела
   today?: string
 }
 export type CalcOut = {
   plan: Plan | null; approx: boolean          // approx — планов нет, расчёт ориентировочный
   downPct: number; months: number; disc: number
   minDown: number; maxMonths: number | null; fixed: boolean   // рамки плана; fixed — свой график застройщика (этапы)
-  devPct: number; devAmt: number; promoAmt: number; promoApplied: boolean; poolAllowed: boolean
+  devPct: number; devAmt: number; promoAmt: number; promoApplied: boolean; poolAllowed: boolean  // devPct/devAmt — всегда 0 (вычета за взнос нет, 361)
+  poolPct: number; poolSource: 'grid' | 'plan' | 'pool'   // максимум скидки по плану и откуда он взят
+  capEff: number; ceilingEff: number                       // порог без согласования и предел скидки — в пределах пула плана
   base: number                                // цена после скидки застройщика и акции (от неё делится пул)
   final: number                               // цена квартиры для клиента после скидки из пула
   total: number                               // с опциями
@@ -44,8 +50,25 @@ export function activeGrid(grid: DownStep[] = [], today: string, buildingId?: st
   const own = live.filter((g) => buildingId && g.building_id === buildingId)
   return own.length ? own : live.filter((g) => !g.building_id)
 }
-// Скидка застройщика по взносу: лучшая ступень, до которой взнос дотягивает
+// Скидка по взносу (без учёта срока) — лучшая ступень, до которой взнос дотягивает; для подсказок
 export const gridDiscount = (grid: DownStep[], downPct: number) => grid.filter((g) => downPct + 1e-9 >= Number(g.from_pct)).reduce((m, g) => Math.max(m, Number(g.discount_pct) || 0), 0)
+
+// Пул плана (361): строка сетки — наибольший взнос не выше фактического и ближайший срок не короче выбранного;
+// полная оплата — «скидка за 100 %» плана полной оплаты (или строка сетки от 100 %); сетки нет или строка не нашлась — пул проекта
+export function planPool(o: { grid?: DownStep[]; plans?: Plan[]; poolPct: number; downPct: number; months: number }): { pct: number; source: 'grid' | 'plan' | 'pool' } {
+  const full = o.downPct >= 100 - 1e-9
+  if (full) {
+    const fp = (o.plans || []).find((p) => isFull(p) && Number(p.full_payment_discount_pct) > 0)
+    if (fp) return { pct: Number(fp.full_payment_discount_pct), source: 'plan' }
+  }
+  const rows = (o.grid || []).filter((g) => o.downPct + 1e-9 >= Number(g.from_pct) && (full || g.max_months == null || Number(g.max_months) >= o.months))
+  if (rows.length) {
+    const top = Math.max(...rows.map((g) => Number(g.from_pct)))
+    const best = rows.filter((g) => Number(g.from_pct) === top).sort((a, b) => (a.max_months ?? 1e9) - (b.max_months ?? 1e9))[0]
+    return { pct: Number(best.discount_pct) || 0, source: 'grid' }
+  }
+  return { pct: Number(o.poolPct) || 0, source: 'pool' }
+}
 
 export const MAX_FREE_MONTHS = 120
 // Какой план застройщика подходит под взнос и срок: 100 % — полная оплата; иначе рассрочка, в рамки которой укладываемся
@@ -82,23 +105,20 @@ export function calcVariant(i: CalcIn): CalcOut {
   const approx = !plan || (!full && !plan.months && !plan.schedule?.length && months > 0)
   // свой график застройщика (этапы) — только если параметры как в плане
   const fixed = !!plan?.schedule?.some((m) => Number(m.pct) > 0) && downPct === minDown && !i.months
-  // скидка застройщика: сетка + «скидка за 100 %» плана полной оплаты
-  const g = [...(i.grid || [])]
-  for (const p of i.plans) if (isFull(p) && Number(p.full_payment_discount_pct)) g.push({ from_pct: 100, discount_pct: Number(p.full_payment_discount_pct) })
-  const devPct = gridDiscount(g, downPct)
-  const devAmt = i.list * devPct / 100
-  // акция и правило сложения — как в priceChain
+  // 361: пул плана — максимум скидки по выбранному взносу и сроку; автоматически из цены ничего не вычитаем
+  const pool = planPool({ grid: i.grid, plans: i.plans, poolPct: i.poolPct ?? Number(i.cond?.pool_pct ?? 0), downPct, months })
+  // акция застройщика (его собственная скидка из прайса) — как в priceChain
   const mode = i.mode || 'chain', promo = i.promo || null
-  const promoOf = (from: number) => (!promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, from) : from * promo.pct / 100)
-  let dev = devAmt, promoAmt = 0
-  if (mode === 'sum') promoAmt = Math.min(promoOf(i.list), i.list - devAmt)
-  else if (mode === 'best') { const pa = promoOf(i.list); if (pa > devAmt) { promoAmt = pa; dev = 0 } }
-  else promoAmt = promoOf(i.list - devAmt)
-  const base = Math.max(0, i.list - dev - promoAmt)
+  const promoAmt = !promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, i.list) : i.list * promo.pct / 100
+  const base = Math.max(0, i.list - promoAmt)
   const poolAllowed = !(mode === 'exclusive' && promoAmt > 0)
-  const ceiling = i.ceiling ?? 100
-  let disc = clamp(Number(i.disc) || 0, 0, poolAllowed ? ceiling : 0)
-  if (disc !== (Number(i.disc) || 0)) clamped.push(poolAllowed ? 'Скидка из пула не больше {c}' : 'По условиям акции скидка из пула не применяется')
+  // пороги ролей прежние, но не выше пула плана; у партнёра своя часть — его доля пула плана (349, 373)
+  const agentPart = i.cond ? planCond(i.cond, pool.pct).agent_pool_pct : Math.min(i.cap ?? 0, pool.pct)
+  const capEff = i.ext ? agentPart : Math.min(i.cap ?? Infinity, pool.pct)
+  // партнёру предел — своя часть; запрос «Попросить больше» (askMax) — до нейтрального предела, отказ — за руководителем рынка
+  const ceilingEff = i.ext ? (i.askMax ?? capEff) : Math.min(i.ceiling ?? 100, pool.pct)
+  let disc = clamp(Number(i.disc) || 0, 0, poolAllowed ? ceilingEff : 0)
+  if (disc !== (Number(i.disc) || 0)) clamped.push(poolAllowed ? 'Скидка не больше {c} — максимум по плану и вашему порогу' : 'По условиям акции скидка из пула не применяется')
   const final = base * (1 - disc / 100)
   const total = final + (i.optionsUsd || 0)
   // график: свой план застройщика (этапы) или «взнос + равные платежи»
@@ -109,10 +129,11 @@ export function calcVariant(i: CalcIn): CalcOut {
   const last = rows.length ? rows[rows.length - 1].due : null
   return {
     plan, approx, downPct, months, disc, minDown, maxMonths, fixed,
-    devPct: dev ? devPct : 0, devAmt: r2(dev), promoAmt: r2(promoAmt), promoApplied: promoAmt > 0, poolAllowed,
+    devPct: 0, devAmt: 0, promoAmt: r2(promoAmt), promoApplied: promoAmt > 0, poolAllowed,
+    poolPct: pool.pct, poolSource: pool.source, capEff, ceilingEff,
     base: r2(base), final: r2(final), total: r2(total), down, monthly, last, rows,
-    needsApproval: disc > (i.cap ?? Infinity) + 1e-9, clamped,
-    split: i.cond ? split(i.cond, base, disc, i.ext !== false) : null,
+    needsApproval: disc > capEff + 1e-9, clamped,
+    split: i.cond ? split(planCond(i.cond, pool.pct), base, disc, i.ext !== false) : null,
   }
 }
 

@@ -29,7 +29,7 @@ async function condOf(d: DealRow): Promise<Cond> {
   const c = { ...cur, ...(d.snapshot || {}) } as Record<string, unknown>
   const n = (k: string, def = 0) => num(c[k] ?? cur[k], def)
   return {
-    fix_pct: n('fix_pct'), pool_pct: n('pool_pct'), agent_fix_pct: n('agent_fix_pct'), agent_pool_pct: n('agent_pool_pct'), agent_our_pool_share: n('agent_our_pool_share'), seller_share_pct: n('seller_share_pct'),
+    fix_pct: n('fix_pct'), pool_pct: n('pool_pct'), agent_fix_pct: n('agent_fix_pct'), agent_pool_pct: n('agent_pool_pct'), agent_our_pool_share: n('agent_our_pool_share'), seller_share_pct: n('seller_share_pct'), fix_base: (c.fix_base === 'list' ? 'list' : 'final') as 'list' | 'final', // 11.11: фикс от прайса или цены клиента
     head_bonus_pct: n('head_bonus_pct'), escort_fix_usd: n('escort_fix_usd', 500), referrer_pct: n('referrer_pct', 2), consultant_pct: n('consultant_pct', 1), vat_rate: n('vat_rate', 18),
     consultant_name: (c.consultant_name as string) || (cur.consultant_name as string) || 'Консультант по застройщикам',
     pay_timing: String(c.pay_timing || cur.pay_timing || 'after_first_payment'), payment_wait_days: n('payment_wait_days', 10), clawback_months: n('clawback_months', 3), clawback_offset: String(c.clawback_offset || cur.clawback_offset || 'any'),

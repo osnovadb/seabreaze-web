@@ -18,7 +18,7 @@ import { calcViewProps } from '@/lib/calcView'
 import { VariantCalc } from '@/components/VariantCalc'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
+type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 export default async function Units(
@@ -42,7 +42,7 @@ export default async function Units(
   const units = await q<U>(`with b as (select distinct on (unit_id) * from portal.bookings where client_id = $1 and status in ('hold','queued','requested','confirmed','release_pending','converted') order by unit_id, created_at desc),
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
-      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
+      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
       d.id deal_id, d.paid_pct::float paid
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
@@ -103,6 +103,7 @@ export default async function Units(
           {active.map((u) => {
             const h = (act: string) => <><input type="hidden" name="id" value={u.booking_id!} /><input type="hidden" name="act" value={act} /></>
             const approve = u.status === 'requested' && u.approval === 'pending' && canApproveDiscount(c.user.role)
+            const overPool = u.plan_pool != null && (u.disc || 0) > u.plan_pool + 1e-9 // 361: больше максимума по плану — только отказ
             const confirm = u.status === 'requested' && u.approval !== 'pending' && canConfirmBooking(c.user.role)
             const office = canConfirmBooking(c.user.role)
             return <div key={u.unit_id} className="card stack" style={{ gap: 10 }}>
@@ -113,7 +114,7 @@ export default async function Units(
                 <span className="row" style={{ gap: 8 }}><b>{usd(L, u.final ?? 0)}</b>{u.status === 'hold' && u.mine && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Запросить бронь')}</Link>}</span>
               </div>
               {approve && <div className="row" style={{ gap: 8 }}>
-                <form action={bookingAction}>{h('approve')}<button className="btn btn--sm btn--p">{T('Согласовать скидку')}</button></form>
+                {overPool ? <span className="small bad">{T('Скидка больше максимума по плану — согласовать нельзя')}</span> : <form action={bookingAction}>{h('approve')}<button className="btn btn--sm btn--p">{T('Согласовать скидку')}</button></form>}
                 <form action={bookingAction}>{h('decline')}<button className="btn btn--sm">{T('Не согласовать')}</button></form></div>}
               {confirm && <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('confirm')}

@@ -1,7 +1,7 @@
 // 2.2 · Калькулятор вариантов, этап 3: варианты расчёта в подборке клиента.
 // До трёх вариантов на квартиру. Клиенту уходит только вариант без согласования или согласованный.
 // Суммы для клиента пересчитываются по действующей цене, плану, сетке и акции (как в калькуляторе), без комиссий.
-import { q } from './db'
+import { q, one } from './db'
 import { unitById, plansFor, downGridFor } from './catalog'
 import { promoForUnit } from './promo'
 import { optionsFor } from './options'
@@ -29,7 +29,9 @@ export async function clientCalc(unitId: string, p: VariantParams, today = new D
   if (!u || u.usd == null) return null
   const [plans, gridAll, promo, options] = await Promise.all([plansFor(u.project_id, u.building_id), downGridFor(u.project_id), promoForUnit(u), optionsFor(u)])
   const picked = options.filter((o) => (p.options || []).includes(o.id))
+  // 361: скидка варианта — в пределах пула плана (сетка или пул проекта) на сегодня
+  const poolPct = (await one<{ p: number }>('select pool_pct::float p from portal.cur_conditions($1)', [u.project_id]))?.p ?? 0
   const r = calcVariant({ list: u.usd, plans, grid: activeGrid(gridAll, today, u.building_id), promo: promo.promo, mode: promo.mode, planId: p.planId || null,
-    downPct: p.downPct, months: p.months, disc: p.disc, start: p.start, optionsUsd: picked.reduce((a, o) => a + o.usd, 0), cap: p.disc, ceiling: p.disc, cond: null, ext: false, today })
+    downPct: p.downPct, months: p.months, disc: p.disc, start: p.start, optionsUsd: picked.reduce((a, o) => a + o.usd, 0), cap: p.disc, ceiling: p.disc, cond: null, ext: false, poolPct, today })
   return { ...r, optionTitles: picked.map((o) => o.title) }
 }

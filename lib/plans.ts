@@ -17,7 +17,8 @@ export function planLabel(T: (s: string, v?: Record<string, string | number>) =>
   return m ? T('Рассрочка {m} мес.', { m: m[1] }) : T(name)
 }
 // Скидка застройщика за полную оплату уменьшает цену до раздела денег: фикс и пул считаются от неё
-export const planBase = (p: Plan | null | undefined, list: number) => (p && isFull(p) ? list * (1 - Number(p.full_payment_discount_pct || 0) / 100) : list)
+// 361 (11.11): «скидка за 100 %» — максимум скидки, а не цена; график считается от прайса
+export const planBase = (_p: Plan | null | undefined, list: number) => list
 export function schedule(p: Plan, price: number) {
   if (isFull(p)) return { full: true, down: price, monthly: 0, months: 0 }
   const down = price * Number(p.down_payment_pct || 0) / 100
@@ -60,7 +61,9 @@ const daysIn = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(
 export type PromoMode = 'chain' | 'sum' | 'best' | 'exclusive'
 export type PromoView = { id: string; name: string; badge: string | null; kind: 'pct' | 'fixed'; pct: number; usd: number; ends_on: string | null }
 export function priceChain(list: number, plan: Plan | null | undefined, promo: PromoView | null | undefined, mode: PromoMode = 'chain') {
-  const planPct = plan && isFull(plan) ? Number(plan.full_payment_discount_pct || 0) : 0
+  // 361 (11.11): «скидка за 100 %» плана — это максимум скидки (пул плана), а не вычет из цены; клиенту автоматически ничего не отдаётся
+  void plan
+  const planPct = 0
   const planAmt0 = list * planPct / 100
   const promoOf = (from: number) => (!promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, from) : from * promo.pct / 100)
   let planAmt = planAmt0, promoAmt = 0

@@ -250,21 +250,22 @@ export default async function ObjectCard(
         <div className="label">{T('Новый план оплаты')}</div>
         {row()}
         <DownGrid />
-        <div className="tiny muted">{T('Скидка за 100% — скидка застройщика: снижает цену до раздела денег, фикс и пул считаются от сниженной цены. Планы видят партнёры в карточке квартиры и при брони, клиент — в режиме показа и на сайтах.')}</div>
+        <div className="tiny muted">{T('Скидка за 100 % — максимальная скидка клиенту при полной оплате (пул плана по договору), цену автоматически не снижает.')}</div>
       </div>
     )
   }
 
   // Сетка скидок застройщика за первый взнос (калькулятор вариантов, 10.11): «взнос от X % → скидка N %», на проект или блок, с датами
   async function DownGrid() {
-    const rows = await q<{ id: string; building_id: string | null; from_pct: number; discount_pct: number; valid_from: string | null; valid_to: string | null; note: string | null }>(
-      'select id, building_id, from_pct::float, discount_pct::float, valid_from::text, valid_to::text, note from portal.down_discounts where project_id = $1 order by building_id nulls first, from_pct', [p!.id])
-    const cols = '.7fr .7fr 1.1fr .8fr .8fr 1.2fr 96px 32px'
+    const rows = await q<{ id: string; building_id: string | null; from_pct: number; discount_pct: number; max_months: number | null; valid_from: string | null; valid_to: string | null; note: string | null }>(
+      'select id, building_id, from_pct::float, discount_pct::float, max_months, valid_from::text, valid_to::text, note from portal.down_discounts where project_id = $1 order by building_id nulls first, from_pct, max_months nulls last', [p!.id])
+    const cols = '.7fr .7fr .7fr 1.1fr .8fr .8fr 1.1fr 96px 32px'
     const row = (r?: (typeof rows)[number]) => (
       <ActionForm key={r?.id || 'new'} action={saveDownDiscount} lang={L} reset={!r} className="objrow" style={{ gridTemplateColumns: cols }}>
         <input type="hidden" name="project" value={p!.id} />{r && <input type="hidden" name="id" value={r.id} />}
         <input className="in" name="from_pct" inputMode="decimal" defaultValue={r?.from_pct ?? ''} placeholder={T('от, %')} required />
-        <input className="in" name="discount_pct" inputMode="decimal" defaultValue={r?.discount_pct ?? ''} placeholder={T('скидка, %')} required />
+        <input className="in" name="max_months" inputMode="numeric" defaultValue={r?.max_months ?? ''} placeholder={T('любой')} title={T('Срок до, мес.; пусто — любой срок')} />
+        <input className="in" name="discount_pct" inputMode="decimal" defaultValue={r?.discount_pct ?? ''} placeholder={T('макс. скидка, %')} required />
         <select key={`building:${r?.building_id || ''}`} className="in" name="building" defaultValue={r?.building_id || ''}><option value="">{T('весь проект')}</option>{blocks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
         <input className="in" name="valid_from" type="date" defaultValue={r?.valid_from || ''} title={T('Действует с')} />
         <input className="in" name="valid_to" type="date" defaultValue={r?.valid_to || ''} title={T('по')} />
@@ -275,9 +276,9 @@ export default async function ObjectCard(
     )
     return (
       <div className="card stack mt16" style={{ gap: 8 }}>
-        <div className="h3" style={{ margin: 0 }}>{T('Скидка застройщика за первый взнос')}</div>
-        <div className="small muted">{T('Сетка застройщика: чем больше первый взнос, тем ниже цена. Калькулятор берёт лучшую ступень, до которой дотягивает взнос; скидка уменьшает цену до раздела денег. «Скидка за 100%» у плана полной оплаты — та же ступень «от 100 %».')}</div>
-        <div className="objhead" style={{ gridTemplateColumns: cols }}>{['Взнос от, %', 'Скидка, %', 'Где действует', 'Действует с', 'по', 'Примечание', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
+        <div className="h3" style={{ margin: 0 }}>{T('Максимальная скидка по плану оплаты')}</div>
+        <div className="small muted">{T('Приложение 1 договора: для взноса от X % и срока до N месяцев — максимум скидки клиенту (пул плана). Клиенту автоматически ничего не вычитается: скидку даёт сейлз или партнёр в этих пределах. Калькулятор берёт строку с наибольшим взносом не выше выбранного и ближайшим сроком не короче выбранного; строки нет — пул из условий проекта.')}</div>
+        <div className="objhead" style={{ gridTemplateColumns: cols }}>{['Взнос от, %', 'Срок до, мес.', 'Макс. скидка, %', 'Где действует', 'Действует с', 'по', 'Примечание', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
         {rows.map((r) => row(r))}
         {rows.length === 0 && <div className="small muted">{T('Ступеней пока нет')}</div>}
         <div className="label mt8">{T('Новая ступень')}</div>

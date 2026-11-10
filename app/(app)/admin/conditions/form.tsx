@@ -23,7 +23,9 @@ export function CondForm({ lang, projectId, cur, canEdit, example }: { lang: Lan
       {cur.status === 'draft' && <div className="note">{T('Редактируется черновик v{v}. Действует опубликованная версия; черновик вступит в силу с даты ниже.', { v: cur.version })}</div>}
       <div className="card">
         <div className="label">{T('Вознаграждение от застройщика')}</div>
-        <div className="grid g3 mt8">{N('fix_pct', 'Фикс от итоговой цены')}{N('pool_pct', 'Пул скидки от прайса')}
+        <div className="grid g3 mt8">{N('fix_pct', 'Фикс застройщика')}
+          <label className="field"><span>{T('Фикс считается от')}</span><select key={`fix_base:${String(cur.fix_base || 'final')}`} className="in" name="fix_base" defaultValue={cur.fix_base || 'final'} disabled={!canEdit}><option value="list">{T('прайса')}</option><option value="final">{T('цены, которую платит клиент')}</option></select></label>
+          {N('pool_pct', 'Пул скидки от прайса (если сетки плана нет)')}
           <label className="field"><span>{T('Когда платит застройщик')}</span><select key={`pay_timing:${String(cur.pay_timing)}`} className="in" name="pay_timing" defaultValue={cur.pay_timing} disabled={!canEdit}><option value="after_first_payment">{T('сразу после первого взноса')}</option><option value="proportional">{T('пропорционально платежам')}</option><option value="deposit_35">{T('всё сразу при задатке от 35%')}</option></select></label></div>
         <div className="label mt16">{T('Распределение с саб-агентом')}</div>
         <div className="grid g3 mt8">{N('agent_fix_pct', 'Фикс агенту (из нашего фикса)')}{N('agent_pool_pct', 'Часть пула агенту')}{N('agent_our_pool_share', 'Доля нашей части пула агенту')}</div>

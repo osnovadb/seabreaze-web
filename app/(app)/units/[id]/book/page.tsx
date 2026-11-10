@@ -4,7 +4,8 @@ import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
 import type { VariantParams } from '@/lib/variants'
 import { t, m2 } from '@/lib/i18n'
-import { unitById, conditionsFor, viewMode, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
+import { activeGrid } from '@/lib/calc'
+import { downGridFor, unitById, conditionsFor, viewMode, codeFor, planUrl, unitNo, projectVisible, plansFor } from '@/lib/catalog'
 import { isExternal, maxDiscount, canBook, discountCeiling } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top } from '@/components/ui'
@@ -45,7 +46,8 @@ export default async function Book(
         sub={`${T('{r} комн.', { r: u.rooms ?? '—' })} · ${m2(L, u.area)} · ${T('{f} этаж', { f: u.floor })} · ${T('условия проекта, версия {v}', { v: cond.version })}`} />
       <div className="page split-l">
         <div className="card">{planUrl(u.plan_file) ? <div className="planbox" style={{ border: 0 }}><img src={planUrl(u.plan_file)!} alt="" /></div> : <div className="muted">{T('План появится позже')}</div>}</div>
-        <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct }}
+        <BookForm lang={L} unitId={u.id} list={u.usd!} ext={ext} cap={maxDiscount(c.user.role, cond)} ceiling={discountCeiling(c.user.role, cond)} cond={{ fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct, fix_base: cond.fix_base || 'final' }}
+          grid={activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)}
           days={cond.booking_days} ext_days={cond.booking_ext_days} clients={clients} plans={plans} fx={fx} promo={promo} mode={mode} options={options} pkgs={pkgs} fee={cond.booking_fee > 0 ? { amount: cond.booking_fee, cur: cond.booking_fee_currency } : null} preset={searchParams.client || vr?.client_id || (await cookies()).get('ge_client')?.value}
           variant={vr ? { id: vr.id, name: vr.name, disc: Number(vr.params.disc) || 0, planId: vr.params.planId || null, downPct: vr.params.downPct, months: vr.params.months, start: vr.params.start || null } : null} showOurs={c.user.role === 'owner' || c.user.role === 'market_head'} />
       </div>

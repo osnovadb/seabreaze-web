@@ -7,8 +7,10 @@ import { revalidatePath } from 'next/cache'
 import { q, one, tx, audit, notify, withKeyLock, personKeys } from './db'
 import { getCtx, requireCtx, signSession, clearSession, setShow, clearShow, Ctx } from './auth'
 import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegisterClient, canReviewAgents, isExternal, maxDiscount, discountCeiling, canApproveDiscount, type Role } from './perm'
-import { conditionsFor, split, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
-import { priceChain } from './plans'
+import { conditionsFor, split, downGridFor, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
+import { priceChain, isFull } from './plans'
+import { planPool, activeGrid } from './calc'
+import { planCond } from './money'
 import { optionsFor } from './options'
 import { toUsd } from './fx'
 import { pbEnqueue } from './pbQueue'
@@ -466,7 +468,6 @@ export async function createBooking(_: unknown, f: FormData) {
   const cMarket = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [clientId]))?.m || 'GLOBAL'
   if (!(await priceNegotiation(cMarket)) && c.user.role !== 'owner' && !(c.user.role === 'market_head' && (c.user.market || 'GLOBAL') === 'GLOBAL'))
     return { error: 'На рынке клиента переговоры о цене выключены — бронь и скидку запрашивает руководитель Global' }
-  const cap = maxDiscount(c.user.role, cond), ceiling = discountCeiling(c.user.role, cond)
   // 10.11 (Денис): партнёру ползунок — до его части пула; больше — только «Попросить больше» (ask=1), без показа нашей части и всего пула
   const extReq = isExternal(c.user.role)
   // Этап 3 калькулятора: бронь из варианта — согласованная (или не требовавшая согласования) скидка варианта второй раз не согласуется
@@ -474,6 +475,17 @@ export async function createBooking(_: unknown, f: FormData) {
   const vr = /^[0-9a-f-]{36}$/.test(vid) ? await one<{ id: string; name: string; params: { downPct: number; months: number; disc: number; start?: string; planId?: string | null } }>(
     `select id, name, params from portal.calc_variants where id = $1 and unit_id = $2 and (not needs_approval or approved_at is not null) and (author_id = $3 or (client_id = $4 and not $6) or $5)`,
     [vid, unit.id, c.user.id, clientId, ['owner', 'market_head'].includes(c.user.role), extReq]) : null
+  // План оплаты брони (на сервере, не из формы)
+  const allPlans = await plansFor(unit.project_id, unit.building_id)
+  const plan = s(f, 'plan') ? allPlans.find((p) => p.id === s(f, 'plan')) : undefined
+  if (s(f, 'plan') && !plan) return { error: t(c.lang, 'План оплаты больше не действует — обновите страницу') }
+  // 361 (11.11): максимум скидки — пул плана по взносу и сроку варианта (или выбранного плана); пороги ролей прежние, но в его пределах;
+  // своя часть партнёра — его доля пула плана (349)
+  const pDown = vr ? Number(vr.params.downPct) || 0 : plan ? (isFull(plan) ? 100 : Number(plan.down_payment_pct) || 0) : 0
+  const pMonths = vr ? Number(vr.params.months) || 0 : plan && !isFull(plan) ? Number(plan.months) || 0 : 0
+  const pool = planPool({ grid: activeGrid(await downGridFor(unit.project_id), new Date().toISOString().slice(0, 10), unit.building_id), plans: allPlans, poolPct: cond.pool_pct, downPct: pDown, months: pMonths })
+  const pc = planCond(cond, pool.pct)
+  const cap = extReq ? pc.agent_pool_pct : Math.min(maxDiscount(c.user.role, cond), pool.pct), ceiling = Math.min(discountCeiling(c.user.role, cond), pool.pct)
   const byVariant = !!vr && disc <= Number(vr.params.disc || 0) + 1e-9
   if (extReq && disc > cap && !f.get('ask') && !byVariant) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
   // QA 10.11 (Ревью): партнёрский запрос — до нейтрального потолка, не равного пулу (иначе перебором находится размер пула); отказ — за руководителем рынка
@@ -493,9 +505,6 @@ export async function createBooking(_: unknown, f: FormData) {
   const days = cond.booking_days
   const tour = { from: s(f, 'tour_from') || null, to: s(f, 'tour_to') || null }
   const signing = ['in_person', 'remote', 'power_of_attorney'].includes(s(f, 'signing')) ? s(f, 'signing') : null
-  // План оплаты: «100% сразу» со скидкой застройщика снижает цену до раздела денег
-  const plan = s(f, 'plan') ? (await plansFor(unit.project_id, unit.building_id)).find((p) => p.id === s(f, 'plan')) : undefined
-  if (s(f, 'plan') && !plan) return { error: t(c.lang, 'План оплаты больше не действует — обновите страницу') }
   // Акция застройщика и правило сложения проекта (М6): цена до раздела денег считается на сервере, не из формы
   const { promo, mode } = await promoForUnit(unit)
   const ch = priceChain(unit.usd!, plan, promo, mode)
@@ -505,7 +514,7 @@ export async function createBooking(_: unknown, f: FormData) {
   const pkg = pkgId ? await one<{ id: string; group_id: string | null }>(`select id, group_id from portal.bookings where id = $1 and client_id = $2 and status in ('requested','confirmed')`, [pkgId, clientId]) : null
   if (pkgId && !pkg) return { error: t(c.lang, 'Бронь для пакета уже неактивна — обновите страницу') }
   const usdPrice = ch.base
-  const sp = split(cond, usdPrice, disc, isExternal(c.user.role))
+  const sp = split(pc, usdPrice, disc, isExternal(c.user.role))
   // Опции (группа 4): только действующие для этой квартиры, цена в USD — на сервере, не из формы
   const want = f.getAll('options').map(String)
   const avail = want.length ? await optionsFor(unit) : []
@@ -521,7 +530,7 @@ export async function createBooking(_: unknown, f: FormData) {
       status, queued_at, queue_until, developer_id, tour_from, tour_to, signing, comment)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10 || ' days')::interval, $11, $12, $13, $14, $15, $16, $17, $18,
       $19, case when $19 = 'queued' then now() end, case when $19 = 'queued' then now() + interval '7 days' end, $20, $21, $22, $23, $24) returning id`,
-    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...cond, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null,
+    [unit.id, unit.project_id, clientId, c.user.id, usdPrice, disc, Math.round(sp.final), cond.id, JSON.stringify({ ...pc, plan_pool: pool.pct, plan_pool_source: pool.source, booking_days: days, split: sp, list_original: unit.usd, promo: ch.promoApplied ? { id: promo!.id, name: promo!.name, amount: Math.round(ch.promoAmt), mode } : null, plan: plan ? { id: plan.id, name: plan.name, down: plan.down_payment_pct, months: plan.months, full_discount: plan.full_payment_discount_pct } : null,
       variant: vr ? { id: vr.id, name: vr.name, downPct: vr.params.downPct, months: vr.params.months, disc: vr.params.disc, start: vr.params.start || null } : null }), days, approval, JSON.stringify(opts), optUsd, group, fee?.amount || 0, fee?.cur || 'USD', fee?.usd || 0, fee ? 'due' : 'none',
       queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
     .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e }) // одновременный второй запрос на ту же квартиру
@@ -555,6 +564,8 @@ export async function bookingAction(f: FormData) {
   if (!b) return
   const mine = b.agent_id === c.user.id || c.user.role === 'owner'
   if ((act === 'approve' || act === 'decline') && canApproveDiscount(c.user.role) && b.approval === 'pending' && b.status === 'requested') {
+    // 361: скидку больше пула плана (максимума по договору) согласовать нельзя — только отказать
+    if (act === 'approve' && Number(b.discount_pct) > Number(b.snapshot?.plan_pool ?? Infinity) + 1e-9) return
     if (act === 'approve') {
       await q(`update portal.bookings set approval = 'approved', approved_by = $2 where id = $1`, [id, c.user.id])
       await notify(b.agent_id, 'booking', 'Скидка по брони согласована', '/bookings')
@@ -824,6 +835,8 @@ export async function saveConditions(_: unknown, f: FormData) {
   const rates: Record<string, number> = {}
   for (const m of ['DE', 'IL', 'GLOBAL']) { const v = s(f, 'rate_' + m).replace(',', '.'); if (v) { if (Number.isNaN(Number(v))) return { error: 'Ставка рынка ' + m }; rates[m] = Number(v) } }
   const pick = (k: string, ok: string[], d: string) => (ok.includes(s(f, k)) ? s(f, k) : d)
+  // 11.11: от чего считается фикс застройщика
+  await q(`update portal.conditions set fix_base = $2 where project_id = $1 and status = 'draft'`, [pid, s(f, 'fix_base') === 'list' ? 'list' : 'final'])
   await q(`update portal.conditions set reg_method = $2, silence_rule = $3, vat_mode = $4, clawback_offset = $5, fx_rule = $6, booking_write_api = $7, options_in_base = $8, sells_to_az = $9,
       rates_by_market = $10, reg_protect_months_sub = $11, reg_response_days = $12, silence_extra_days = $13, reg_protect_months = $14, renew_remind_days = $15, clawback_months = $16, payment_wait_days = $17,
       head_bonus_pct = $18, escort_fix_usd = $19, referrer_pct = $20, consultant_pct = $21, vat_rate = $22

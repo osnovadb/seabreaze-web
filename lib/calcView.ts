@@ -21,7 +21,7 @@ export async function calcViewProps(u: Unit, c: Ctx, o: { clients: { id: string;
     needs_approval: v.needs_approval, approved_at: v.approved_at, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
   return {
     list: u.usd, plans, grid: activeGrid(gridAll, new Date().toISOString().slice(0, 10), u.building_id), fx, promo: pr.promo, mode: pr.mode, options: opts,
-    cond: cond ? { fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct } : null,
+    cond: cond ? { fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct, fix_base: cond.fix_base || 'final' } : null,
     ext, cap: cond ? maxDiscount(role, cond) : 0, ceiling: cond && canBook(role) ? (ext ? maxDiscount(role, cond) : discountCeiling(role, cond)) : 0, ask: ext, self,
     unitId: u.id, variants, clients: o.clients, clientPreset: o.clientId || undefined,
     canApprove: ['owner', 'market_head'].includes(role), ownerView: role === 'owner', bookable: o.bookable,

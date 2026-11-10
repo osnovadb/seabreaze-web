@@ -105,24 +105,46 @@ test('калькулятор: без планов — свободный рас�
   const full = calcVariant({ list: 150000, plans: [], downPct: 100, months: 12, disc: 0 })
   assert.equal(full.months, 0); assert.equal(full.rows.length, 1)
 })
-test('калькулятор: сетка скидок за взнос и «скидка за 100 %» плана как частный случай', () => {
-  const grid = [{ from_pct: 50, discount_pct: 3 }, { from_pct: 70, discount_pct: 5 }]
-  assert.equal(gridDiscount(grid, 49.9), 0); assert.equal(gridDiscount(grid, 50), 3); assert.equal(gridDiscount(grid, 80), 5)
-  const r = calcVariant({ list: 100000, plans: [PL({ id: 'r', down: 30, months: 24 }), PL({ id: 'f', down: 100, fpd: 7 })], grid, downPct: 70, months: 12, disc: 0 })
-  assert.equal(r.devPct, 5); assert.equal(r.base, 95000)
-  const f = calcVariant({ list: 100000, plans: [PL({ id: 'r', down: 30, months: 24 }), PL({ id: 'f', down: 100, fpd: 7 })], grid, planId: 'f', downPct: 100, months: 0, disc: 0 })
-  assert.equal(f.devPct, 7); assert.equal(f.total, 93000)
+test('калькулятор (361, 11.11): сетка «взнос и срок» и «скидка за 100 %» — максимум скидки (пул плана), а не вычет из цены', async () => {
+  const { planPool } = await import('../../lib/calc.ts')
+  const grid = [{ from_pct: 100, max_months: 0, discount_pct: 20 }, { from_pct: 30, max_months: 36, discount_pct: 8 }, { from_pct: 15, max_months: 48, discount_pct: 1 }]
+  // пример из ответа Дениса: прайс 100 000, взнос 30 %, 36 мес., сетка Арада 8 % → клиенту не больше 8 000
+  const r = calcVariant({ list: 100000, plans: [], grid, downPct: 30, months: 36, disc: 15, cap: 20, ceiling: 20, cond: COND, ext: false })
+  assert.equal(r.poolPct, 8); assert.equal(r.poolSource, 'grid'); assert.equal(r.base, 100000, 'из цены ничего не вычтено автоматически')
+  assert.equal(r.disc, 8); assert.equal(r.final, 92000); assert.ok(r.clamped.length)
+  assert.equal(calcVariant({ list: 100000, plans: [], grid, downPct: 30, months: 36, disc: 0, cond: COND }).total, 100000, 'без скидки клиент платит прайс')
+  // строка: наибольший взнос не выше фактического и ближайший срок не короче выбранного
+  assert.equal(planPool({ grid, poolPct: 20, downPct: 30, months: 48 }).pct, 1, '30 % на 48 мес. — строка 15 %/48')
+  assert.equal(planPool({ grid, poolPct: 20, downPct: 50, months: 24 }).pct, 8)
+  assert.equal(planPool({ grid, poolPct: 20, downPct: 100, months: 0 }).pct, 20)
+  assert.deepEqual(planPool({ grid, poolPct: 20, downPct: 10, months: 12 }), { pct: 20, source: 'pool' }, 'строка не нашлась — пул проекта')
+  assert.deepEqual(planPool({ grid: [], poolPct: 20, downPct: 30, months: 24 }), { pct: 20, source: 'pool' })
+  // «скидка за 100 %» плана полной оплаты — максимум, цена не меняется
+  const f = calcVariant({ list: 100000, plans: [PL({ id: 'r', down: 30, months: 24 }), PL({ id: 'f', down: 100, fpd: 7 })], planId: 'f', downPct: 100, months: 0, disc: 0, cond: COND })
+  assert.equal(f.poolPct, 7); assert.equal(f.total, 100000); assert.equal(f.devAmt, 0)
   // сетка по датам и блоку: своя ступень блока главнее общей
   const g2 = [{ from_pct: 50, discount_pct: 2, valid_to: '2026-01-01' }, { from_pct: 50, discount_pct: 4 }, { from_pct: 50, discount_pct: 6, building_id: 'B' }]
   assert.equal(gridDiscount(activeGrid(g2, '2026-11-10'), 60), 4); assert.equal(gridDiscount(activeGrid(g2, '2026-11-10', 'B'), 60), 6)
 })
-test('калькулятор: скидка из пула — до предела роли; выше порога — «нужно согласование»; доход партнёра', () => {
-  const r = calcVariant({ list: 100000, plans: [], downPct: 30, months: 24, disc: 12, cap: 5, ceiling: 10, cond: COND, ext: true })
+test('калькулятор: скидка — до порога роли и пула плана; выше порога — «нужно согласование»', () => {
+  const r = calcVariant({ list: 100000, plans: [], downPct: 30, months: 24, disc: 12, cap: 5, ceiling: 10, cond: COND, ext: false })
   assert.equal(r.disc, 10); assert.ok(r.clamped.length); assert.equal(r.needsApproval, true); assert.equal(r.final, 90000)
-  assert.ok(Math.abs(r.split.agent - 90000 * 0.02) < 0.01, 'вся часть пула партнёра ушла в скидку — остаётся фикс')
-  const ok = calcVariant({ list: 100000, plans: [], downPct: 30, months: 24, disc: 4, cap: 5, ceiling: 10 })
+  const ok = calcVariant({ list: 100000, plans: [], downPct: 30, months: 24, disc: 4, cap: 5, ceiling: 10, cond: COND })
   assert.equal(ok.needsApproval, false)
   assert.deepEqual(fromPlan(PL({ down: 30, months: 24 })), { downPct: 30, months: 24 }); assert.deepEqual(fromPlan(PL({ down: 100 })), { downPct: 100, months: 0 })
+})
+test('калькулятор (349, 373): у партнёра своя часть — его доля пула плана; «попросить больше» — сверх неё; маржа от пула плана', () => {
+  const grid = [{ from_pct: 30, max_months: 36, discount_pct: 8 }]
+  // доля партнёра в условиях 10 из 20 — половина: при пуле плана 8 % его часть 4 %
+  const own = calcVariant({ list: 100000, plans: [], grid, downPct: 30, months: 36, disc: 6, cap: 10, ceiling: 10, cond: COND, ext: true })
+  assert.equal(own.capEff, 4); assert.equal(own.disc, 4); assert.equal(own.needsApproval, false)
+  assert.ok(Math.abs(own.split.agent - 96000 * 0.02) < 0.01, 'своя часть отдана целиком — у партнёра остаётся фикс')
+  assert.ok(Math.abs(own.split.ourPool - 4000) < 0.01, 'наша маржа = (пул плана − наша часть) × прайс')
+  const ask = calcVariant({ list: 100000, plans: [], grid, downPct: 30, months: 36, disc: 6, cap: 10, ceiling: 10, askMax: 50, cond: COND, ext: true })
+  assert.equal(ask.disc, 6); assert.equal(ask.needsApproval, true)
+  // фикс от прайса (Арад) — не зависит от скидки
+  const arad = calcVariant({ list: 100000, plans: [], grid, downPct: 30, months: 36, disc: 4, cap: 10, ceiling: 10, cond: { ...COND, fix_base: 'list' }, ext: true })
+  assert.equal(arad.split.fix, 5000); assert.ok(Math.abs(arad.split.agentFix - 2000) < 0.01)
 })
 test('калькулятор (QA 10.11): план выбирается по взносу и сроку; срок до 120; план без срока — ориентировочно', async () => {
   const { pickPlan, startPlan } = await import('../../lib/calc.ts')
@@ -131,7 +153,7 @@ test('калькулятор (QA 10.11): план выбирается по вз
   const a = calcVariant({ list: 100000, plans: marina, downPct: 60, months: 12, disc: 0 })
   assert.equal(a.plan.id, 'inst'); assert.equal(a.downPct, 60); assert.equal(a.months, 12); assert.equal(a.clamped.length, 0)
   const f = calcVariant({ list: 100000, plans: marina, downPct: 100, months: 12, disc: 0 })
-  assert.equal(f.plan.id, 'full'); assert.equal(f.months, 0); assert.equal(f.total, 95000)
+  assert.equal(f.plan.id, 'full'); assert.equal(f.months, 0); assert.equal(f.total, 100000, '361: «скидка за 100 %» — максимум, а не вычет'); assert.equal(f.poolPct, 5)
   const lo = calcVariant({ list: 100000, plans: marina, downPct: 10, months: 12, disc: 0 })
   assert.equal(lo.plan.id, 'inst'); assert.equal(lo.downPct, 30, 'взнос ниже минимума подтягивается к рассрочке, не к 100 %')
   const free = calcVariant({ list: 100000, plans: [], downPct: 20, months: 200, disc: 0 })

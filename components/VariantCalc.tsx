@@ -63,11 +63,11 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   const [asking, setAsking] = useState(false) // партнёр: «Попросить больше» — скидка сверх его части пула, на согласование
   const params = JSON.stringify({ downPct: r.downPct, months: r.months, disc: r.disc, start, options: picked, planId: r.plan?.id || null })
   const load = (v: VariantView) => { setPlanId(v.params.planId || null); setDownPct(v.params.downPct); setMonths(v.params.months); setDisc(v.params.disc); if (v.params.start) setStart(v.params.start); setPicked(v.params.options || []); setAmt(null); setPctS(null) }
-  const cur = (v: VariantView) => calcVariant({ list, plans, grid, promo, mode, planId: v.params.planId || null, downPct: v.params.downPct, months: v.params.months, disc: v.params.disc, start: v.params.start, cap, ceiling: Math.max(ceiling, v.params.disc), cond, ext,
+  const cur = (v: VariantView) => calcVariant({ list, plans, grid, promo, mode, planId: v.params.planId || null, downPct: v.params.downPct, months: v.params.months, disc: v.params.disc, start: v.params.start, cap, ceiling: Math.max(ceiling, v.params.disc), askMax: ext ? Math.max(v.params.disc, 0) : undefined, poolPct: Math.max(Number(cond?.pool_pct ?? 0), v.params.disc), cond, ext,
     optionsUsd: options.filter((o) => (v.params.options || []).includes(o.id)).reduce((a, o) => a + o.usd, 0) })
   const fxs = (n: number) => (fx ? SIGN[fx.cur] + num(lang, Math.round(n * fx.perUsd)) : '')
   // ступени сетки — подсказка «ещё N % взноса — скидка M %»
-  const next = grid.filter((g) => g.from_pct > r.downPct).sort((a, b) => a.from_pct - b.from_pct)[0]
+  const next = grid.filter((g) => g.from_pct > r.downPct && (g.max_months == null || g.max_months >= r.months) && g.discount_pct > r.poolPct).sort((a, b) => a.from_pct - b.from_pct)[0]
   return (
     <div className={'stack vcalc' + (compact ? '' : ' card')} style={{ gap: 12 }}>
       {!compact && <div className="h3" style={{ margin: 0 }}>{title ?? T(client ? 'Рассрочка и платежи' : 'Калькулятор вариантов')}</div>}
@@ -83,15 +83,16 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         <label className="field"><span>{T('Срок рассрочки')} · <b>{r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки')}</b>{r.maxMonths ? <span className="tiny muted"> · {T('макс. {m} мес.', { m: r.maxMonths })}</span> : null}</span>
           <input type="range" className="disc" min={0} max={maxM} step={1} value={Math.min(r.months, maxM)} disabled={r.downPct >= 100} onChange={(e) => setMonths(Number(e.target.value))} />
           <span className="row" style={{ gap: 6 }}><input className="in in--sm" type="number" min={0} max={maxM} value={r.months} disabled={r.downPct >= 100} onChange={(e) => setMonths(Number(e.target.value) || 0)} style={{ width: 70 }} /><span className="small">{T('мес.')}</span></span></label>
-        {ceiling > 0 && r.poolAllowed && <label className="field"><span>{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')} · <b>{pct(lang, r.disc)}</b></span>
-          <input type="range" className="disc" min={0} max={ceiling} step={0.5} value={Math.min(disc, ceiling)} onChange={(e) => setDisc(Number(e.target.value))} />
-          <span className="between tiny muted"><span>0%</span>{cap < ceiling && <span>{T('без согласования до {p}', { p: pct(lang, cap) })}</span>}<span>{pct(lang, ceiling)}</span></span></label>}
+        {/* 361/349: предел ползунка — пул выбранного плана (у партнёра — его часть), меняется вместе со взносом и сроком */}
+        {ceiling > 0 && r.ceilingEff > 0 && r.poolAllowed && <label className="field"><span>{ext ? T('Скидка клиенту из вашей части') : T('Скидка клиенту')} · <b>{pct(lang, r.disc)}</b></span>
+          <input type="range" className="disc" min={0} max={r.ceilingEff} step={0.5} value={Math.min(disc, r.ceilingEff)} onChange={(e) => setDisc(Number(e.target.value))} />
+          <span className="between tiny muted"><span>0%</span>{r.capEff < r.ceilingEff && <span>{T('без согласования до {p}', { p: pct(lang, r.capEff) })}</span>}<span>{pct(lang, r.ceilingEff)}</span></span></label>}
         <label className="field"><span>{T('Дата первого взноса')}</span><input className="in" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} style={{ maxWidth: 200 }} /></label>
       </div>
       {options.length > 0 && <div className="noprint">{options.map((o) => (
         <label key={o.id} className="kv check" style={{ cursor: 'pointer' }}><span><input type="checkbox" checked={picked.includes(o.id)} onChange={(e) => setPicked((a) => (e.target.checked ? [...a, o.id] : a.filter((x) => x !== o.id)))} /> {o.title}</span><span className="small">+{usd(lang, o.usd)}</span></label>))}</div>}
-      {(r.clamped.length ? r.clamped : flash).map((k) => <div key={k} className="tiny warnc">{T(k, { p: pct(lang, r.minDown), m: r.maxMonths ?? 0, c: pct(lang, ceiling) })}</div>)}
-      {r.needsApproval && <div className="note small">{T('Скидка сверх {p} — вариант требует согласования владельца или руководителя рынка', { p: pct(lang, cap) })}</div>}
+      {(r.clamped.length ? r.clamped : flash).map((k) => <div key={k} className="tiny warnc">{T(k, { p: pct(lang, r.minDown), m: r.maxMonths ?? 0, c: pct(lang, r.ceilingEff) })}</div>)}
+      {r.needsApproval && <div className="note small">{T('Скидка сверх {p} — вариант требует согласования владельца или руководителя рынка', { p: pct(lang, r.capEff) })}</div>}
       <div className="vcalc__kpis">
         {[[T(client ? 'Цена' : 'Цена для клиента'), usd(lang, r.total), fx ? '≈ ' + fxs(r.total) : ''],
           [T('Первый взнос'), usd(lang, r.down), pct(lang, r.downPct)],
@@ -100,23 +101,27 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
       </div>
       <div className="small">
         <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, list)}</span></div>
-        {r.devAmt > 0 && <div className="kv"><span>{T('Скидка застройщика за взнос {p}', { p: pct(lang, r.downPct) })}</span><span>−{usd(lang, r.devAmt)} ({pct(lang, r.devPct)})</span></div>}
+        {/* 361: максимум скидки по выбранному взносу и сроку; партнёру — только его часть (наш пул ему не раскрываем) */}
+        {!client && (ext ? <div className="kv"><span>{T('Ваша часть по плану')}</span><span>{pct(lang, r.capEff)}</span></div>
+          : <div className="kv"><span>{T('Максимальная скидка по плану')}</span><span>{pct(lang, r.poolPct)} · {usd(lang, list * r.poolPct / 100)}{r.poolSource === 'pool' ? ' · ' + T('пул проекта') : ''}</span></div>)}
         {promo && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={r.promoApplied ? 'okc' : 'muted small'}>{r.promoApplied ? '−' + usd(lang, r.promoAmt) : T('не суммируется')}</span></div>}
-        {r.disc > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, r.base - r.final)} ({pct(lang, r.disc)})</span></div>}
+        {r.disc > 0 && <div className="kv"><span>{T('Скидка клиенту')}</span><span>−{usd(lang, r.base - r.final)} ({pct(lang, r.disc)})</span></div>}
         {optionsUsd > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optionsUsd)}</span></div>}
-        {next && <div className="tiny bronze mt8">{T('Взнос от {f} — скидка застройщика {d}', { f: pct(lang, next.from_pct), d: pct(lang, next.discount_pct) })}</div>}
+        {next && !ext && !client && <div className="tiny bronze mt8">{T('Взнос от {f} — максимальная скидка {d}', { f: pct(lang, next.from_pct), d: pct(lang, next.discount_pct) })}</div>}
       </div>
       <ScheduleTable rows={r.rows} price={r.total} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} />
       {self && r.split && <details className="noprint"><summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Для себя')}</summary>
         <div className="kv mt8"><span>{self === 'agent' ? T('Ваш доход по сделке') : self === 'seller' ? T('Ваш бонус по сделке') : T('Наш доход по сделке')}</span><b className="okc">{usd(lang, self === 'agent' ? r.split.agent : self === 'seller' ? r.split.seller : r.split.ours)}</b></div>
         {self === 'seller' && <div className="tiny muted">{T('{p} от нашей части — до вычета прочих долей по сделке', { p: pct(lang, cond?.seller_share_pct || 0) })}</div>}
-        {self === 'agent' && <div className="tiny muted">{T('Фикс {f} от итоговой цены + остаток вашей части пула после скидки', { f: pct(lang, cond?.agent_fix_pct || 0) })}</div>}</details>}
+        {self === 'agent' && <div className="tiny muted">{T(cond?.fix_base === 'list' ? 'Фикс {f} от прайса + остаток вашей части после скидки' : 'Фикс {f} от цены клиента + остаток вашей части после скидки', { f: pct(lang, cond?.agent_fix_pct || 0) })}</div>}</details>}
       {unitId && !client && <form action={saveAct} className="row noprint" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }} onSubmit={() => setVname('')}>
         <input type="hidden" name="unit" value={unitId} /><input type="hidden" name="params" value={params} />
         <label className="field" style={{ flex: '1 1 220px' }}><span title={T('Клиент видит «Вариант 1–3»')}>{T('Название варианта (только для вас)')}</span><input className="in" name="name" value={vname} onChange={(e) => setVname(e.target.value)} placeholder={T('Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки') })} maxLength={80} /></label>
         {clients.length > 0 && <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Клиент (необязательно)')}</span><select key={`client:${clientPreset || ''}`} className="in" name="client" defaultValue={clientPreset || ''}><option value="">—</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+        {/* 373: «Попросить больше» — только когда своя часть отдана клиенту целиком */}
         {ask && ceiling > 0 && (!asking
-          ? <button type="button" className="btn" onClick={() => setAsking(true)}>{T('Попросить больше')}</button>
+          ? (r.disc + 1e-9 >= r.capEff ? <button type="button" className="btn" onClick={() => setAsking(true)}>{T('Попросить больше')}</button>
+            : <span className="tiny muted">{T('«Попросить больше» — когда вся ваша часть отдана клиенту')}</span>)
           : <span className="row" style={{ gap: 6, flexBasis: '100%', flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <label className="field"><span>{T('Какая скидка нужна клиенту, %')}</span><input className="in" name="ask_pct" inputMode="decimal" style={{ width: 110 }} /></label>
               <label className="field" style={{ flex: '1 1 260px' }}><span>{T('Комментарий для руководителя рынка')}</span><input className="in" name="ask_note" maxLength={500} placeholder={T('Почему нужна большая скидка: бюджет клиента, конкурент, несколько квартир…')} /></label>

@@ -22,15 +22,15 @@ export async function calcInputs(unitId: string, user: User) {
     unit: u, options,
     base: {
       list: u.usd, plans, grid: activeGrid(gridAll, new Date().toISOString().slice(0, 10), u.building_id), promo: promo.promo, mode: promo.mode,
-      cond: cond ? { fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct } : null,
+      cond: cond ? { fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct, fix_base: cond.fix_base || 'final' } : null,
       ext, cap: cond ? maxDiscount(role, cond) : 0, ceiling: cond && canBook(role) ? discountCeiling(role, cond) : 0,
     } satisfies Omit<CalcIn, 'downPct' | 'months' | 'disc'>,
   }
 }
 
-export function runVariant(inp: NonNullable<Awaited<ReturnType<typeof calcInputs>>>, p: VariantParams): CalcOut {
+export function runVariant(inp: NonNullable<Awaited<ReturnType<typeof calcInputs>>>, p: VariantParams, askMax?: number): CalcOut {
   const optionsUsd = inp.options.filter((o) => (p.options || []).includes(o.id)).reduce((a, o) => a + o.usd, 0)
-  return calcVariant({ ...inp.base, planId: p.planId || null, downPct: p.downPct, months: p.months, disc: p.disc, start: p.start, optionsUsd })
+  return calcVariant({ ...inp.base, planId: p.planId || null, downPct: p.downPct, months: p.months, disc: p.disc, start: p.start, optionsUsd, askMax })
 }
 export const snapshotOf = (r: CalcOut, list: number): Snapshot => ({ list, total: r.total, down: r.down, monthly: r.monthly, months: r.months, downPct: r.downPct, last: r.last, devPct: r.devPct, disc: r.disc, approx: r.approx, needsApproval: r.needsApproval })
 

@@ -29,12 +29,17 @@ export async function saveVariant(_: unknown, f: FormData) {
   const p = parseParams(s(f, 'params'))
   // 10.11 (Денис): партнёр — до своей части пула; больше — только запросом («Попросить больше»), без показа нашей части и всего пула
   const ext = !!inp.base.ext, askPct = Number(s(f, 'ask_pct').replace(',', '.')) || 0, askNote = s(f, 'ask_note').slice(0, 500)
-  if (ext && askPct > p.disc) p.disc = askPct
-  if (ext && p.disc > inp.base.cap && !(askPct > 0)) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
+  // 373: «Попросить больше» — только когда своя часть (доля партнёра в пуле плана) отдана клиенту целиком
+  const own = runVariant(inp, { ...p, disc: 0 }).capEff // своя часть партнёра по выбранному взносу и сроку (349)
+  if (ext && askPct > p.disc) {
+    if (p.disc + 1e-9 < own) return { error: t(c.lang, 'Сначала отдайте клиенту свою часть целиком — затем «Попросить больше»') }
+    p.disc = askPct
+  }
+  if (ext && p.disc > own + 1e-9 && !(askPct > 0)) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
   // QA 10.11: нейтральный потолок запроса (не размер пула); отказ — за руководителем рынка
   if (ext && p.disc > 50) return { error: t(c.lang, 'Скидка больше {p}% не запрашивается', { p: 50 }) }
   // суммы — на сервере, по действующей цене; запрос партнёра не обрезаем по пулу (размер пула ему не раскрываем)
-  const r = runVariant(ext && askPct > 0 ? { ...inp, base: { ...inp.base, ceiling: 50 } } : inp, p)
+  const r = runVariant(inp, p, ext && askPct > 0 ? 50 : undefined)
   const name = s(f, 'name').slice(0, 80) || t(c.lang, 'Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? t(c.lang, '{m} мес.', { m: r.months }) : t(c.lang, 'без рассрочки') })
   const id = s(f, 'id')
   const params: VariantParams & { ask_note?: string } = { ...p, downPct: r.downPct, months: r.months, disc: r.disc, planId: r.plan?.id || null, ...(askNote ? { ask_note: askNote } : {}) }

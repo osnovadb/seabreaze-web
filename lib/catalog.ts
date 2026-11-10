@@ -122,6 +122,7 @@ export const planUrl = (fileId: string | null) => (fileId ? `/plan/${fileId}` : 
 export type Conditions = {
   id: string; project_id: string; version: number; status: string; valid_from: string; fix_pct: number; pool_pct: number
   agent_fix_pct: number; agent_pool_pct: number; agent_our_pool_share: number; seller_share_pct: number; seller_self_disc: number; seller_max_disc: number
+  fix_base?: 'list' | 'final' // 11.11: фикс от прайса (Арад) или от цены клиента (Premium)
   booking_days: number; booking_ext_days: number; protect_months: number; max_bookings_client: number; max_bookings_agent: number; max_bookings_total: number
   pay_timing: string; payment_plans: { name: string; note: string }[]; note: string | null; created_at: string; booking_fee: number; booking_fee_currency: string
   // 2.2 · условия договора на проект
@@ -131,7 +132,7 @@ export type Conditions = {
   // 2.2 · §8 ставки ролей
   head_bonus_pct?: number; escort_fix_usd?: number; referrer_pct?: number; consultant_pct?: number; vat_rate?: number; consultant_name?: string | null
 }
-const COND = `id, project_id, version, status, valid_from::text valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float,
+const COND = `id, project_id, version, status, valid_from::text valid_from, fix_pct::float, pool_pct::float, agent_fix_pct::float, agent_pool_pct::float, agent_our_pool_share::float, seller_share_pct::float, fix_base,
   seller_self_disc::float, seller_max_disc::float, booking_days, booking_ext_days, protect_months, max_bookings_client, max_bookings_agent, max_bookings_total, pay_timing, payment_plans, note, created_at, booking_fee::float, booking_fee_currency,
   reg_method, reg_response_days, silence_rule, silence_extra_days, reg_protect_months, reg_protect_months_sub, renew_remind_days, booking_write_api, rates_by_market, vat_mode,
   options_in_base, fx_rule, clawback_months, clawback_offset, payment_wait_days, sells_to_az,
@@ -174,8 +175,8 @@ export const VIEW_NAME: Record<string, string> = { sea: 'на море', marina:
 export const DIR_NAME: Record<string, string> = { N: 'север', NE: 'северо-восток', E: 'восток', SE: 'юго-восток', S: 'юг', SW: 'юго-запад', W: 'запад', NW: 'северо-запад' }
 
 // Сетка скидок застройщика за первый взнос (калькулятор вариантов): все ступени проекта — даты и блок фильтрует lib/calc activeGrid
-export const downGridFor = (projectId: string) => q<{ from_pct: number; discount_pct: number; building_id: string | null; valid_from: string | null; valid_to: string | null }>(
-  `select from_pct::float, discount_pct::float, building_id, valid_from::text, valid_to::text from portal.down_discounts where project_id = $1 order by from_pct`, [projectId])
+export const downGridFor = (projectId: string) => q<{ from_pct: number; discount_pct: number; max_months: number | null; building_id: string | null; valid_from: string | null; valid_to: string | null }>(
+  `select from_pct::float, discount_pct::float, max_months, building_id, valid_from::text, valid_to::text from portal.down_discounts where project_id = $1 order by from_pct, max_months nulls last`, [projectId])
 // Планы оплаты квартиры: весь проект или её блок, действующие сегодня
 export const plansFor = (projectId: string, buildingId: string | null) => q<Plan>(`select ${PLAN_COLS} from payment_plans
   where project_id = $1 and (building_id is null or building_id = $2) and (valid_from is null or valid_from <= current_date) and (valid_to is null or valid_to >= current_date) order by sort, name`, [projectId, buildingId])

@@ -8,7 +8,7 @@ import { bookingScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
 
-type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
+type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; plan_pool: number | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
 const PAGE = 200 // QA 10.11: «Все» у руководителя рынка — тысяча строк одним списком
 export default async function Bookings(
@@ -20,7 +20,7 @@ export default async function Bookings(
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
   const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.group_id, b.fee_status, b.fee_usd::float, b.fee_amount::float, b.fee_currency, b.price_list::float, b.discount_pct::float, portal.unit_no(bl.external_id, un.number) unit, un.id unit_id, un.status unit_status,
-      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, cl.kyc_status
+      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, cl.kyc_status
     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id
     where ${bs.sql} order by case when b.status in ('hold','queued','requested','confirmed','release_pending') then 0 else 1 end, b.ends_at`, bs.params)
   const active = rows.filter((r) => ['hold', 'queued', 'requested', 'confirmed', 'release_pending'].includes(r.status))
@@ -75,7 +75,7 @@ export default async function Bookings(
                     <td style={{ minWidth: 110 }}>{r.status === 'confirmed' && <><div style={{ height: 6, background: 'var(--stone)', borderRadius: 3 }}><div style={{ height: 6, borderRadius: 3, width: `${Math.max(4, Math.min(100, (left / total) * 100))}%`, background: left <= 3 ? 'var(--warn-line)' : 'var(--ok-line)' }} /></div><div className="tiny muted">{T('{d} дн.', { d: Math.max(0, left) })}</div></>}</td>
                     <td>{conflict(r) ? <Pill kind="bad">{T('у застройщика: не свободна')}</Pill> : r.status === 'requested' && r.approval === 'pending' ? <Pill kind="warn">{T('скидка на согласовании')}</Pill> : r.status === 'requested' && r.fee_status === 'due' ? <Pill kind="warn">{T('ждёт взнос')}</Pill> : r.status === 'requested' ? <Pill kind="warn">{T('ждёт офис в Баку')}</Pill> : r.status === 'confirmed' ? <Pill kind="ok">{T('подтверждена')}</Pill> : r.status === 'hold' ? <Pill kind="ink">{T('холд 24 ч')}</Pill> : r.status === 'queued' ? <Pill kind="warn">{T('в очереди у застройщика')}</Pill> : r.status === 'release_pending' ? <Pill kind="warn">{T('снять у застройщика')}</Pill> : r.status === 'declined' ? <Pill kind="bad">{T('отклонена')}</Pill> : r.status === 'converted' ? <Pill kind="ink">{T('договор')}</Pill> : <Pill kind="off">{T(r.status === 'cancelled' ? 'снята' : 'истекла')}</Pill>}</td>
                     <td style={{ minWidth: 260 }}><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                      {r.status === 'requested' && r.approval === 'pending' && canApproveDiscount(c.user.role) && <>{act('approve', 'Согласовать', true)}{act('decline', 'Отказать')}</>}
+                      {r.status === 'requested' && r.approval === 'pending' && canApproveDiscount(c.user.role) && <>{r.plan_pool != null && r.discount_pct > r.plan_pool + 1e-9 ? <span className="tiny bad">{T('больше максимума по плану ({p}) — только отказ', { p: pct(L, r.plan_pool) })}</span> : act('approve', 'Согласовать', true)}{act('decline', 'Отказать')}</>}
                       {r.fee_status === 'due' && live && ['owner', 'office', 'finance'].includes(c.user.role) && act('fee_paid', 'Взнос получен', true)}
                       {r.fee_status === 'paid' && ['cancelled', 'expired'].includes(r.status) && ['owner', 'finance'].includes(c.user.role) && <>{act('fee_refund', 'Вернуть взнос')}{act('fee_keep', 'Удержать')}</>}
                       {r.status === 'requested' && r.approval !== 'pending' && r.fee_status !== 'due' && canConfirmBooking(c.user.role) && confirm}
