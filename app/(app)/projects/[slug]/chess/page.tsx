@@ -65,7 +65,7 @@ export default async function ChessPage(
   const shown = side ? cu.filter((u) => u.view_side === side) : cu
   const layouts = Array.from(new Set(cu.map((u) => u.layout).filter(Boolean))).sort() as string[]
   const cs = clientScope(c.user)
-  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
+  const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') and cl.anonymized_at is null order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
   // этап 4 калькулятора: расчёт вариантов в боковой панели — те же данные и права, что на карточке квартиры
   const selCalc = sel && mode !== 'show' && sel.usd != null ? await calcViewProps(sel, c, { clients: clients.map((x) => ({ id: x.id, name: x.name })), clientId: curClient || null,
     bookable: codeFor(sel, c.user, mode, curClient) === 'F' && canBook(c.user.role) && sel.sales_status === 'sales' }) : null

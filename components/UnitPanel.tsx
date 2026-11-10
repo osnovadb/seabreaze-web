@@ -6,6 +6,7 @@ import { Pill } from '@/components/ui'
 import { startShow } from '@/lib/actions'
 import { quickUnit } from '@/lib/objects'
 import { ActionForm } from '@/components/ActionForm'
+import { FitHeight } from '@/components/FitHeight'
 
 const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 'ink']> = {
   F: ['Свободно', 'ok'], B: ['Бронь застройщика', 'warn'], S: ['Продано', 'bad'], N: ['Не в продаже', 'off'], SB: ['Передана агентству (Sea Breeze)', 'off'],
@@ -25,6 +26,7 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
   const show = mode === 'show'
   return (
     <div className="card upanel">
+      <FitHeight selector=".upanel" />
       <div className="between">
         <div>
           <div className="h3">{T('Квартира {n}', { n: unitNo(u) })}</div>
