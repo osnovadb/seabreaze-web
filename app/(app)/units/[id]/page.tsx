@@ -83,7 +83,7 @@ export default async function UnitPage(
         title={T('Квартира {n}', { n: unitNo(u) })} sub={`${T('{r} комн.', { r: u.rooms ?? '—' })} · ${m2(L, u.area)} · ${T('{f} этаж', { f: u.floor })} · ${u.building}`}
         right={<Pill kind={ck}>{T(cn)}</Pill>} />
       <div className="page split">
-        <div className="card">
+        <div className="stack" style={{ minWidth: 0 }}><div className="card">
           <div className="chips">{imgs.map(([k, l]) => <Link key={k} href={`?img=${encodeURIComponent(k)}`} className={'chip' + (cur === k ? ' on' : '')}>{l}</Link>)}</div>
           <div className="mt16">
             {cur === 'floor' && fp ? (
@@ -95,6 +95,9 @@ export default async function UnitPage(
               : <div className="ph"><img src={cur} alt="" /></div>}
           </div>
           {cur === 'floor' ? <div className="small muted mt8">{myCell ? T('Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.') : T('План этажа — квартира на нём ещё не размечена.')}</div> : cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
+        </div>
+          {/* калькулятор вариантов — под планировкой, на всю ширину левой колонки (место для сравнения вариантов) */}
+          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? discountCeiling(role, calcCond) : 0} self={calcSelf} />}
         </div>
         <div className="stack">
           <div className="card">
@@ -145,7 +148,6 @@ export default async function UnitPage(
               <form action={startShow} className="mt8"><input type="hidden" name="to" value={`/show/unit/${u.id}`} /><input type="hidden" name="lang" value={L} /><button className="btn btn--b btn--block">{T('Показать клиенту')}</button></form>
             )}
           </div>
-          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? discountCeiling(role, calcCond) : 0} self={calcSelf} />}
           {!ext && (
             <div className="card card--sand">
               <div className="label" style={{ color: 'var(--bronze)' }}>{T('Только для команды')}</div>
