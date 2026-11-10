@@ -26,3 +26,24 @@ test('вариант: суммы считает сервер; скидка вы�
   await act(S, 'deleteVariant', { id: v.id })
   assert.equal(await one('select 1 from portal.calc_variants where id = $1', [v.id]), undefined, 'автор не смог удалить свой вариант')
 })
+test('партнёр: скидка — до своей части пула; больше — только «Попросить больше», без показа нашей части', async () => {
+  const { agency, register } = await import('./h.mjs')
+  const ag = await agency('DE'); const H = await user('agency_head', { agency_id: ag.id })
+  const u = await freeUnit()
+  const cond = await one(`select agent_pool_pct::float own, pool_pct::float pool from portal.conditions where project_id = $1 and status = 'published' order by valid_from desc, version desc limit 1`, [u.project_id])
+  if (!(cond.pool > cond.own)) return // в условиях проекта нет нашей части пула — проверять нечего
+  const over = Math.min(cond.pool, cond.own + 1)
+  const r1 = await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: over }) })
+  assert.match(JSON.stringify(r1.result || r1), /Попросить больше/, 'скидка сверх своей части сохранилась без запроса')
+  assert.ok(!new RegExp(`\\b${cond.pool}\\b`).test(JSON.stringify(r1.result || r1)), 'в ответе партнёру виден размер пула')
+  await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: cond.own }), ask_pct: String(over), ask_note: 'QA клиент просит больше' })
+  const v = await one(`select * from portal.calc_variants where unit_id = $1 and author_id = $2 order by created_at desc limit 1`, [u.id, H.id])
+  assert.ok(v && v.needs_approval && Number(v.params.disc) === over, 'запрос «Попросить больше» не сохранил вариант на согласование: ' + JSON.stringify(v?.params))
+  const r3 = await act(H, 'saveVariant', { unit: u.id, params: JSON.stringify({ downPct: 40, months: 12, disc: 0 }), ask_pct: String(cond.pool + 5) })
+  assert.match(JSON.stringify(r3.result || r3), /согласовать нельзя/, 'запрос сверх всего пула принят')
+  assert.ok(!JSON.stringify(r3.result || r3).includes(String(cond.pool)), 'в ответе партнёру виден размер пула')
+  // бронь: сверх своей части без ask — отказ
+  const cl = (await register(H)).result?.id
+  const b = await act(H, 'createBooking', { unit: u.id, client: cl, discount: String(over) })
+  assert.match(JSON.stringify(b.result || b), /Попросить больше/, 'бронь со скидкой сверх своей части прошла без запроса')
+})

@@ -19,10 +19,10 @@ export type VariantView = { id: string; name: string; author: string; client: st
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date())
 const SIGN = { EUR: '€', ILS: '₪' } as const
 
-export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false }: {
+export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false, ask = false }: {
   list: number; plans: Plan[]; grid?: DownStep[]; promo?: PromoView | null; mode?: PromoMode; options?: Opt[]; fx: FxView; lang: Lang
   cond?: SplitCond | null; ext?: boolean; cap?: number; ceiling?: number; self?: 'agent' | 'ours' | 'seller' | null; title?: string; client?: boolean
-  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean
+  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean; ask?: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   // старт — с плана рассрочки (QA: открывался на «100% сразу»); дальше план выбирается сам по взносу и сроку, чип — только подсказка-пресет
@@ -54,9 +54,10 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   const maxM = r.maxMonths ?? MAX_FREE_MONTHS
   const [saved, saveAct, saving] = useActionState(saveVariant, null)
   const [vname, setVname] = useState('')
+  const [asking, setAsking] = useState(false) // партнёр: «Попросить больше» — скидка сверх его части пула, на согласование
   const params = JSON.stringify({ downPct: r.downPct, months: r.months, disc: r.disc, start, options: picked, planId: r.plan?.id || null })
   const load = (v: VariantView) => { setPlanId(v.params.planId || null); setDownPct(v.params.downPct); setMonths(v.params.months); setDisc(v.params.disc); if (v.params.start) setStart(v.params.start); setPicked(v.params.options || []); setAmt(null); setPctS(null) }
-  const cur = (v: VariantView) => calcVariant({ list, plans, grid, promo, mode, planId: v.params.planId || null, downPct: v.params.downPct, months: v.params.months, disc: v.params.disc, start: v.params.start, cap, ceiling, cond, ext,
+  const cur = (v: VariantView) => calcVariant({ list, plans, grid, promo, mode, planId: v.params.planId || null, downPct: v.params.downPct, months: v.params.months, disc: v.params.disc, start: v.params.start, cap, ceiling: Math.max(ceiling, v.params.disc), cond, ext,
     optionsUsd: options.filter((o) => (v.params.options || []).includes(o.id)).reduce((a, o) => a + o.usd, 0) })
   const fxs = (n: number) => (fx ? SIGN[fx.cur] + num(lang, Math.round(n * fx.perUsd)) : '')
   // ступени сетки — подсказка «ещё N % взноса — скидка M %»
@@ -108,6 +109,13 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         <input type="hidden" name="unit" value={unitId} /><input type="hidden" name="params" value={params} />
         <label className="field" style={{ flex: '1 1 220px' }}><span>{T('Название варианта')}</span><input className="in" name="name" value={vname} onChange={(e) => setVname(e.target.value)} placeholder={T('Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки') })} maxLength={80} /></label>
         {clients.length > 0 && <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Клиент (необязательно)')}</span><select className="in" name="client" defaultValue=""><option value="">—</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+        {ask && ceiling > 0 && (!asking
+          ? <button type="button" className="btn" onClick={() => setAsking(true)}>{T('Попросить больше')}</button>
+          : <span className="row" style={{ gap: 6, flexBasis: '100%', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label className="field"><span>{T('Какая скидка нужна клиенту, %')}</span><input className="in" name="ask_pct" inputMode="decimal" style={{ width: 110 }} /></label>
+              <label className="field" style={{ flex: '1 1 260px' }}><span>{T('Комментарий для руководителя рынка')}</span><input className="in" name="ask_note" maxLength={500} placeholder={T('Почему нужна большая скидка: бюджет клиента, конкурент, несколько квартир…')} /></label>
+              <button type="button" className="btn btn--sm btn--ghost" onClick={() => setAsking(false)}>{T('Отменить запрос')}</button>
+            </span>)}
         <button className="btn btn--p" disabled={saving}>{T('Сохранить вариант')}</button>
         {saved?.error && <span className="err tiny">{saved.error}</span>}{saved?.ok && <span className="okc tiny">{T('Вариант сохранён')}</span>}
       </form>}

@@ -2567,5 +2567,15 @@
 "Квартира недоступна": "Unit not available",
 "Только просмотр": "View only",
 "Скидка в варианте «{n}» согласована": "Discount in option “{n}” approved",
-"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Payment option with {d}% discount awaits approval: {n}"
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Payment option with {d}% discount awaits approval: {n}",
+"Попросить больше": "Ask for more",
+"Какая скидка нужна клиенту, %": "Discount the client needs, %",
+"Комментарий для руководителя рынка": "Comment for the market head",
+"Почему нужна большая скидка: бюджет клиента, конкурент, несколько квартир…": "Why a bigger discount is needed: client budget, competitor, several units…",
+"Бронь уйдёт на согласование руководителю рынка; офис подтвердит её после решения.": "The booking goes to the market head for approval; the office confirms it after the decision.",
+"Отменить запрос": "Cancel request",
+"Скидка больше вашей части — нажмите «Попросить больше»": "Discount above your share — use “Ask for more”",
+"Такую скидку согласовать нельзя — уменьшите запрос": "This discount cannot be approved — lower the request",
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»": "Payment option with {d}% discount awaits approval: {n} — “{c}”",
+"Запрос скидки {p}% по {u}: {n}": "Discount request {p}% for {u}: {n}"
 }

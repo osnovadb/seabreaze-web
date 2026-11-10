@@ -25,11 +25,16 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   // Скидка застройщика за 100% снижает цену до раздела денег
   const ch = priceChain(priceList, plan, promo, mode)
   const list = ch.base
-  const maxDisc = ch.poolAllowed ? ceiling : 0
+  // 10.11 (Денис): партнёру ползунок — до его части пула; больше — «Попросить больше» без показа нашей части и всего пула
+  const maxDisc = ch.poolAllowed ? (ext ? cap : ceiling) : 0
+  const [ask, setAsk] = useState(false)
+  const [askPct, setAskPct] = useState('')
   useEffect(() => { if (disc > maxDisc) setDisc(maxDisc) }, [maxDisc]) // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false)
   const [st, act] = useActionState(createBooking, null)
-  const sp = split(cond, list, disc, ext)
+  const askN = Number(askPct.replace(',', '.')) || 0
+  const eff = ext && ask && askN > disc ? askN : disc // скидка, с которой уходит бронь
+  const sp = split(cond, list, eff, ext)
   const [picked, setPicked] = useState<string[]>([])
   // Опции — сверху итоговой цены, без скидок и вне раздела денег (комиссия считается с квартиры)
   const optSum = options.filter((o) => picked.includes(o.id)).reduce((a, o) => a + o.usd, 0)
@@ -55,10 +60,19 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         </div>}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
         <div className="small muted">{ext ? T('Вам выделено {p} от прайса: сколько отдать клиенту, а сколько оставить себе — решаете вы', { p: pct(lang, cond.agent_pool_pct) }) : T('Сами — до {p}, больше — с согласованием руководителя', { p: pct(lang, cap) })}</div>
-        <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} name="discount" />
+        <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} />
+        <input type="hidden" name="discount" value={eff} />{ext && ask && askN > disc && <input type="hidden" name="ask" value="1" />}
         <div className="between small muted"><span>0%</span><b style={{ color: 'var(--ink)' }}>{pct(lang, disc)}</b><span>{pct(lang, maxDisc)}</span></div>
         {!ch.poolAllowed && <div className="note mt8">{T('По условиям акции «{n}» скидка из пула не применяется.', { n: promo?.name || '' })}</div>}
-        {disc > cap && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, cap) })}</div>}
+        {ext && ch.poolAllowed && (!ask
+          ? <button type="button" className="btn btn--sm mt8" onClick={() => setAsk(true)}>{T('Попросить больше')}</button>
+          : <div className="card card--tight stack mt8" style={{ gap: 6 }}>
+              <label className="field"><span>{T('Какая скидка нужна клиенту, %')}</span><input className="in" inputMode="decimal" value={askPct} onChange={(e) => setAskPct(e.target.value)} style={{ maxWidth: 120 }} /></label>
+              <label className="field"><span>{T('Комментарий для руководителя рынка')}</span><textarea className="in" name="ask_note" rows={2} maxLength={500} placeholder={T('Почему нужна большая скидка: бюджет клиента, конкурент, несколько квартир…')} /></label>
+              <div className="tiny muted">{T('Бронь уйдёт на согласование руководителю рынка; офис подтвердит её после решения.')}</div>
+              <div><button type="button" className="btn btn--sm btn--ghost" onClick={() => { setAsk(false); setAskPct('') }}>{T('Отменить запрос')}</button></div>
+            </div>)}
+        {!ext && disc > cap && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, cap) })}</div>}
         <div className="grid g2 mt16">
           <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, sp.final)}</div><div className="tiny muted">{(list < priceList ? T('цена с учётом акции и плана {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) }) : T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, sp.discount) }))}</div></div>
           {ext
@@ -66,12 +80,12 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
             : showOurs ? <div className="card card--tight" style={{ background: 'var(--ok-bg)', borderColor: 'var(--ok-line)' }}><div className="small okc">{T('Наш доход по сделке')}</div><div className="big num okc">{usd(lang, sp.ours)}</div><div className="tiny okc">{T('фикс {f} + пул {p} · продавцу {s}', { f: usd(lang, sp.ourFix), p: usd(lang, sp.ourPool), s: usd(lang, sp.seller) })}</div></div>
               : <div className="card card--tight"><div className="small muted">{T('Скидка')}</div><div className="big num">{pct(lang, disc)}</div></div>}
         </div>
-        {plan && <><div className="label mt16">{T('График платежей')}{disc > 0 ? ' · ' + T('с учётом скидки {p}', { p: pct(lang, disc) }) : ''}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
+        {plan && <><div className="label mt16">{T('График платежей')}{eff > 0 ? ' · ' + T('с учётом скидки {p}', { p: pct(lang, eff) }) : ''}</div><ScheduleTable plan={plan} price={sp.final} lang={lang} fx={fx} expanded={open} onExpand={() => setOpen(true)} /></>}
         <div className="mt16">
           <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, priceList)}</span></div>
           {ch.planAmt > 0 && <div className="kv"><span>{T('Скидка за 100%')}</span><span>−{usd(lang, ch.planAmt)}</span></div>}
           {promo && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
-          {disc > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, sp.discount)} ({pct(lang, disc)})</span></div>}
+          {eff > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, sp.discount)} ({pct(lang, eff)})</span></div>}
           <div className="kv"><span>{T('Итоговая цена')}</span><span>{usd(lang, sp.final)}</span></div>
           {optSum > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optSum)} · {T('всего {a}', { a: usd(lang, sp.final + optSum) })}</span></div>}
           {ext && <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(lang, cond.agent_fix_pct)} {T('от итоговой цены')} · {usd(lang, sp.agentFix)}</span></div>}

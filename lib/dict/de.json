@@ -2567,5 +2567,15 @@
 "Квартира недоступна": "Wohnung nicht verfügbar",
 "Только просмотр": "Nur Ansicht",
 "Скидка в варианте «{n}» согласована": "Rabatt in der Variante „{n}“ freigegeben",
-"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Variante mit {d} % Rabatt wartet auf Freigabe: {n}"
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n}": "Variante mit {d} % Rabatt wartet auf Freigabe: {n}",
+"Попросить больше": "Mehr anfragen",
+"Какая скидка нужна клиенту, %": "Benötigter Rabatt für den Kunden, %",
+"Комментарий для руководителя рынка": "Kommentar für die Marktleitung",
+"Почему нужна большая скидка: бюджет клиента, конкурент, несколько квартир…": "Warum ein höherer Rabatt nötig ist: Budget, Wettbewerber, mehrere Wohnungen…",
+"Бронь уйдёт на согласование руководителю рынка; офис подтвердит её после решения.": "Die Reservierung geht zur Freigabe an die Marktleitung; das Büro bestätigt nach der Entscheidung.",
+"Отменить запрос": "Anfrage zurücknehmen",
+"Скидка больше вашей части — нажмите «Попросить больше»": "Rabatt über Ihrem Anteil — bitte „Mehr anfragen“",
+"Такую скидку согласовать нельзя — уменьшите запрос": "Dieser Rabatt kann nicht freigegeben werden — bitte Anfrage senken",
+"Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»": "Variante mit {d} % Rabatt wartet auf Freigabe: {n} — „{c}“",
+"Запрос скидки {p}% по {u}: {n}": "Rabattanfrage {p} % für {u}: {n}"
 }

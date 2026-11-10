@@ -463,7 +463,11 @@ export async function createBooking(_: unknown, f: FormData) {
   if (!(await priceNegotiation(cMarket)) && c.user.role !== 'owner' && !(c.user.role === 'market_head' && (c.user.market || 'GLOBAL') === 'GLOBAL'))
     return { error: 'На рынке клиента переговоры о цене выключены — бронь и скидку запрашивает руководитель Global' }
   const cap = maxDiscount(c.user.role, cond), ceiling = discountCeiling(c.user.role, cond)
-  if (disc > ceiling) return { error: t(c.lang, 'Скидка больше {p}% — только по запросу', { p: ceiling }) }
+  // 10.11 (Денис): партнёру ползунок — до его части пула; больше — только «Попросить больше» (ask=1), без показа нашей части и всего пула
+  const extReq = isExternal(c.user.role)
+  if (extReq && disc > cap && !f.get('ask')) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
+  if (disc > ceiling) return { error: extReq ? t(c.lang, 'Такую скидку согласовать нельзя — уменьшите запрос') : t(c.lang, 'Скидка больше {p}% — только по запросу', { p: ceiling }) }
+  const askNote = String(f.get('ask_note') || '').trim().slice(0, 500)
   // Сверх своего порога — бронь ставится, но ждёт согласования владельца или руководителя рынка (офис не подтверждает до решения)
   const approval = disc > cap ? 'pending' : null
   const active = await one<{ cl: number; ag: number; tot: number }>(`select
@@ -518,7 +522,8 @@ export async function createBooking(_: unknown, f: FormData) {
   if (approval) {
     const mk = (await one<{ market: string | null }>('select market from portal.clients where id = $1', [clientId]))?.market
     for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [mk])) await notify(o.id, 'booking', 'Скидка {p}% по брони {u} ждёт согласования', '/bookings', { p: disc, u })
-    await queueTask(clientId, `Discount approval · ${disc}% · ${u}`, `Скидка ${disc}% сверх порога автора (${c.user.name}). Согласовать или отклонить — во вкладке Units → Условия покупки.`, 'market_head') // §13 п.9
+    await queueTask(clientId, `Discount approval · ${disc}% · ${u}`, `Скидка ${disc}% сверх порога автора (${c.user.name}).${askNote ? ' Комментарий: ' + askNote : ''} Согласовать или отклонить — во вкладке Units → Условия покупки.`, 'market_head') // §13 п.9
+    if (askNote) await q(`insert into portal.activities (client_id, user_id, kind, text, vars, internal) values ($1,$2,'system','Запрос скидки {p}% по {u}: {n}',$3,true)`, [clientId, c.user.id, { p: disc, u, n: askNote }])
   } else if (!queued) {
     for (const o of await q<{ id: string }>(`select id from portal.users where role = 'office' and active`)) await notify(o.id, 'booking', fee ? 'Новая платная бронь {u}: ждём взнос, затем подтверждение у застройщика' : 'Новая бронь {u} ждёт подтверждения у застройщика', '/bookings', { u })
     // §12 «Reservation request: задача бэк-офису» — в Bitrix24, к сделке клиента
