@@ -2577,5 +2577,13 @@
 "Скидка больше вашей части — нажмите «Попросить больше»": "Rabatt über Ihrem Anteil — bitte „Mehr anfragen“",
 "Такую скидку согласовать нельзя — уменьшите запрос": "Dieser Rabatt kann nicht freigegeben werden — bitte Anfrage senken",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»": "Variante mit {d} % Rabatt wartet auf Freigabe: {n} — „{c}“",
-"Запрос скидки {p}% по {u}: {n}": "Rabattanfrage {p} % für {u}: {n}"
+"Запрос скидки {p}% по {u}: {n}": "Rabattanfrage {p} % für {u}: {n}",
+"Документы KYC запрошены — ждём загрузку клиентом": "KYC-Dokumente angefordert — warten auf Upload durch den Kunden",
+"Запросить документы": "Dokumente anfordern",
+"KYC на проверке": "KYC in Prüfung",
+"Договор на согласовании": "Vertrag in Abstimmung",
+"Договор на согласовании с {d}": "Vertrag in Abstimmung seit {d}",
+"«Договор на согласовании» и «Договор подписан» — после пройденного KYC": "„Vertrag in Abstimmung“ und „Vertrag unterzeichnet“ — nach bestandener KYC",
+"Отказ клиента — причина": "Absage des Kunden — Grund",
+"Сделка в Bitrix24 уйдёт в Lost с этой причиной; руками стадии после Selection в Bitrix24 не двигаются.": "Der Deal in Bitrix24 geht mit diesem Grund auf Lost; Phasen nach Selection werden in Bitrix24 nicht manuell verschoben."
 }

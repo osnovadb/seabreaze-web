@@ -2577,5 +2577,13 @@
 "Скидка больше вашей части — нажмите «Попросить больше»": "Discount above your share — use “Ask for more”",
 "Такую скидку согласовать нельзя — уменьшите запрос": "This discount cannot be approved — lower the request",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»": "Payment option with {d}% discount awaits approval: {n} — “{c}”",
-"Запрос скидки {p}% по {u}: {n}": "Discount request {p}% for {u}: {n}"
+"Запрос скидки {p}% по {u}: {n}": "Discount request {p}% for {u}: {n}",
+"Документы KYC запрошены — ждём загрузку клиентом": "KYC documents requested — waiting for the client to upload",
+"Запросить документы": "Request documents",
+"KYC на проверке": "KYC under review",
+"Договор на согласовании": "Contract under approval",
+"Договор на согласовании с {d}": "Contract under approval since {d}",
+"«Договор на согласовании» и «Договор подписан» — после пройденного KYC": "“Contract under approval” and “Contract signed” — after KYC is passed",
+"Отказ клиента — причина": "Client refusal — reason",
+"Сделка в Bitrix24 уйдёт в Lost с этой причиной; руками стадии после Selection в Bitrix24 не двигаются.": "The Bitrix24 deal goes to Lost with this reason; stages after Selection are not moved by hand in Bitrix24."
 }

@@ -70,3 +70,7 @@ export const REG_ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'in
 // Источник клиента и согласия — словами (QA 09.11: в отчётах и журнале согласий были коды partner_link, consent_link)
 export const SOURCE_LABEL: Record<string, string> = { agent: 'Партнёр', partner: 'Партнёр', partner_link: 'Ссылка партнёра', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация',
   quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт', bitrix24: 'Bitrix24', consent_link: 'Ссылка согласия', withdraw: 'Отзыв согласия' }
+
+// Причины отказа — как в Bitrix24 («Правила работы», гл. 6); прежние русские причины v2 — сопоставление для обмена
+export const B24_LOST = ['Price', 'Financing', 'No trust', 'Not ready', 'No contact', 'Chose other project', 'Chose other agency', 'Developer client', 'Registered with other agency', 'Compliance', 'Other']
+export const LOST_TO_B24: Record<string, string> = { 'дорого': 'Price', 'не то место': 'Chose other project', 'купил другое': 'Chose other project', 'не выходит на связь': 'No contact', 'сроки сдачи': 'Not ready', 'другое': 'Other' }

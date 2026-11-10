@@ -5,14 +5,16 @@ import { q, one } from '@/lib/db'
 import { t, usd, date } from '@/lib/i18n'
 import { listProjects, buildingsOf } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
-import { bookingAction, dealPaid } from '@/lib/actions'
+import { bookingAction, dealPaid, refuseClient } from '@/lib/actions'
+import { kycLink } from '@/lib/kycActions'
+import { B24_LOST } from '@/lib/stages'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 import { setEscort } from '@/lib/moneyActions'
 import { ConsentBox } from '@/components/ConsentBox'
 import { clientScope } from '@/lib/scope'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
+type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 export default async function Units(
@@ -28,15 +30,15 @@ export default async function Units(
   const cs = clientScope(c.user)
   const visible = await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
   if (!visible) notFound()
-  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string
+  const cl = await one<{ id: string; name: string; attach_status: string; protected_until: string | null; b24_deal_id: number | null; market: string | null; kyc_status: string; kyc_token: string | null
     consent_status: string; consent_token: string | null; consent_at: string | null; marketing_consent_at: string | null; phone_norm: string | null; email: string | null; language: string | null; do_not_contact: boolean }>(
-    `select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status, consent_status, consent_token, consent_at, marketing_consent_at, phone_norm, email, language, do_not_contact
+    `select id, name, attach_status, protected_until::text, b24_deal_id, market, kyc_status, kyc_token, consent_status, consent_token, consent_at, marketing_consent_at, phone_norm, email, language, do_not_contact
      from portal.clients where id = $1`, [params.id])
   if (!cl) notFound()
   const units = await q<U>(`with b as (select distinct on (unit_id) * from portal.bookings where client_id = $1 and status in ('hold','queued','requested','confirmed','release_pending','converted') order by unit_id, created_at desc),
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
-      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id,
+      coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
       d.id deal_id, d.paid_pct::float paid
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
@@ -106,9 +108,18 @@ export default async function Units(
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('reject')}
                   <label className="field"><span>{T('Причина отказа')}</span><select name="reason" className="in">{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <button className="btn btn--sm">{T('Отклонить')}</button></form></div>}
-              {u.status === 'confirmed' && office && (cl.kyc_status === 'passed'
-                ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
-                : <div className="small muted">{T('«Договор подписан» — после пройденного KYC')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></div>)}
+              {/* гл. 6 (решение 341): стадии после Selection двигает портал — кнопки по шагам: KYC → SPA approval → SPA signed */}
+              {u.status === 'confirmed' && office && <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {!['pending', 'passed'].includes(cl.kyc_status) && (cl.kyc_token
+                  ? <span className="small muted">{T('Документы KYC запрошены — ждём загрузку клиентом')}</span>
+                  : <form action={kycLink}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--sm btn--p">{T('Запросить документы')}</button></form>)}
+                {cl.kyc_status === 'pending' && <span className="small muted">{T('KYC на проверке')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></span>}
+                {cl.kyc_status === 'passed' && !u.spa_approval_at && <form action={bookingAction}>{h('spa_approval')}<button className="btn btn--sm">{T('Договор на согласовании')}</button></form>}
+                {cl.kyc_status === 'passed' && u.spa_approval_at && <span className="small okc">{T('Договор на согласовании с {d}', { d: date(L, u.spa_approval_at) })}</span>}
+                {cl.kyc_status === 'passed'
+                  ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
+                  : <span className="small muted">{T('«Договор на согласовании» и «Договор подписан» — после пройденного KYC')}</span>}
+              </div>}
               {['confirmed', 'converted'].includes(u.status!) && office && staff.length > 0 && <form action={setEscort} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.booking_id!} />
                 <label className="field"><span>{T('Сопровождающий в Баку')}</span><select key={`escort:${String(u.escort_id || '')}`} name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 <button className="btn btn--sm">{T('Сохранить')}</button></form>}
@@ -120,6 +131,12 @@ export default async function Units(
                 : <div className="small muted">{T('Оплачено клиентом')}: {u.paid ?? 0}%</div>)}
             </div>
           })}
+          {['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <input type="hidden" name="client" value={cl.id} />
+            <label className="field"><span>{T('Отказ клиента — причина')}</span><select name="reason" className="in" defaultValue="Price">{B24_LOST.filter((x) => x !== 'Compliance').map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <button className="btn btn--sm">{T('Отказ')}</button>
+            <span className="tiny muted">{T('Сделка в Bitrix24 уйдёт в Lost с этой причиной; руками стадии после Selection в Bitrix24 не двигаются.')}</span>
+          </form>}
         </div>}
       </div>
     </>

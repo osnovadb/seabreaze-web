@@ -67,6 +67,8 @@ test('бронь → Reservation request → Reserved → KYC → SPA signed →
   await q(`update portal.clients set kyc_status = 'pending' where id = $1`, [sale])
   await act(OF, 'reviewKyc', { client: sale, decision: 'passed' })
   assert.equal(await stageName(c.b24_deal_id), 'KYC')
+  await act(OF, 'bookingAction', { id: b.id, act: 'spa_approval' }) // гл. 6: «Договор на согласовании» — после KYC Passed
+  assert.equal(await stageName(c.b24_deal_id), 'SPA approval')
   await act(OF, 'bookingAction', { id: b.id, act: 'contract' })
   assert.equal(await stageName(c.b24_deal_id), 'SPA signed')
   const d = await one('select id from portal.deals where client_id = $1', [sale])
@@ -138,4 +140,15 @@ test('две подтверждённые брони → две сделки: в
   assert.equal(d2.CATEGORY_ID, d1.CATEGORY_ID); assert.equal(String(d2.CONTACT_ID), String(d1.CONTACT_ID))
   assert.equal(Number(d1.OPPORTUNITY), Math.round(bs[0].price)); assert.equal(Number(d2.OPPORTUNITY), Math.round(bs[1].price))
   assert.equal(await stageName(bs[1].b24_deal_id), 'Reserved')
+})
+test('«Отказ» во вкладке Units → сделка Lost с причиной из списка (гл. 6)', { skip }, async () => {
+  const S = await user('seller', { market: 'DE' })
+  const r = await register(S, { name: 'QA B24 Refuse' })
+  const c = await keep(r.result.id)
+  assert.ok(c.b24_deal_id, 'нет сделки клиента команды')
+  await act(S, 'refuseClient', { client: c.id, reason: 'Financing' })
+  const d = await b24('crm.deal.get', { id: c.b24_deal_id })
+  assert.equal(d.STAGE_SEMANTIC_ID, 'F', 'сделка не закрыта как Lost')
+  const f = (await b24('crm.deal.userfield.list', { filter: { FIELD_NAME: 'UF_CRM_GE_LOST' } }))[0]
+  assert.equal(f.LIST.find((x) => String(x.ID) === String(d.UF_CRM_GE_LOST))?.VALUE, 'Financing')
 })

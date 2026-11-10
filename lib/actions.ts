@@ -16,7 +16,7 @@ import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mail
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, type Lang } from './i18n'
-import { stageBlock, LOST_REASONS } from './stages'
+import { stageBlock, LOST_REASONS, B24_LOST } from './stages'
 import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
 import { autoPost } from './posts'
 import { syncAct } from './acts'
@@ -276,7 +276,7 @@ export async function moveStage(clientId: string, target: string, extra?: { reas
     await q(`update portal.clients set pause_until = $2, last_activity_at = now() where id = $1`, [clientId, extra.until])
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Пауза до {d}',$3)`, [clientId, c.user.id, { d: extra.until }])
   } else if (target === 'lost') {
-    if (!extra?.reason || !LOST_REASONS.includes(extra.reason)) return { error: t(c.lang, 'Выберите причину отказа') }
+    if (!extra?.reason || ![...LOST_REASONS, ...B24_LOST].includes(extra.reason)) return { error: t(c.lang, 'Выберите причину отказа') }
     await q(`update portal.clients set stage = 'lost', lost_reason = $2, pause_until = null, last_activity_at = now() where id = $1`, [clientId, extra.reason])
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Стадия: {stage}{r}',$3)`, [clientId, c.user.id, { stage: 'lost', r: ' · ' + extra.reason }])
   } else {
@@ -579,6 +579,11 @@ export async function bookingAction(f: FormData) {
     await q(`update portal.bookings set status = 'cancelled' where id = $1`, [id])
     if (b.status === 'confirmed') await pbEnqueue(b.unit_id, 'release', id, c.user.id) // снять бронь и в Profitbase
     if (b.fee_status === 'paid') for (const o of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(o.id, 'booking', 'Оплаченная бронь снята — решите по взносу: вернуть или удержать', '/bookings?f=fee')
+  } else if (act === 'spa_approval' && canConfirmBooking(c.user.role) && b.status === 'confirmed') {
+    // гл. 6 (решение 341): «Договор на согласовании» → SPA approval; только после пройденного KYC
+    const kyc = await one<{ k: string | null }>('select kyc_status k from portal.clients where id = $1', [b.client_id])
+    if (kyc?.k !== 'passed') return
+    await q('update portal.bookings set spa_approval_at = coalesce(spa_approval_at, now()), spa_approval_by = coalesce(spa_approval_by, $2) where id = $1', [id, c.user.id])
   } else if (act === 'contract' && canConfirmBooking(c.user.role) && b.status === 'confirmed') { // «Договор подписан» ставит бэк-офис (§14)
     // Договор — только после пройденного KYC (v2)
     if ((await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [b.client_id]))?.kyc_status !== 'passed') return
@@ -608,13 +613,24 @@ export async function bookingAction(f: FormData) {
   }
   await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
-  const NOTE: Record<string, string> = { confirm: 'бронь подтверждена у застройщика', reject: 'бронь отклонена', release_confirm: 'бронь снята у застройщика', release_hold: 'холд снят', cancel: 'бронь снята', contract: 'договор подписан (SPA signed)', extend: 'бронь продлена', approve: 'скидка согласована', decline: 'скидка не согласована' }
+  const NOTE: Record<string, string> = { spa_approval: 'договор на согласовании (SPA approval)', confirm: 'бронь подтверждена у застройщика', reject: 'бронь отклонена', release_confirm: 'бронь снята у застройщика', release_hold: 'холд снят', cancel: 'бронь снята', contract: 'договор подписан (SPA signed)', extend: 'бронь продлена', approve: 'скидка согласована', decline: 'скидка не согласована' }
   if (NOTE[act]) await pushDeal(b.client_id, NOTE[act])
   revalidatePath('/bookings')
   revalidatePath(`/clients/${b.client_id}`); revalidatePath('/clients'); revalidatePath('/')
   revalidatePath(`/b24/units/${b.client_id}`)
   // QA 09.11: после «Договор подписан» строка пропадала из броней молча — возвращаемся с пояснением
   if (act === 'contract' && s(f, 'back') === 'bookings') redirect(`/bookings?contract=${id}`)
+}
+
+// гл. 6 (решение 341): «Отказ» во вкладке Units — Lost с причиной из списка (Price, Financing, …); стадию Lost в Bitrix24 ставит портал
+export async function refuseClient(f: FormData) {
+  const c = await writeCtx()
+  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) return
+  const id = s(f, 'client'), reason = B24_LOST.includes(s(f, 'reason')) ? s(f, 'reason') : 'Other'
+  const r = await moveStage(id, 'lost', { reason })
+  if (r?.error) return
+  await pushDeal(id, `отказ клиента: ${reason}`)
+  revalidatePath(`/b24/units/${id}`); revalidatePath(`/clients/${id}`)
 }
 
 /* ── Подборки ── */
