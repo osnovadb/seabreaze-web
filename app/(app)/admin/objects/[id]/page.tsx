@@ -91,7 +91,7 @@ export default async function ObjectCard(
 
   function Blocks() {
     const row = (b?: (typeof blocks)[number]) => (
-      <ActionForm key={b?.id || 'new'} action={saveBuilding} lang={L} reset={!b} className="objrow" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr auto auto' }}>
+      <ActionForm key={b?.id || 'new'} action={saveBuilding} lang={L} reset={!b} className="objrow" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr 96px 32px' }}>
         <input type="hidden" name="project" value={p!.id} />{b && <input type="hidden" name="id" value={b.id} />}
         <input className="in" name="name" defaultValue={b?.name} placeholder={T('Название блока')} required />
         <input className="in" name="code" defaultValue={b?.external_id || ''} placeholder={T('Код (A, B…)')} />
@@ -105,7 +105,7 @@ export default async function ObjectCard(
     )
     return (
       <div className="card stack" style={{ gap: 8 }}>
-        <div className="objhead" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr auto auto' }}>{['Название', 'Код', 'Тип', 'Этажей', 'Сдача блока', 'Порядок', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
+        <div className="objhead" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr 96px 32px' }}>{['Название', 'Код', 'Тип', 'Этажей', 'Сдача блока', 'Порядок', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
         {blocks.map((b) => row(b))}
         <div className="label mt8">{T('Новый блок')}</div>
         {row()}
@@ -116,7 +116,7 @@ export default async function ObjectCard(
 
   function Layouts() {
     const row = (l?: (typeof layouts)[number]) => (
-      <ActionForm key={l?.id || 'new'} action={saveLayout} lang={L} reset={!l} className="objrow" style={{ gridTemplateColumns: '64px .8fr .8fr 1fr .5fr .6fr .6fr .6fr 1.2fr auto' }}>
+      <ActionForm key={l?.id || 'new'} action={saveLayout} lang={L} reset={!l} className="objrow" style={{ gridTemplateColumns: '64px .8fr .8fr 1fr .5fr .6fr .6fr .6fr 1.2fr 110px' }}>
         <input type="hidden" name="project" value={p!.id} />{l && <input type="hidden" name="id" value={l.id} />}
         {l?.plan_file ? <a href={planUrl(l.plan_file)!} target="_blank"><img src={planUrl(l.plan_file)!} alt="" style={{ width: 56, height: 40, objectFit: 'contain', background: '#fff', border: '1px solid var(--line)', borderRadius: 4 }} /></a> : <span className="tiny muted">{T('нет плана')}</span>}
         <input className="in" name="code" defaultValue={l?.code} placeholder={T('Код')} required />
@@ -132,7 +132,7 @@ export default async function ObjectCard(
     )
     return (
       <div className="card stack" style={{ gap: 8 }}>
-        <div className="objhead" style={{ gridTemplateColumns: '64px .8fr .8fr 1fr .5fr .6fr .6fr .6fr 1.2fr auto' }}>{['План', 'Код', 'Тип', 'Название', 'Спален', 'Общая', 'Внутр.', 'Терраса', 'Файл плана', ''].map((h, i) => <span key={i}>{T(h)}</span>)}</div>
+        <div className="objhead" style={{ gridTemplateColumns: '64px .8fr .8fr 1fr .5fr .6fr .6fr .6fr 1.2fr 110px' }}>{['План', 'Код', 'Тип', 'Название', 'Спален', 'Общая', 'Внутр.', 'Терраса', 'Файл плана', ''].map((h, i) => <span key={i}>{T(h)}</span>)}</div>
         {layouts.map((l) => row(l))}
         <div className="label mt8">{T('Новая планировка')}</div>
         {row()}
@@ -438,7 +438,7 @@ export default async function ObjectCard(
           <div className="h3" style={{ margin: 0 }}>{T('Окружение на схеме этажа')}</div>
           <div className="tiny muted">{T('Для блоков без плана этажа: что за окнами верхнего и нижнего ряда квартир на условной схеме и что у торцов. Партнёр видит это на экране «Этаж» и в карточке квартиры.')}</div>
           {blocks.map((b) => { const sd = (sides.find((x) => x.building_id === b.id)?.sides || {}) as Sides; return (
-            <ActionForm key={b.id} action={saveSides} lang={L} className="objrow" style={{ gridTemplateColumns: '160px repeat(4, minmax(0,1fr)) auto', alignItems: 'end' }}>
+            <ActionForm key={b.id} action={saveSides} lang={L} className="objrow" style={{ gridTemplateColumns: '160px repeat(4, minmax(0,1fr)) 110px', alignItems: 'end' }}>
               <input type="hidden" name="project" value={p!.id} /><input type="hidden" name="building" value={b.id} />
               <b className="small">{b.name}</b>
               {SIDES.map((k) => <div key={k} className="stack" style={{ gap: 4 }}><span className="tiny muted">{T(SIDE_NAME[k])}</span>
