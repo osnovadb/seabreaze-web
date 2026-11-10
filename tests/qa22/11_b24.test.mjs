@@ -7,7 +7,7 @@ import { user, agency, register, qualify, freeUnit, q, one, close, act, lastBook
 
 const WH = (process.env.B24_WEBHOOK || '').replace(/\/+$/, '')
 const skip = !WH || !/3044/.test(process.env.QA_URL || '')
-const b24 = async (m, p = {}) => { const r = await fetch(`${WH}/${m}.json`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) }).then((x) => x.json()); if ('error' in r || r.error_description) throw new Error(`${m}: ${r.error} ${r.error_description || ''}`); return r.result } // Bitrix24 на удалённую запись отвечает error: ''
+const b24 = async (m, p = {}) => { for (let i = 0; ; i++) { const r = await fetch(`${WH}/${m}.json`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) }).then((x) => x.json()); if (r.error === 'QUERY_LIMIT_EXCEEDED' && i < 6) { await new Promise((ok) => setTimeout(ok, 1500 * (i + 1))); continue } if ('error' in r || r.error_description) throw new Error(`${m}: ${r.error} ${r.error_description || ''}`); return r.result } } // Bitrix24 на удалённую запись отвечает error: ''; лимит запросов — повтор
 const made = { lead: new Set(), contact: new Set(), deal: new Set(), task: new Set() }
 const keep = async (cl) => { const c = await client(cl); for (const [k, f] of [['lead', 'b24_lead_id'], ['contact', 'b24_contact_id'], ['deal', 'b24_deal_id']]) if (c[f]) made[k].add(Number(c[f])); return c }
 const stageName = async (dealId) => { const d = await b24('crm.deal.get', { id: dealId }); const st = await b24('crm.status.list', { filter: { ENTITY_ID: Number(d.CATEGORY_ID) ? `DEAL_STAGE_${d.CATEGORY_ID}` : 'DEAL_STAGE' } }); return st.find((s) => s.STATUS_ID === d.STAGE_ID)?.NAME }
@@ -142,11 +142,10 @@ test('две подтверждённые брони → две сделки: в
   assert.equal(await stageName(bs[1].b24_deal_id), 'Reserved')
 })
 test('«Отказ» во вкладке Units → сделка Lost с причиной из списка (гл. 6)', { skip }, async () => {
-  const S = await user('seller', { market: 'DE' })
-  const r = await register(S, { name: 'QA B24 Refuse' })
+  const r = await register(P, { name: 'QA B24 Refuse', fields: { goal: 'invest', budget: '300k', timeline: '3m' } })
   const c = await keep(r.result.id)
-  assert.ok(c.b24_deal_id, 'нет сделки клиента команды')
-  await act(S, 'refuseClient', { client: c.id, reason: 'Financing' })
+  assert.ok(c.b24_deal_id, 'нет сделки клиента')
+  await act(OF, 'refuseClient', { client: c.id, reason: 'Financing' })
   const d = await b24('crm.deal.get', { id: c.b24_deal_id })
   assert.equal(d.STAGE_SEMANTIC_ID, 'F', 'сделка не закрыта как Lost')
   const f = (await b24('crm.deal.userfield.list', { filter: { FIELD_NAME: 'UF_CRM_GE_LOST' } }))[0]
