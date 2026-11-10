@@ -4,9 +4,11 @@
 select current_database() = 'seabreeze_qa22' as ok \gset
 \if :ok
 update portal.deals d set stage = 'cancelled' from portal.bookings b join portal.users u on u.id = b.agent_id
-  where d.booking_id = b.id and u.email like 'qa-%@qa.test' and d.stage <> 'cancelled' and b.created_at < now() - interval '1 hour';
+  where d.booking_id = b.id and u.email like 'qa-%@qa.test' and d.stage <> 'cancelled';
 update portal.bookings b set status = 'cancelled' from portal.users u
-  where u.id = b.agent_id and u.email like 'qa-%@qa.test' and b.status in ('hold','queued','requested','confirmed','release_pending','converted') and b.created_at < now() - interval '1 hour';
+  where u.id = b.agent_id and u.email like 'qa-%@qa.test' and b.status in ('hold','queued','requested','confirmed','release_pending','converted');
+-- лимит «10 заявок с адреса за час» на ссылке партнёра: прошлые прогоны шли с 127.0.0.1 — снимаем у них адрес, чтобы новый прогон не упёрся в лимит
+update portal.inbound_leads set payload = payload - 'ip' where source = 'partner_link' and payload->>'ip' in ('127.0.0.1', '::1', '::ffff:127.0.0.1', '');
 \else
 \echo 'not the QA database — skipped'
 \endif
