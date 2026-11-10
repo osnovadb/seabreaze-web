@@ -2616,5 +2616,7 @@
 "Клиент недоступен": "Kunde nicht verfügbar",
 "Уже продана": "Bereits verkauft",
 "Показаны первые {n} из {t} — уточните поиск или вкладку": "Erste {n} von {t} angezeigt — Suche oder Reiter eingrenzen",
-"Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.": "Aktive Reservierungen aller Projekte. Das Limit gleichzeitiger Reservierungen steht in den Projektkonditionen."
+"Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.": "Aktive Reservierungen aller Projekte. Das Limit gleichzeitiger Reservierungen steht in den Projektkonditionen.",
+"Расчёт": "Berechnung",
+"Добавьте квартиры клиенту во вкладке «Подбор» — расчёт делается по его квартирам": "Fügen Sie dem Kunden im Reiter «Auswahl» Wohnungen hinzu — berechnet wird für seine Wohnungen"
 }

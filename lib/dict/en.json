@@ -2616,5 +2616,7 @@
 "Клиент недоступен": "Client unavailable",
 "Уже продана": "Already sold",
 "Показаны первые {n} из {t} — уточните поиск или вкладку": "Showing the first {n} of {t} — refine the search or tab",
-"Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.": "Active bookings across all projects. The limit of simultaneous bookings is in the project terms."
+"Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.": "Active bookings across all projects. The limit of simultaneous bookings is in the project terms.",
+"Расчёт": "Calculation",
+"Добавьте квартиры клиенту во вкладке «Подбор» — расчёт делается по его квартирам": "Add apartments for the client in the «Selection» tab — calculations are made for their apartments"
 }

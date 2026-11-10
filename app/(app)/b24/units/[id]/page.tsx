@@ -12,13 +12,17 @@ import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 import { setEscort } from '@/lib/moneyActions'
 import { ConsentBox } from '@/components/ConsentBox'
 import { clientScope } from '@/lib/scope'
+import { unitById, codeFor, viewMode } from '@/lib/catalog'
+import { canBook } from '@/lib/perm'
+import { calcViewProps } from '@/lib/calcView'
+import { VariantCalc } from '@/components/VariantCalc'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
 type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 export default async function Units(
-  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string }> }
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string; u?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
@@ -50,6 +54,11 @@ export default async function Units(
   const ps = tab === 'pick' ? await listProjects(c.user) : []
   const blds = tab === 'pick' ? await Promise.all(ps.map(async (p) => ({ p, bs: await buildingsOf(p.id, c.user) }))) : []
   const active = units.filter((u) => u.status)
+  // этап 4 калькулятора: вкладка «Расчёт» — варианты по квартирам клиента, сохраняются сразу на этого клиента
+  const priced = units.filter((x) => x.usd != null)
+  const calcUnit = tab === 'calc' && priced.length ? await unitById(priced.some((x) => x.unit_id === searchParams.u) ? searchParams.u! : priced[0].unit_id) : null
+  const calcProps = calcUnit ? await calcViewProps(calcUnit, c, { clients: [{ id: cl.id, name: cl.name }], clientId: cl.id,
+    bookable: codeFor(calcUnit, c.user, viewMode(c.user, false)) === 'F' && canBook(c.user.role) && calcUnit.sales_status === 'sales' }) : null
   // сопровождающий в Баку (§8): назначает бэк-офис при Reserved; фикс — из условий проекта
   const staff = canConfirmBooking(c.user.role) && active.some((u) => ['confirmed', 'converted'].includes(u.status!)) ? await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('office','seller','market_head') order by name`) : []
   return (
@@ -59,7 +68,7 @@ export default async function Units(
       <div className="page">
         {cl.consent_status !== 'given' && <div className="card card--tight" style={{ marginBottom: 12 }}><div className="small" style={{ marginBottom: 6 }}><b>{T('Согласие клиента')}</b> · {T('отправьте ссылку при первом контакте — без согласия клиент не попадает в рекламу')}</div><ConsentBox lang={L} cl={cl} /></div>}
         {searchParams.created && <div className="okbox" style={{ marginBottom: 12 }}>{T('Запрос брони отправлен бэк-офису — статус появится в сделке Bitrix24')}</div>}
-        <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`]].map(([k, l]) => <a key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</a>)}</div>
+        <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`], ['calc', T('Расчёт')]].map(([k, l]) => <a key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</a>)}</div>
         {tab === 'pick' && <div className="grid g3 mt16">{blds.map(({ p, bs }) => (
           <div key={p.id} className="card stack" style={{ gap: 8 }}>
             <div className="h3">{p.name}</div>
@@ -83,6 +92,12 @@ export default async function Units(
               </td>
             </tr>)}
           </tbody></table></div>}
+        {tab === 'calc' && <div className="stack mt16">
+          {priced.length === 0 ? <div className="muted">{T('Добавьте квартиры клиенту во вкладке «Подбор» — расчёт делается по его квартирам')}</div> : <>
+            <div className="chips">{priced.map((x) => <a key={x.unit_id} href={`?tab=calc&u=${x.unit_id}`} className={'chip' + (x.unit_id === calcUnit?.id ? ' on' : '')}>{x.no} · {x.project}</a>)}</div>
+            {calcProps && <VariantCalc key={calcUnit!.id} lang={L} {...calcProps} />}
+          </>}
+        </div>}
         {tab === 'terms' && <div className="stack mt16">
           {active.length === 0 && <div className="muted">{T('Нет холдов и запросов брони')}</div>}
           {active.map((u) => {

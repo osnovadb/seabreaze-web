@@ -13,9 +13,10 @@ const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 
 }
 
 // Квартира справа от шахматки: смотреть, не уходя со страницы. mode=show — без рабочих действий и внутренней информации.
-export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient, quickEdit }: {
+export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient, quickEdit, calc }: {
   u: Unit; code: Code; lang: Lang; mode: 'team' | 'agent' | 'show'; closeHref: string; canBook?: boolean
   booking?: { client: string; agent: string; ends_at: string } | null; orient?: string; quickEdit?: boolean
+  calc?: React.ReactNode // этап 4 калькулятора: расчёт вариантов прямо в панели шахматки
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const outdoor = (u.plot_area || 0) + (u.ext_area || 0)
@@ -43,6 +44,7 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
         {orient && <div className="kv"><span>{T('Вид из окон')}</span><span>{orient}</span></div>}
         {mode === 'team' && booking && <div className="kv"><span>{T('Бронь')}</span><span className="small">{booking.client} · {booking.agent} · {T('до {d}', { d: date(lang, booking.ends_at) })}</span></div>}
       </div>
+      {calc && !show && <details className="mt16 upanel__calc"><summary className="label" style={{ cursor: 'pointer' }}>{T('Калькулятор вариантов')}</summary><div className="mt8">{calc}</div></details>}
       {quickEdit && mode === 'team' && (
         <ActionForm action={quickUnit} lang={lang} className="card card--sand card--tight stack mt16" style={{ gap: 6 }}>
           <div className="label">{T('Быстрая правка')}</div>

@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { variantsOf } from '@/lib/variants'
 import { activeGrid } from '@/lib/calc'
+import { calcViewProps } from '@/lib/calcView'
 import { VariantCalc } from '@/components/VariantCalc'
 import { fmtDelivery } from '@/lib/delivery'
 import Link from 'next/link'
@@ -69,13 +70,8 @@ export default async function UnitPage(
   const opts = await optionsFor(u)
   const fx = await fxFor(c.user.market, L)
   const { promo, mode: promoMode } = await promoForUnit(u)
-  // калькулятор вариантов: сетка скидок за взнос (по блоку и датам), предел и порог скидки роли, доход «для себя»
-  const calcCond = await conditionsFor(u.project_id, c.user)
-  const grid = activeGrid(await downGridFor(u.project_id), new Date().toISOString().slice(0, 10), u.building_id)
-  const role = c.user.role
-  const calcSelf: 'agent' | 'ours' | 'seller' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : role === 'seller' ? 'seller' : null
-  // этап 2: сохранённые варианты квартиры (свои; владельцу и руководителю рынка — все, для согласования)
-  const variants = (await variantsOf(u.id, c.user)).map((v) => ({ id: v.id, name: v.name, author: v.author, client: v.client, client_id: v.client_id, mine: v.author_id === c.user.id, needs_approval: v.needs_approval, approved_at: v.approved_at, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
+  // калькулятор вариантов (этапы 1–4): данные и права — общие с шахматкой и вкладкой Bitrix24 (lib/calcView)
+  const calcProps = await calcViewProps(u, c, { clients: clients.map((x) => ({ id: x.id, name: x.name })), bookable: code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' })
   const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = ext && code === 'O' ? (['Забронирована', 'warn'] as const) : CODE_NAME[code]
@@ -104,7 +100,7 @@ export default async function UnitPage(
           {cur === 'floor' ? <div className="small muted mt8">{myCell ? T('Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.') : T('План этажа — квартира на нём ещё не размечена.')}</div> : cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
         </div>
           {/* калькулятор вариантов — под планировкой, на всю ширину левой колонки (место для сравнения вариантов) */}
-          {u.usd && <VariantCalc key={u.id} list={u.usd} plans={plans} grid={grid} lang={L} fx={fx} promo={promo} mode={promoMode} options={opts} cond={calcCond ? { fix_pct: calcCond.fix_pct, pool_pct: calcCond.pool_pct, agent_fix_pct: calcCond.agent_fix_pct, agent_pool_pct: calcCond.agent_pool_pct, agent_our_pool_share: calcCond.agent_our_pool_share, seller_share_pct: calcCond.seller_share_pct } : null} ext={ext} cap={calcCond ? maxDiscount(role, calcCond) : 0} ceiling={calcCond && canBook(role) ? (ext ? maxDiscount(role, calcCond) : discountCeiling(role, calcCond)) : 0} ask={ext} self={calcSelf} unitId={u.id} variants={variants} clients={clients.map((x) => ({ id: x.id, name: x.name }))} canApprove={['owner', 'market_head'].includes(role)} ownerView={c.user.role === 'owner'} bookable={code === 'F' && canBook(c.user.role) && u.sales_status === 'sales'} />}
+          {calcProps && <VariantCalc key={u.id} lang={L} {...calcProps} />}
         </div>
         <div className="stack">
           <div className="card">

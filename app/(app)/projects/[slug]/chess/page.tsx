@@ -14,6 +14,8 @@ import { ViewTabs } from '@/components/ViewTabs'
 import { seesSource, isExternal, canBook } from '@/lib/perm'
 import { one } from '@/lib/db'
 import { UnitPanel } from '@/components/UnitPanel'
+import { VariantCalc } from '@/components/VariantCalc'
+import { calcViewProps } from '@/lib/calcView'
 import { Top } from '@/components/ui'
 
 export default async function ChessPage(
@@ -64,6 +66,9 @@ export default async function ChessPage(
   const layouts = Array.from(new Set(cu.map((u) => u.layout).filter(Boolean))).sort() as string[]
   const cs = clientScope(c.user)
   const clients = ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) ? await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed','lost') order by (cl.id::text = '${((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '')}') desc, last_activity_at desc limit 200`, cs.params) : []
+  // этап 4 калькулятора: расчёт вариантов в боковой панели — те же данные и права, что на карточке квартиры
+  const selCalc = sel && mode !== 'show' && sel.usd != null ? await calcViewProps(sel, c, { clients: clients.map((x) => ({ id: x.id, name: x.name })), clientId: curClient || null,
+    bookable: codeFor(sel, c.user, mode, curClient) === 'F' && canBook(c.user.role) && sel.sales_status === 'sales' }) : null
   const editor = ['owner', 'office'].includes(c.user.role)
   return (
     <>
@@ -86,7 +91,8 @@ export default async function ChessPage(
           <ChessBoard units={shown} lang={L} team={mode === 'team'} selected={sel?.id} hrefFor={Object.fromEntries(shown.map((u) => [u.id, qs({ u: u.id, side: side || undefined })]))} views={views} layouts={layouts}
             clients={clients} projectId={p.id} canPick={clients.length > 0 || editor} initial={searchParams.l ? { l: searchParams.l } : undefined}
             bulk={{ toSelection: addManyToSelection, ...(editor ? { status: bulkStatus } : {}), ...(c.user.role === 'owner' ? { hide: bulkHide } : {}) }} />
-          {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} />
+          {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor}
+            calc={selCalc ? <VariantCalc key={sel.id} lang={L} compact {...selCalc} /> : null} />
             : null}
         </div>
         <div className="row mt16 small muted">

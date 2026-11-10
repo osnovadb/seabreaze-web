@@ -4,6 +4,7 @@
 // последний платёж, график и справочно € / ₪. Рамки — из плана застройщика; без планов — свободно, с пометкой «ориентировочно».
 // «Для себя» (доход партнёра / наш) — свёрнуто, чтобы не показывать клиенту с экрана.
 import { useActionState, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { saveVariant, deleteVariant, approveVariant } from '@/lib/variantActions'
 import { calcVariant, fromPlan, startPlan, MAX_FREE_MONTHS, type DownStep } from '@/lib/calc'
 import { planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
@@ -19,10 +20,10 @@ export type VariantView = { id: string; name: string; author: string; client: st
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date())
 const SIGN = { EUR: '€', ILS: '₪' } as const
 
-export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false, ownerView = false, ask = false, bookable = false }: {
+export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', options = [], fx, lang, cond = null, ext = true, cap = 0, ceiling = 0, self = null, title, client = false, unitId, variants = [], clients = [], canApprove = false, ownerView = false, ask = false, bookable = false, clientPreset, compact = false }: {
   list: number; plans: Plan[]; grid?: DownStep[]; promo?: PromoView | null; mode?: PromoMode; options?: Opt[]; fx: FxView; lang: Lang
   cond?: SplitCond | null; ext?: boolean; cap?: number; ceiling?: number; self?: 'agent' | 'ours' | 'seller' | null; title?: string; client?: boolean
-  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean; ownerView?: boolean; ask?: boolean; bookable?: boolean
+  unitId?: string; variants?: VariantView[]; clients?: { id: string; name: string }[]; canApprove?: boolean; ownerView?: boolean; ask?: boolean; bookable?: boolean; clientPreset?: string; compact?: boolean
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   // старт — с плана рассрочки (QA: открывался на «100% сразу»); дальше план выбирается сам по взносу и сроку, чип — только подсказка-пресет
@@ -53,6 +54,11 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   const pickPlan = (p: Plan | null) => { setPlanId(p?.id || null); const v = fromPlan(p); setDownPct(v.downPct); setMonths(v.months); setOpen(false) }
   const maxM = r.maxMonths ?? MAX_FREE_MONTHS
   const [saved, saveAct, saving] = useActionState(saveVariant, null)
+  // этап 4: калькулятор живёт и в шахматке, и во вкладке Bitrix24 — после действий обновляем текущую страницу, где бы она ни была
+  const router = useRouter()
+  useEffect(() => { if (saved?.ok) router.refresh() }, [saved]) // eslint-disable-line react-hooks/exhaustive-deps
+  const approveAct = async (fd: FormData) => { await approveVariant(fd); router.refresh() }
+  const deleteAct = async (fd: FormData) => { await deleteVariant(fd); router.refresh() }
   const [vname, setVname] = useState('')
   const [asking, setAsking] = useState(false) // партнёр: «Попросить больше» — скидка сверх его части пула, на согласование
   const params = JSON.stringify({ downPct: r.downPct, months: r.months, disc: r.disc, start, options: picked, planId: r.plan?.id || null })
@@ -63,8 +69,8 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   // ступени сетки — подсказка «ещё N % взноса — скидка M %»
   const next = grid.filter((g) => g.from_pct > r.downPct).sort((a, b) => a.from_pct - b.from_pct)[0]
   return (
-    <div className="card stack vcalc" style={{ gap: 12 }}>
-      <div className="h3" style={{ margin: 0 }}>{title ?? T(client ? 'Рассрочка и платежи' : 'Калькулятор вариантов')}</div>
+    <div className={'stack vcalc' + (compact ? '' : ' card')} style={{ gap: 12 }}>
+      {!compact && <div className="h3" style={{ margin: 0 }}>{title ?? T(client ? 'Рассрочка и платежи' : 'Калькулятор вариантов')}</div>}
       {plans.length > 0 && <div className="chips noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === r.plan?.id ? ' on' : '')} onClick={() => pickPlan(p)}>{planLabel(T, p.name)}</button>)}</div>}
       {r.approx && <div className="note small">{T(r.plan ? 'Срок рассрочки у застройщика не задан — расчёт ориентировочный.' : 'Условия рассрочки у застройщика не заданы — расчёт ориентировочный.')}</div>}
       <div className="vcalc__ctrls noprint">
@@ -108,7 +114,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
       {unitId && !client && <form action={saveAct} className="row noprint" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }} onSubmit={() => setVname('')}>
         <input type="hidden" name="unit" value={unitId} /><input type="hidden" name="params" value={params} />
         <label className="field" style={{ flex: '1 1 220px' }}><span title={T('Клиент видит «Вариант 1–3»')}>{T('Название варианта (только для вас)')}</span><input className="in" name="name" value={vname} onChange={(e) => setVname(e.target.value)} placeholder={T('Взнос {p}% · {m}', { p: Math.round(r.downPct), m: r.months ? T('{m} мес.', { m: r.months }) : T('без рассрочки') })} maxLength={80} /></label>
-        {clients.length > 0 && <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Клиент (необязательно)')}</span><select className="in" name="client" defaultValue=""><option value="">—</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+        {clients.length > 0 && <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Клиент (необязательно)')}</span><select key={`client:${clientPreset || ''}`} className="in" name="client" defaultValue={clientPreset || ''}><option value="">—</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
         {ask && ceiling > 0 && (!asking
           ? <button type="button" className="btn" onClick={() => setAsking(true)}>{T('Попросить больше')}</button>
           : <span className="row" style={{ gap: 6, flexBasis: '100%', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -136,9 +142,9 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
             <div className="row noprint" style={{ gap: 4, marginTop: 4 }}>
               <button type="button" className="btn btn--sm" onClick={() => load(v)}>{T('Открыть')}</button>
               {bookable && unitId && (!v.needs_approval || v.approved_at) && <a className="btn btn--sm btn--p" href={`/units/${unitId}/book?variant=${v.id}${v.client_id ? '&client=' + v.client_id : ''}`}>{T('Запросить бронь')}</a>}
-              {canApprove && v.needs_approval && !v.approved_at && <form action={approveVariant}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--p">{T('Согласовать')}</button></form>}
+              {canApprove && v.needs_approval && !v.approved_at && <form action={approveAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--p">{T('Согласовать')}</button></form>}
               {/* QA 10.11: удалить может автор или владелец — руководителю рынка «×» не показываем (было: молча не срабатывало) */}
-              {(v.mine || ownerView) && <form action={deleteVariant}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--ghost" title={T('Удалить')}>×</button></form>}
+              {(v.mine || ownerView) && <form action={deleteAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--ghost" title={T('Удалить')}>×</button></form>}
             </div>
           </div> })}</div>
       </div>}
