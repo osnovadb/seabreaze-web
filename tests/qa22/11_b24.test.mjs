@@ -119,3 +119,23 @@ test('заявка партнёра → сделка в воронке Partners 
   assert.ok(d.UF_CRM_GE_PARTNER_TYPE, 'тип партнёра не заполнен')
   assert.ok(!cats.some((c) => /^(Agencies|Sub-agents) |^Installments$/.test(c.name)), 'остались прежние воронки')
 })
+test('две подтверждённые брони → две сделки: вторая квартира — своя сделка того же клиента, сумма — цена её квартиры (гл. 6)', { skip }, async () => {
+  const r = await register(P, { name: 'QA B24 Two Units', fields: { goal: 'invest', budget: '300k', timeline: '3m' } })
+  const c0 = await keep(r.result.id)
+  assert.ok(c0.b24_deal_id, 'нет сделки клиента')
+  const u1 = await freeUnit(), u2 = await freeUnit('premium-residence', { exclude: [u1.id] })
+  for (const u of [u1, u2]) {
+    await act(P, 'createBooking', { unit: u.id, client: c0.id, discount: 0 })
+    const b = await one(`select id from portal.bookings where client_id = $1 and unit_id = $2 order by created_at desc limit 1`, [c0.id, u.id])
+    await act(OF, 'bookingAction', { id: b.id, act: 'confirm', dev_no: 'QA-2U' })
+  }
+  const bs = await q(`select b.unit_id, b.b24_deal_id, b.final_price::float price from portal.bookings b where b.client_id = $1 and b.status = 'confirmed' order by b.created_at`, [c0.id])
+  assert.equal(bs.length, 2)
+  assert.equal(String(bs[0].b24_deal_id), String(c0.b24_deal_id), 'первая подтверждённая бронь — не в сделке клиента')
+  assert.ok(bs[1].b24_deal_id && String(bs[1].b24_deal_id) !== String(c0.b24_deal_id), 'вторая бронь без своей сделки')
+  made.deal.add(Number(bs[1].b24_deal_id))
+  const d1 = await b24('crm.deal.get', { id: bs[0].b24_deal_id }), d2 = await b24('crm.deal.get', { id: bs[1].b24_deal_id })
+  assert.equal(d2.CATEGORY_ID, d1.CATEGORY_ID); assert.equal(String(d2.CONTACT_ID), String(d1.CONTACT_ID))
+  assert.equal(Number(d1.OPPORTUNITY), Math.round(bs[0].price)); assert.equal(Number(d2.OPPORTUNITY), Math.round(bs[1].price))
+  assert.equal(await stageName(bs[1].b24_deal_id), 'Reserved')
+})

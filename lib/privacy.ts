@@ -35,7 +35,7 @@ export async function executePrivacyRequest(f: FormData) {
   const deals = await q<{ id: string; b24_deal_id: number | null }>(`select d.id, null::bigint b24_deal_id from portal.deals d where d.client_id = $1 and d.stage <> 'cancelled'`, [cl.id])
   const hasDeal = deals.length > 0
   const b24deals = (await q<{ id: number }>(`select b24_deal_id id from portal.clients where id = $1 and b24_deal_id is not null
-    union select b24_inst_id from portal.deals where client_id = $1 and b24_inst_id is not null union select b24_after_id from portal.deals where client_id = $1 and b24_after_id is not null`, [cl.id])).map((x) => Number(x.id))
+    union select b24_inst_id from portal.deals where client_id = $1 and b24_inst_id is not null union select b24_after_id from portal.deals where client_id = $1 and b24_after_id is not null union select b24_deal_id from portal.bookings where client_id = $1 and b24_deal_id is not null`, [cl.id])).map((x) => Number(x.id))
   const result = await tx(async (t) => {
     const n = (sql: string) => t.query(sql, [cl.id]).then((x) => x.rowCount || 0)
     const out: Record<string, number | boolean> = { hasDeal }
