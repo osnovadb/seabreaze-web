@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { deliveryRange } from '@/lib/delivery'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd } from '@/lib/i18n'
@@ -40,7 +41,7 @@ export default async function Projects() {
               </div>
               <div style={{ padding: 18 }}>
                 <div className="between"><div className="h2">{p.name}</div><span className="row" style={{ gap: 6 }}>{!ext && p.sales_status !== 'sales' && <Pill kind={st[1]}>{T(st[0])}</Pill>}<span className="pill pill--ok">{T('{n} свободно', { n: p.free })}</span></span></div>
-                <div className="small muted mt8">{p.developer} · {p.city || 'Баку'} · {T('{b} корп.', { b: p.buildings })} · {T('сдача')} {p.delivery || T('уточняется')}</div>
+                <div className="small muted mt8">{p.developer} · {p.city || 'Баку'} · {T('{b} корп.', { b: p.buildings })} · {T('сдача')} {deliveryRange(L, p.delivery, p.block_deliveries) || T('уточняется')}</div>
                 <div className="mt8"><b>{p.min_usd ? (x?.max_usd && x.max_usd > p.min_usd ? <bdi dir="ltr">{usd(L, p.min_usd)} – {usd(L, x.max_usd)}</bdi> : T('от {p}', { p: usd(L, p.min_usd) })) : '—'}</b></div>
                 {x?.mix && <div className="chips mt8">{Object.entries(x.mix).sort(([a], [b]) => Number(a) - Number(b)).map(([r, n]) => <span key={r} className="chip" style={{ height: 24 }}>{Number(r) >= 4 ? '4+' : r}{T('к')} <span className="n">{n}</span></span>)}</div>}
               </div>

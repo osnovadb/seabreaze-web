@@ -4,7 +4,7 @@ import { seesAllStatuses } from './perm'
 import { PLAN_COLS, type Plan } from './plans'
 import { t, type Lang } from './i18n'
 
-export type Project = { sales_status: string; id: string; slug: string; name: string; status: string; delivery: string | null; city: string | null; location: string | null; developer: string; units: number; free: number; min_usd: number | null; buildings: number }
+export type Project = { sales_status: string; id: string; slug: string; name: string; status: string; delivery: string | null; block_deliveries: string[]; city: string | null; location: string | null; developer: string; units: number; free: number; min_usd: number | null; buildings: number }
 export type Building = { id: string; name: string; external_id: string | null; floors_total: number | null; delivery: string | null; units: number; free: number; min_usd: number | null; sort: number }
 export type Unit = {
   id: string; project_id: string; building_id: string; building: string; block: string; number: string; floor: number; unit_type: string; bedrooms: number | null
@@ -63,7 +63,8 @@ export async function listProjects(viewer?: User | null): Promise<Project[]> {
          and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
          and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''}) as free,
       (select min(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null${f ? HIDDEN : ''}) as min_usd,
-      (select count(*)::int from buildings b where b.project_id = p.id) as buildings
+      (select count(*)::int from buildings b where b.project_id = p.id) as buildings,
+      (select coalesce(array_agg(b.delivery order by b.sort, b.name) filter (where b.delivery is not null), '{}') from buildings b where b.project_id = p.id) as block_deliveries
     from projects p join developers d on d.id = p.developer_id ${f ? 'where ' + visibleSql('p') : ''} order by p.sort, p.name`, f ? [viewer!.id, viewer!.agency_id, viewer!.market] : [])
 }
 export const projectBySlug = async (slug: string, viewer?: User | null) => (await listProjects(viewer)).find((p) => p.slug === slug)

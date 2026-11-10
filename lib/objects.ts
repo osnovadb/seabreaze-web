@@ -1,4 +1,5 @@
 'use server'
+import { deliveryFromForm, parseDelivery } from './delivery'
 // Админка каталога: проекты, блоки, планировки, квартиры, планы оплаты и видимость для партнёров.
 // Пишем прямо в таблицы каталога; триггеры каталога сами ведут историю цен, ставят замки ручных правок и пересобирают витрины сайтов.
 import crypto from 'node:crypto'
@@ -16,6 +17,9 @@ import { UNIT_TYPES, riser } from './catalog'
 import { readXlsx } from './xlsx'
 import { parseChess, bareNo } from './chessImport'
 
+const keepLegacy = (raw: string) => (raw && !parseDelivery(raw) ? raw : null) // сброс обоих списков очищает срок; нераспознанную старую запись не теряем
+// Срок сдачи из формы: квартал + год → «2027-Q4»; ничего не выбрано — прежнее значение (в т.ч. нераспознанное) не теряем
+const dlv = (f: FormData) => f.has('delivery_q') || f.has('delivery_y') ? deliveryFromForm(String(f.get('delivery_q') || ''), String(f.get('delivery_y') || '')) ?? keepLegacy(String(f.get('delivery_raw') || '').trim()) : (String(f.get('delivery') || '').trim() || null)
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const num = (f: FormData, k: string) => { const v = s(f, k).replace(',', '.'); return v === '' ? null : Number(v) }
 const slugify = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 60)
@@ -60,7 +64,7 @@ export async function saveProject(_: unknown, f: FormData) {
   try {
     if (id) {
       await q(`update projects set name = $2, developer_id = $3, city = $4, location = $5, delivery = $6, status = $7, sort = $8 where id = $1`,
-        [id, name, dev, s(f, 'city') || null, s(f, 'location') || null, s(f, 'delivery') || null, status, num(f, 'sort') ?? 0])
+        [id, name, dev, s(f, 'city') || null, s(f, 'location') || null, dlv(f), status, num(f, 'sort') ?? 0])
       // Обложка для списка проектов: картинка до 25 МБ; «убрать» — вернуть картинку по умолчанию
       const cover = f.get('cover')
       if (isFile(cover)) {
@@ -76,7 +80,7 @@ export async function saveProject(_: unknown, f: FormData) {
     }
     const slug = s(f, 'slug') || slugify(name)
     const p = await one<{ id: string }>(`insert into projects (developer_id, slug, name, status, delivery, city, location, sort, source_id) values ($1,$2,$3,$4,$5,$6,$7,$8,'manual') returning id`,
-      [dev, slug, name, status, s(f, 'delivery') || null, s(f, 'city') || 'Баку', s(f, 'location') || null, num(f, 'sort') ?? 0])
+      [dev, slug, name, status, dlv(f), s(f, 'city') || 'Баку', s(f, 'location') || null, num(f, 'sort') ?? 0])
     // Новый проект — черновик: партнёры и сайты его не видят, пока не откроете
     await q(`insert into portal.project_settings (project_id, sales_status, agent_markets) values ($1, 'draft', '{}') on conflict do nothing`, [p!.id])
     await log(c, 'object.project_create', 'project', p!.id, { name })
@@ -101,9 +105,9 @@ export async function saveBuilding(_: unknown, f: FormData) {
   const kind = ['block', 'tower', 'villa_cluster'].includes(s(f, 'kind')) ? s(f, 'kind') : 'block'
   try {
     if (id) await q(`update buildings set name = $2, external_id = $3, kind = $4, floors_total = $5, delivery = $6, sort = $7 where id = $1 and project_id = $8`,
-      [id, s(f, 'name'), s(f, 'code') || null, kind, num(f, 'floors'), s(f, 'delivery') || null, num(f, 'sort') ?? 0, pid])
+      [id, s(f, 'name'), s(f, 'code') || null, kind, num(f, 'floors'), dlv(f), num(f, 'sort') ?? 0, pid])
     else await q(`insert into buildings (project_id, name, external_id, kind, floors_total, delivery, sort, source_id) values ($1,$2,$3,$4,$5,$6,$7,'manual')`,
-      [pid, s(f, 'name'), s(f, 'code') || null, kind, num(f, 'floors'), s(f, 'delivery') || null, num(f, 'sort') ?? 0])
+      [pid, s(f, 'name'), s(f, 'code') || null, kind, num(f, 'floors'), dlv(f), num(f, 'sort') ?? 0])
   } catch {
     return { error: t(c.lang, 'Блок с таким названием или кодом уже есть') }
   }

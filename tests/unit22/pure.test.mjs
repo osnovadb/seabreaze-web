@@ -63,3 +63,25 @@ test('kycMissing: минимум 251 — паспорт и адрес главн
   assert.deepEqual(kycMissing(all, base, buyers), [])
   assert.ok(kycMissing(all, { ...base, kyc_pep: null }, buyers).includes('ответ про PEP'))
 })
+
+// 10.11 · срок сдачи кварталом и годом
+import { parseDelivery, canonDelivery, deliveryFromForm, fmtDelivery, deliveryRange } from '../../lib/delivery.ts'
+test('срок сдачи: разбор прежних записей и канон с годом впереди (сайты берут slice(0, 4))', () => {
+  const c = (x) => canonDelivery(parseDelivery(x))
+  assert.equal(c('IV кв. 2027'), '2027-Q4'); assert.equal(c('II квартал 2028'), '2028-Q2'); assert.equal(c('Q3 2026'), '2026-Q3'); assert.equal(c('4 кв 2029'), '2029-Q4')
+  assert.equal(c('2030'), '2030'); assert.equal(c('2027-Q1'), '2027-Q1'); assert.equal(c('сдан'), 'done'); assert.equal(c('2025-done'), '2025-done')
+  assert.equal(parseDelivery('уточняется'), null); assert.equal(parseDelivery(''), null)
+  for (const v of ['2027-Q4', '2030', '2025-done']) assert.match(v.slice(0, 4), /^\d{4}$/)
+})
+test('срок сдачи: из формы и вывод на четырёх языках', () => {
+  assert.equal(deliveryFromForm('4', '2027'), '2027-Q4'); assert.equal(deliveryFromForm('', '2027'), '2027'); assert.equal(deliveryFromForm('4', ''), null); assert.equal(deliveryFromForm('done', '2025'), '2025-done'); assert.equal(deliveryFromForm('', ''), null)
+  assert.equal(fmtDelivery('ru', '2027-Q4'), 'IV кв. 2027'); assert.equal(fmtDelivery('en', '2027-Q4'), 'Q4 2027'); assert.equal(fmtDelivery('de', '2027-Q4'), 'Q4 2027'); assert.equal(fmtDelivery('he', '2027-Q4'), 'רבעון 4 2027')
+  assert.equal(fmtDelivery('ru', '2030'), '2030'); assert.equal(fmtDelivery('de', '2025-done'), 'fertiggestellt · 2025'); assert.equal(fmtDelivery('ru', 'уточняется'), 'уточняется')
+  assert.equal(fmtDelivery('ru', 'IV кв. 2027'), 'IV кв. 2027', 'прежняя запись выводится в том же виде')
+})
+test('срок проекта: свой или диапазон по блокам', () => {
+  assert.equal(deliveryRange('en', null, ['2028-Q1', '2027-Q2', null, '2027-Q4']), 'Q2 2027 – Q1 2028')
+  assert.equal(deliveryRange('ru', '2029', ['2027-Q2']), '2029')
+  assert.equal(deliveryRange('ru', null, ['2030', '2030']), '2030')
+  assert.equal(deliveryRange('en', null, []), '')
+})

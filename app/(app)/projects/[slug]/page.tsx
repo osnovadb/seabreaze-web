@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
@@ -45,7 +46,8 @@ export default async function ProjectPage(
       ${ext ? 'and not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id)' : ''} group by 1 order by 1`, [p.id])
   const finishes = (await q<{ finish: string }>('select distinct finish from units where project_id = $1 and finish is not null', [p.id])).map((r) => r.finish)
   const FIN: Record<string, string> = { shell: 'без ремонта', white_box: 'white box', turnkey: 'с ремонтом', furnished: 'с мебелью' }
-  const deliveries = Array.from(new Set(bs.map((b) => b.delivery).filter(Boolean)))
+  // срок проекта: свой или диапазон по блокам; формат — по языку (квартал + год)
+  const deliveryLabel = deliveryRange(L, p.delivery, bs.map((b) => b.delivery))
   const tabs: [string, string, string][] = [['plan', 'Генплан', `/projects/${p.slug}`], ['chess', 'Шахматка', `/projects/${p.slug}/chess`], ['list', 'Список', `/catalog?p=${p.slug}`],
     ['terms', 'Условия', `?tab=terms`], ['materials', `${T('Материалы')} · ${mats.length}`, `?tab=materials`], ['docs', `${T('Документы')} · ${docs.length}`, `?tab=docs`]]
   return (
@@ -55,7 +57,7 @@ export default async function ProjectPage(
         right={<>{site && <a className="btn" href={site} target="_blank" rel="noopener">{T('На сайте')} ↗</a>}<Link className="btn btn--p" href={`/projects/${p.slug}/chess`}>{T('Шахматка')}</Link></>} />
       <div className="page">
         <div className="grid g4" style={{ marginBottom: 16 }}>
-          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveries.join(' · ') || p.delivery || T('уточняется'), T('срок сдачи')], [String(bs.length), T('корпусов')]].map(([a, b]) => (
+          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveryLabel || T('уточняется'), T('срок сдачи')], [String(bs.length), T('корпусов')]].map(([a, b]) => (
             <div key={b} className="card card--tight kpi"><div className="v" style={{ fontSize: 22 }}>{a}</div><div className="small muted">{b}</div></div>
           ))}
         </div>
@@ -93,7 +95,7 @@ export default async function ProjectPage(
           ) : <div className="card small muted">{T('Генплан с контурами домов появится после загрузки — пока выберите блок ниже.')}</div>}
           {gp?.note && !ext && <div className="small bronze mt8">{T(gp.note)}</div>}
           <div className="grid g4 mt16">
-            {bs.map((b) => <Link key={b.id} href={`/projects/${p!.slug}/chess?b=${b.id}`} className="card card--tight"><b>{b.name}</b><div className="small muted">{T('{n} свободно', { n: b.free })} / {b.units}{b.min_usd ? ' · ' + T('от {p}', { p: usd(L, b.min_usd) }) : ''}</div>{b.delivery && <div className="tiny muted">{T('сдача')}: {b.delivery}</div>}</Link>)}
+            {bs.map((b) => <Link key={b.id} href={`/projects/${p!.slug}/chess?b=${b.id}`} className="card card--tight"><b>{b.name}</b><div className="small muted">{T('{n} свободно', { n: b.free })} / {b.units}{b.min_usd ? ' · ' + T('от {p}', { p: usd(L, b.min_usd) }) : ''}</div>{b.delivery && <div className="tiny muted">{T('сдача')}: {fmtDelivery(L, b.delivery)}</div>}</Link>)}
           </div>
         </div>
         <div className="stack">

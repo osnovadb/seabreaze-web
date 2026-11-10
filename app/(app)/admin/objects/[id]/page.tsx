@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DeliveryPicker } from '@/components/DeliveryPicker'
 import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
@@ -72,7 +73,7 @@ export default async function ObjectCard(
         <label className="field"><span>{T('Новый застройщик (если выбран «новый»)')}</span><input className="in" name="developer_name" /></label>
         <div className="grid g3">
           <label className="field"><span>{T('Город')}</span><input className="in" name="city" defaultValue={p!.city || ''} /></label>
-          <label className="field"><span>{T('Сдача')}</span><input className="in" name="delivery" defaultValue={p!.delivery || ''} /></label>
+          <DeliveryPicker lang={L} value={p!.delivery} label="Сдача проекта (пусто — по блокам)" />
           <label className="field"><span>{T('Стройка')}</span><select className="in" name="status" defaultValue={p!.status}><option value="planned">{T('проект')}</option><option value="under_construction">{T('строится')}</option><option value="completed">{T('сдан')}</option></select></label>
         </div>
         <div className="grid g2">
@@ -90,13 +91,13 @@ export default async function ObjectCard(
 
   function Blocks() {
     const row = (b?: (typeof blocks)[number]) => (
-      <ActionForm key={b?.id || 'new'} action={saveBuilding} lang={L} reset={!b} className="objrow" style={{ gridTemplateColumns: '1.4fr .6fr .8fr .6fr 1fr .5fr auto auto' }}>
+      <ActionForm key={b?.id || 'new'} action={saveBuilding} lang={L} reset={!b} className="objrow" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr auto auto' }}>
         <input type="hidden" name="project" value={p!.id} />{b && <input type="hidden" name="id" value={b.id} />}
         <input className="in" name="name" defaultValue={b?.name} placeholder={T('Название блока')} required />
         <input className="in" name="code" defaultValue={b?.external_id || ''} placeholder={T('Код (A, B…)')} />
         <select className="in" name="kind" defaultValue={b?.kind || 'block'}><option value="block">{T('блок')}</option><option value="tower">{T('башня')}</option><option value="villa_cluster">{T('виллы')}</option></select>
         <input className="in" name="floors" type="number" defaultValue={b?.floors_total ?? ''} placeholder={T('этажей')} />
-        <input className="in" name="delivery" defaultValue={b?.delivery || ''} placeholder={T('сдача блока')} />
+        <DeliveryPicker lang={L} value={b?.delivery || null} compact />
         <input className="in" name="sort" type="number" defaultValue={b?.sort ?? 0} title={T('Порядок')} />
         <button className="btn btn--sm">{b ? T('Сохранить') : T('Добавить')}</button>
         {b ? <button className="btn btn--sm" name="delete" value="1" title={b.n ? T('В блоке {n} квартир', { n: b.n }) : T('Удалить')}>×</button> : <span />}
@@ -104,7 +105,7 @@ export default async function ObjectCard(
     )
     return (
       <div className="card stack" style={{ gap: 8 }}>
-        <div className="objhead" style={{ gridTemplateColumns: '1.4fr .6fr .8fr .6fr 1fr .5fr auto auto' }}>{['Название', 'Код', 'Тип', 'Этажей', 'Сдача', 'Порядок', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
+        <div className="objhead" style={{ gridTemplateColumns: '1.3fr .5fr .8fr .5fr 1.5fr .5fr auto auto' }}>{['Название', 'Код', 'Тип', 'Этажей', 'Сдача блока', 'Порядок', '', ''].map((h, i) => <span key={i}>{h ? T(h) : ''}</span>)}</div>
         {blocks.map((b) => row(b))}
         <div className="label mt8">{T('Новый блок')}</div>
         {row()}

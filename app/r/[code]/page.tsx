@@ -32,7 +32,7 @@ export default async function PartnerLink(
         <div className="grid g3 mt16">{p.projects.map((x) => (
           <div key={x.id} className="card stack" style={{ gap: 6 }}>
             <div className="h3" style={{ margin: 0 }}>{x.name}</div>
-            <div className="small muted">{[x.city, x.delivery && T('сдача {d}', { d: x.delivery })].filter(Boolean).join(' · ')}</div>
+            <div className="small muted">{[x.city, x.delivery_label && T('сдача {d}', { d: x.delivery_label })].filter(Boolean).join(' · ')}</div>
             <div className="small">{x.from_usd ? T('от {p}', { p: usd(L, x.from_usd) }) : T('цена по запросу')}</div>
           </div>))}</div>
         <div className="card mt24" style={{ maxWidth: 560 }}>

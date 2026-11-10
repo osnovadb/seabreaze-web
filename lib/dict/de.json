@@ -2504,5 +2504,13 @@
 "бронь клиента": "Reservierung des Kunden",
 "Ссылка партнёра": "Partnerlink",
 "Ссылка согласия": "Einwilligungslink",
-"Отзыв согласия": "Widerruf"
+"Отзыв согласия": "Widerruf",
+"Сдача проекта (пусто — по блокам)": "Fertigstellung Projekt (leer — nach Blöcken)",
+"Сдача блока": "Fertigstellung Block",
+"квартал": "Quartal",
+"кв.": "Q",
+"Год": "Jahr",
+"год": "Jahr",
+"было": "vorher",
+"выберите квартал и год": "Quartal und Jahr wählen"
 }

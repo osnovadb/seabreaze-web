@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { fmtDelivery } from '@/lib/delivery'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
@@ -102,7 +103,7 @@ export default async function UnitPage(
               {u.layout_code && <div className="kv"><span>{T('Планировка')}</span><span>{u.layout_code}</span></div>}
               {oriText && <div className="kv"><span>{T('Вид из окон')}</span><span>{oriText}</span></div>}
               <div className="kv"><span>{T('Отделка')}</span><span>{T('без ремонта')}</span></div>
-              <div className="kv"><span>{T('Сдача')}</span><span>{u.delivery || T('уточняется у застройщика')}</span></div>
+              <div className="kv"><span>{T('Сдача')}</span><span>{fmtDelivery(L, u.delivery) || T('уточняется у застройщика')}</span></div>
             </div>
             {searchParams.err && <div className="err mt16">{searchParams.err}</div>}
             {searchParams.held && <div className="okbox mt16">{T('Квартира придержана на 24 часа — за это время запросите бронь')}</div>}

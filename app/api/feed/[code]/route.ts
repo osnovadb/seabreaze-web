@@ -10,6 +10,6 @@ export async function GET(_: Request, props: { params: Promise<{ code: string }>
   const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '')
   return NextResponse.json({
     updated_at: new Date().toISOString(), currency: 'USD', lead_form: `${base}/r/${p.code}`,
-    projects: p.projects.map((x) => ({ name: x.name, developer: x.developer, city: x.city, delivery: x.delivery, units_available: x.free, price_from: x.from_usd, lead_form: `${base}/r/${p.code}?project=${encodeURIComponent(x.slug)}` })),
+    projects: p.projects.map((x) => ({ name: x.name, developer: x.developer, city: x.city, delivery: x.delivery, delivery_label: x.delivery_label, units_available: x.free, price_from: x.from_usd, lead_form: `${base}/r/${p.code}?project=${encodeURIComponent(x.slug)}` })),
   }, { headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=900', 'X-Robots-Tag': 'noindex' } })
 }
