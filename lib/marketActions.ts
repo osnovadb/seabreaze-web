@@ -10,7 +10,7 @@ async function owner() { const c = await requireCtx(); if (c.user.role !== 'owne
 export async function saveMarket(f: FormData) {
   const c = await owner()
   const code = s(f, 'code')
-  const days = s(f, 'workdays').split(/[\s,]+/).map(Number).filter((d) => d >= 1 && d <= 7)
+  const days = (s(f, 'wd_form') ? f.getAll('wd').map(String) : s(f, 'workdays').split(/[\s,]+/)).map(Number).filter((d) => d >= 1 && d <= 7).sort((a, b) => a - b) // Л9: галочки по дням
   await q(`update portal.markets set price_negotiation = $2, sla_minutes = $3, work_from = $4::time, work_to = $5::time, workdays = $6, languages = $7, mailbox = nullif($8, '') where code = $1`,
     [code, f.get('price_negotiation') === 'on', Math.max(5, Number(s(f, 'sla_minutes')) || 15), s(f, 'work_from') || '09:00', s(f, 'work_to') || '18:00', days.length ? days : [1, 2, 3, 4, 5],
       s(f, 'languages').toUpperCase().split(/[\s,;]+/).filter(Boolean), s(f, 'mailbox').toLowerCase()])

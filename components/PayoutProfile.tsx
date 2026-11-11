@@ -19,13 +19,13 @@ export async function PayoutGapNote({ userId, lang, href }: { userId: string; la
   </div>
 }
 
-export async function PayoutProfile({ userId, lang }: { userId: string; lang: Lang }) {
+export async function PayoutProfile({ userId, lang, gapNote = true }: { userId: string; lang: Lang; gapNote?: boolean }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const prof = await one<Prof>(`select partner_form, vat_payer, vat_no, tax_country, tax_no, tax_cert_until::text, bank_holder, bank_iban, bank_swift, bank_name from portal.users where id = $1`, [userId])
   return (
     <form action={savePayoutProfile} className="card stack mt24" style={{ gap: 10 }} id="payout">
       <div className="h3" style={{ margin: 0 }}>{T('Данные для выплат')}</div>
-      <PayoutGapNote userId={userId} lang={lang} />
+      {gapNote && <PayoutGapNote userId={userId} lang={lang} />}{/* Л4: на «Комиссии» предупреждение уже стоит сверху */}
       <div className="small muted">{T('Компания или ИП — счёт против нашего акта; физлицо — акт и налоговый номер. Без документа выплата переносится на следующий месяц.')}</div>
       <div className="grid g3">
         <label className="field"><span>{T('Форма')}</span><select key={`partner_form:${String(prof?.partner_form || '')}`} className="in" name="partner_form" defaultValue={prof?.partner_form || ''}><option value="">—</option><option value="company">{T('Компания')}</option><option value="sole">{T('ИП')}</option><option value="individual">{T('Физлицо')}</option></select></label>

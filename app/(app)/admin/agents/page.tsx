@@ -33,7 +33,7 @@ export default async function Agents() {
           <thead><tr>{['Заявитель', 'Рынок', 'Лицензия маклера', 'Объём / каналы', 'Дата', 'Статус', 'Решение'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{apps.map((a) => (
             <tr key={a.id}>
-              <td><Link href={`/admin/agents/app/${a.id}`}><b>{a.name}</b></Link>{Number(a.nfiles) > 0 && <span className="tiny muted"> · 📎 {a.nfiles}</span>}{a.company && <div className="small">{a.company}</div>}<div className="tiny muted">{T(a.kind === 'agency' ? 'Агентство' : 'Частный агент')} · {a.email} · {a.city} · {a.languages}</div></td>
+              <td><Link href={`/admin/agents/app/${a.id}`}><b>{a.name}</b></Link>{Number(a.nfiles) > 0 && <span className="tiny muted"> · 📎 {a.nfiles}</span>}{a.company && <div className="small">{a.company}</div>}<div className="tiny muted">{[T(a.kind === 'agency' ? 'Агентство' : 'Частный агент'), a.email, a.city, a.languages].filter(Boolean).join(' · ')}{/* М9: пустые поля не печатаем */}</div></td>
               <td>{a.market}</td><td className="small">{a.license || '—'}</td><td className="small">{a.volume}<div className="tiny muted">{a.channels}</div></td>
               <td className="small muted">{date(L, a.created_at)}</td><td><Pill kind={st[a.status][1]}>{T(st[a.status][0])}</Pill></td>
               <td><form action={reviewApplication} className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input type="hidden" name="id" value={a.id} />

@@ -2683,5 +2683,15 @@
 "Данные удалены по запросу клиента {d}": "Daten auf Kundenwunsch gelöscht {d}",
 "Карточка закрыта: данные клиента удалены по его запросу. Договор и KYC по сделке, если она была, хранятся по закону — в разделе «Согласия и данные».": "Die Karte ist geschlossen: Die Kundendaten wurden auf Wunsch gelöscht. Vertrag und KYC einer Transaktion werden, falls vorhanden, gesetzlich aufbewahrt — unter «Einwilligungen und Daten».",
 "Ничего не отмечено — выгрузить весь список по фильтру: {n} строк?": "Nichts markiert — die ganze gefilterte Liste exportieren: {n} Zeilen?",
-"Строк: {n}": "Zeilen: {n}"
+"Строк: {n}": "Zeilen: {n}",
+"Транш получен": "Tranche erhalten",
+"Рабочие дни": "Arbeitstage",
+"пн": "Mo",
+"вт": "Di",
+"ср": "Mi",
+"чт": "Do",
+"пт": "Fr",
+"сб": "Sa",
+"вс": "So",
+"Скопировать ссылку": "Link kopieren"
 }

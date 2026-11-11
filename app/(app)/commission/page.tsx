@@ -73,7 +73,7 @@ export default async function Commission() {
               <td><Link className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</Link></td></tr>)}</tbody></table></div>
         </>}
         {debt < 0 && <div className="err mt16">{T('Удержание по расторгнутой сделке: {a} — зачтём из следующих выплат', { a: usd(L, -debt) })}</div>}
-        {payee && <PayoutProfile userId={c.user.id} lang={L} />}
+        {payee && <PayoutProfile userId={c.user.id} lang={L} gapNote={false} />}
         <div className="h2 mt24">{T('Сделки')}</div>
         <div className="tbl-wrap mt8"><table className="tbl">
           <thead><tr>{['Квартира', 'Клиент', 'Цена сделки', 'Ваша комиссия', 'Оплачено клиентом', 'Статус'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>

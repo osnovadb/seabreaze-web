@@ -6,7 +6,7 @@ import { t, date, dateTime, usd, fmtVars } from '@/lib/i18n'
 import { isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
-import { partnerCol, REG_ST } from '@/lib/stages'
+import { partnerCol, REG_ST, SOURCE_LABEL } from '@/lib/stages'
 import { StageStepper } from '@/components/StageStepper'
 import { ConsentBox } from '@/components/ConsentBox'
 import { EditContacts } from './contacts'
@@ -95,7 +95,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               <div className="kv"><span>{T('Телефон')}</span><span>{cl.phone || '—'}</span></div>
               <div className="kv"><span>E-mail</span><span className="small">{cl.email || '—'}</span></div>
               <div className="kv"><span>{T('Страна, язык')}</span><span>{[cl.country, (cl.language || '').toUpperCase()].filter(Boolean).join(' · ')}</span></div>
-              <div className="kv"><span>{T('Источник')}</span><span>{cl.source ? T(SRC_NAME[cl.source] || (cl.source.startsWith('site') ? 'Сайт' : cl.source)) : '—'}</span></div>
+              <div className="kv"><span>{T('Источник')}</span><span>{cl.source ? T(SRC_NAME[cl.source] || SOURCE_LABEL[cl.source] || (cl.source.startsWith('site') ? 'Сайт' : cl.source)) : '—'}</span></div>
               <div className="kv" style={{ alignItems: 'flex-start' }}><span>{T('Согласие')}</span><ConsentBox lang={L} cl={cl} /></div>
               <EditContacts lang={L} cl={{ id: cl.id, name: cl.name, phone: cl.phone, email: cl.email, country: cl.country, language: cl.language }} />
             </div>

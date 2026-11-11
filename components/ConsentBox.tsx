@@ -2,6 +2,7 @@ import { t, date, type Lang } from '@/lib/i18n'
 import { consentUrl, waText } from '@/lib/consent'
 import { sendConsentLink } from '@/lib/consentActions'
 import { Pill } from './ui'
+import { CopyLink } from './CopyLink'
 
 // 2.2 · §15 Статус согласия клиента и отправка ссылки: письмом (из портала) или в WhatsApp со своего номера
 export function ConsentBox({ lang, cl }: { lang: Lang; cl: { id: string; consent_status: string; consent_token: string | null; consent_at: string | null; marketing_consent_at: string | null; phone_norm: string | null; email: string | null; language: string | null; do_not_contact: boolean } }) {
@@ -22,7 +23,7 @@ export function ConsentBox({ lang, cl }: { lang: Lang; cl: { id: string; consent
         {url && cl.phone_norm && <a className="btn btn--sm" href={`https://wa.me/${cl.phone_norm}?text=${encodeURIComponent(waText(cLang, url))}`} target="_blank" rel="noreferrer">WhatsApp</a>}
         {!url && <form action={sendConsentLink}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--sm btn--ghost">{T('Создать ссылку')}</button></form>}
       </div>}
-      {url && st !== 'given' && <div className="tiny muted" style={{ wordBreak: 'break-all' }}>{url}</div>}
+      {url && st !== 'given' && <div><CopyLink url={url} label={T('Скопировать ссылку')} done={T('Скопировано')} /></div>}
     </div>
   )
 }

@@ -87,7 +87,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
             <tr key={x.id}><td><b>{x.unit}</b><div className="tiny muted">{x.project}</div></td><td className="small">{x.dev}</td><td className="small">№{x.no} · {Math.round(x.pct * 100) / 100}%</td><td><b>{usd(L, x.amount)}</b></td>
               <td><Pill kind={TR[x.status][1]}>{T(TR[x.status][0])}</Pill>{x.status === 'scheduled' && <div className="tiny muted">{T('оплачено клиентом {p}%', { p: x.paid_pct })}</div>}</td>
               <td className="small">{x.status === 'received' ? date(L, x.received_at) : x.expected_at ? date(L, x.expected_at) : '—'}</td>
-              <td>{fin && x.status === 'expected' && <details><summary className="btn btn--sm btn--p">{T('Получено (Received by AZ)')}</summary>
+              <td>{fin && x.status === 'expected' && <details><summary className="btn btn--sm btn--p">{T('Транш получен')}{/* Л10: без смеси языков */}</summary>
                 {/* QA 09.11: отметка необратима и запускает начисления — второй шаг с суммой на глазах */}
                 <form action={trancheReceived} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="id" value={x.id} /><div className="tiny muted">{T('{a} от {d} пришли на счёт? Начисления по долям создадутся сразу, отменить нельзя.', { a: usd(L, x.amount), d: x.dev })}</div><button className="btn btn--sm">{T('Да, деньги на счёте')}</button></form></details>}</td></tr>))}</tbody></table></div>}
         {tab === 'register' && fin && <EntChips />}

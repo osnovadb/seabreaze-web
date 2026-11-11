@@ -14,10 +14,11 @@ const CODE_NAME: Record<Code, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ours' | 
 }
 
 // Квартира справа от шахматки: смотреть, не уходя со страницы. mode=show — без рабочих действий и внутренней информации.
-export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient, quickEdit, calc }: {
+export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, orient, quickEdit, calc, promo }: {
   u: Unit; code: Code; lang: Lang; mode: 'team' | 'agent' | 'show'; closeHref: string; canBook?: boolean
   booking?: { client: string; agent: string; ends_at: string } | null; orient?: string; quickEdit?: boolean
   calc?: React.ReactNode // этап 4 калькулятора: расчёт вариантов прямо в панели шахматки
+  promo?: { name: string; usd: number } | null // Л13: цена с акцией и название акции — как в сетке
 }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const outdoor = (u.plot_area || 0) + (u.ext_area || 0)
@@ -36,7 +37,8 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
       </div>
       {!show && <div className="mt8"><Pill kind={ck}>{T(cn)}</Pill></div>}
       <div className="mt16">{plan ? <div className="planbox"><img src={plan} alt="" /></div> : <div className="planbox muted small" style={{ height: 160 }}>{T('План появится позже')}</div>}</div>
-      <div className="big num mt16">{u.usd ? usd(lang, u.usd) : T('Цена по запросу')}</div>
+      <div className="big num mt16">{u.usd ? (promo ? <>{usd(lang, u.usd - promo.usd)} <s className="small muted">{usd(lang, u.usd)}</s></> : usd(lang, u.usd)) : T('Цена по запросу')}</div>
+      {u.usd && promo && <div className="small okc">{T('Акция «{n}»', { n: promo.name })}: −{usd(lang, promo.usd)}</div>}
       {u.usd ? <div className="small muted">{usd(lang, u.usd / (u.area + outdoor))}/{lang === 'ru' ? 'м²' : 'm²'}{outdoor ? ' · ' + T('с учётом сада или террасы') : ''}</div> : null}
       <div className="mt8">
         <div className="kv"><span>{T('Общая площадь')}</span><span>{m2(lang, u.area)}</span></div>

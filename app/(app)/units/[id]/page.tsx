@@ -122,21 +122,17 @@ export default async function UnitPage(
             {searchParams.err && <div className="err mt16">{searchParams.err}</div>}
             {searchParams.held && <div className="okbox mt16">{T('Квартира придержана на 24 часа — за это время запросите бронь')}</div>}
             {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Запросить бронь')}</Link>}
-            {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && clients.length > 0 && (
-              <form action={holdUnit} className="row mt8"><input type="hidden" name="unit" value={u.id} />
-                <select className="in" name="client" style={{ flex: 1 }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-                <button className="btn">{T('Придержать 24 ч')}</button></form>
+            {/* Л3 (ревью 10.11): один выбор клиента на страницу — и для «Придержать 24 ч», и для «В подборку» */}
+            {code === 'F' && clients.length > 0 && (
+              <form action={addToSelection} className="row mt8" style={{ flexWrap: 'wrap' }}><input type="hidden" name="unit" value={u.id} />
+                <select className="in" name="client" style={{ flex: '1 1 180px' }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+                {canBook(c.user.role) && u.sales_status === 'sales' && <button className="btn" formAction={holdUnit}>{T('Придержать 24 ч')}</button>}
+                <button className="btn">{T('В подборку')}</button></form>
             )}
             {code === 'M' && u.booking_status === 'hold' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Ваш холд до {d} · запросить бронь', { d: date(L, u.booking_ends) })}</Link>}
             {u.sales_status === 'stop' && <div className="note mt16">{T('Проект на стоп-продажах — новые брони не принимаются')}</div>}
             {code === 'M' && u.booking_status !== 'hold' && <Link className="btn btn--lg btn--block mt16" href="/bookings">{T('Ваша бронь до {d} →', { d: date(L, u.booking_ends) })}</Link>}
-            {code === 'F' && clients.length > 0 && (
-              <form action={addToSelection} className="row mt8">
-                <input type="hidden" name="unit" value={u.id} />
-                <select className="in" name="client" style={{ flex: 1 }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-                <button className="btn">{T('В подборку')}</button>
-              </form>
-            )}
+
             {waitable && (
               <div className="mt16">
                 {myWait.map((w, i) => <div key={i} className="note small">{T('Вы в листе ожидания: {n}-й', { n: w.pos })}{w.client ? ' · ' + w.client : ''}</div>)}

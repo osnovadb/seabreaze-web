@@ -2,7 +2,7 @@ import { embedClient } from '@/lib/embed'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
-import { t, usd, m2 } from '@/lib/i18n'
+import { t, usd, m2, m2u } from '@/lib/i18n'
 import { listProjects, unitsOfProjects, viewMode, codeFor, unitNo, planUrl, TYPE_NAME, VIEW_NAME, isLiving, type Code } from '@/lib/catalog'
 import { offersFor, promoOf, promoBadge } from '@/lib/promo'
 import { normFilter, matchUnit } from '@/lib/unitMatch.mjs'
@@ -102,7 +102,7 @@ export default async function Catalog(
                     <div className="tiny muted">{!p ? ps.find((x) => x.id === u.project_id)?.name + ' · ' : ''}{u.building} · {T('{f} этаж', { f: u.floor })}</div>
                     <div className="small mt8">{isLiving(u.unit_type) && u.rooms ? T('{r} комн.', { r: u.rooms }) + ' · ' : T(TYPE_NAME[u.unit_type] || u.unit_type) + ' · '}{m2(L, u.area)}{out(u) ? ` + ${u.plot_area ? T('сад') : T('терраса')} ${m2(L, out(u))}` : ''}</div>
                     {u.view_side && <div className="tiny muted">{T('Вид')} {T(VIEW_NAME[u.view_side] || u.view_side)}{u.is_corner ? ' · ' + T('угловая') : ''}</div>}
-                    <div className="between mt8"><span className="h3" style={{ margin: 0 }}>{u.usd ? usd(L, u.promo ? u.usd - u.promo.usd : u.usd) : '—'}</span><span className="tiny muted">{u.usd ? usd(L, per(u)) + '/м²' : ''}</span></div>
+                    <div className="between mt8"><span className="h3" style={{ margin: 0 }}>{u.usd ? usd(L, u.promo ? u.usd - u.promo.usd : u.usd) : '—'}</span><span className="tiny muted">{u.usd ? usd(L, per(u)) + '/' + m2u(L) : ''}</span></div>
                     {u.promo && u.usd && <div className="tiny muted"><s>{usd(L, u.usd)}</s></div>}
                   </div>
                 </Link>

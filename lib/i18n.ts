@@ -24,6 +24,7 @@ export function t(lang: Lang, ru: string, vars?: Record<string, string | number>
   }
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v))
   if (lang === 'he' && vars) s = heOne(s)
+  if (lang === 'en' && vars) s = s.replace(/(^|[^\d.,])1 (room|day|month|apartment|unit|booking|client|floor|week|project|deal|hour|working day|file|row)s\b/g, (_m, p: string, w: string) => `${p}1 ${w}`) // М6: «1 rooms»
   return s
 }
 // Вычитка иврита 11.11: при значении 1 — форма единственного числа («1 ימים» → «יום אחד»)
@@ -42,8 +43,10 @@ const LOCALE: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', de: 'de-DE', he
 export const num = (lang: Lang, n: number, d = 0) => new Intl.NumberFormat(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).format(n)
 export const usd = (lang: Lang, n: number) => (n < 0 ? '−$' : '$') + num(lang, Math.round(Math.abs(n)))
 export const pct = (lang: Lang, n: number) => num(lang, n, Number(n) % 1 ? 1 : 0) + '%'
-export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + (lang === 'ru' ? ' м²' : lang === 'he' ? ' מ״ר' : ' m²')
-export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
+export const m2u = (lang: Lang) => (lang === 'ru' ? 'м²' : lang === 'he' ? 'מ״ר' : 'm²') // М6: в английском была кириллическая «м²»
+export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + ' ' + m2u(lang)
+// М6: в английском «07/05/2027» непонятно — май или июль; пишем «7 May 2027»
+export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
 export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
 // Переменные шаблонов из базы: даты в ISO показываем в формате языка
 export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | undefined) =>

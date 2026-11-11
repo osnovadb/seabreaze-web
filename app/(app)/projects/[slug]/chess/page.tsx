@@ -95,13 +95,14 @@ export default async function ChessPage(
           <ChessBoard units={shown} lang={L} team={mode === 'team'} selected={sel?.id} hrefFor={Object.fromEntries(shown.map((u) => [u.id, qs({ u: u.id, side: side || undefined })]))} views={views} layouts={layouts}
             clients={clients} projectId={p.id} canPick={clients.length > 0 || editor} initial={searchParams.l ? { l: searchParams.l } : undefined}
             bulk={{ toSelection: addManyToSelection, ...(editor ? { status: bulkStatus } : {}), ...(c.user.role === 'owner' ? { hide: bulkHide } : {}) }} />
-          {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor}
+          {sel ? <UnitPanel key={sel.id} u={sel} code={codeFor(sel, c.user, mode, curClient)} lang={L} mode={mode} closeHref={qs({ u: '' })} canBook={canBook(c.user.role) && sel.sales_status === 'sales'} booking={selBooking} orient={orient(sel)} quickEdit={editor} promo={(() => { const pr = promoOf(sel, offers); return pr ? { name: pr.name, usd: pr.usd } : null })()}
             calc={selCalc ? <VariantCalc key={sel.id} lang={L} compact {...selCalc} /> : null} />
             : null}
         </div>
         <div className="row mt16 small muted">
           {!sel && <span>{T('Наведите на квартиру — краткая карточка; нажмите — подробная справа')}</span>}
-          {free.length > 0 && <span>· {T('цены свободных')} {usd(L, Math.min(...free.map((u) => u.usd || 0)))} – {usd(L, Math.max(...free.map((u) => u.usd || 0)))}</span>}
+          {/* Л12: диапазон — по тому, что на экране (выбранная сторона дома) */}
+          {(() => { const fr = shown.filter((u) => u.code === 'F' && u.usd); return fr.length > 0 && <span>· {T('цены свободных')} {usd(L, Math.min(...fr.map((u) => u.usd || 0)))} – {usd(L, Math.max(...fr.map((u) => u.usd || 0)))}</span> })()}
           {isExternal(c.user.role) && <span>· {T('Недоступные квартиры показаны серым без причины')}</span>}
         </div>
       </div>

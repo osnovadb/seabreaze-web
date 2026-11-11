@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { t, usd, num, type Lang } from '@/lib/i18n'
+import { t, usd, num, type Lang, m2u } from '@/lib/i18n'
 import { normFilter, matchUnit } from '@/lib/unitMatch.mjs'
 
 // Шахматка блока (уровня Profitbase): компактный вид и «Шахматка+», мгновенная подсветка по фильтрам каталога,
@@ -45,12 +45,13 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
   const val = (u: CU) => {
     if (u.code === 'X') return ''
     if (mode === 'rooms') return u.rooms ? `${u.rooms}${T('к')}` : T(u.typeName)
-    if (mode === 'area') return `${Math.round(u.area)} м²`
+    if (mode === 'area') return `${Math.round(u.area)} ${m2u(lang)}`
     const p = u.net ?? u.usd
     if (!p || (!team && u.code !== 'F')) return ''
     return mode === 'm2' ? '$' + num(lang, Math.round(p / (u.area + u.out))) : (big ? usd(lang, p) : k(p))
   }
   const click = (u: CU, e: React.MouseEvent) => {
+    setHover(null) // В1: после клика подсказка не висит поверх панели и фильтров
     if (!pick) return
     e.preventDefault()
     if (u.code === 'X') return
@@ -122,7 +123,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
             <div className="between mt8"><b>{hover.u.no}</b><span className="tiny">{T(STATUS.find(([c]) => c === hover.u.code)?.[1] || '')}</span></div>
             <div className="small">{hover.u.rooms ? T('{r} комн.', { r: hover.u.rooms }) + ' · ' : T(hover.u.typeName) + ' · '}{num(lang, hover.u.area, 1)} м²{hover.u.out ? ` + ${num(lang, hover.u.out, 1)}` : ''} · {T('{f} этаж', { f: hover.u.floor })}</div>
             {hover.u.orient && <div className="tiny muted">{hover.u.orient}</div>}
-            {(team || hover.u.code === 'F') && hover.u.usd ? <div className="mt8"><b>{usd(lang, hover.u.net ?? hover.u.usd)}</b>{hover.u.promo ? <> <s className="tiny muted">{usd(lang, hover.u.usd)}</s> <span className="tiny bronze">{hover.u.promo}</span></> : null}<div className="tiny muted">{usd(lang, (hover.u.net ?? hover.u.usd) / (hover.u.area + hover.u.out))}/м²{hover.u.layout ? ' · ' + hover.u.layout : ''}</div></div> : null}
+            {(team || hover.u.code === 'F') && hover.u.usd ? <div className="mt8"><b>{usd(lang, hover.u.net ?? hover.u.usd)}</b>{hover.u.promo ? <> <s className="tiny muted">{usd(lang, hover.u.usd)}</s> <span className="tiny bronze">{hover.u.promo}</span></> : null}<div className="tiny muted">{usd(lang, (hover.u.net ?? hover.u.usd) / (hover.u.area + hover.u.out))}/{m2u(lang)}{hover.u.layout ? ' · ' + hover.u.layout : ''}</div></div> : null}
             {team && hover.u.hidden && <div className="tiny warnc">{T('скрыта от партнёров')}</div>}
           </div>
         )}

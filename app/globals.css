@@ -38,7 +38,7 @@ h1, h2, h3 { margin: 0; font-weight: 500; }
 .nav .cnt { background: var(--gold); color: var(--deep); border-radius: 10px; font-size: 11px; font-weight: 600; padding: 1px 7px; }
 .side__foot { margin-top: auto; padding: 12px; border-top: 1px solid #1F5D5B; display: flex; flex-direction: column; gap: 10px; }
 .langs { display: flex; gap: 8px; font-size: 12.5px; }
-.langs button { color: var(--mist-2); font-weight: 500; }
+.langs button { color: var(--mist-2); font-weight: 500; min-height: 32px; padding: 0 6px; } /* В2: на телефоне переключатель был 18 px */
 .langs button.on { color: #fff; font-weight: 700; }
 /* на светлом фоне (вход, заявка) */
 .langs--light button { color: var(--muted); }
@@ -116,6 +116,12 @@ h1, h2, h3 { margin: 0; font-weight: 500; }
 .field > span { font-size: 12px; color: var(--muted); }
 .in, select.in, textarea.in { height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); outline: none; width: 100%; }
 textarea.in { height: auto; min-height: 80px; padding: 10px 12px; resize: vertical; }
+/* В2 (ревью 10.11): один стиль списка — своя стрелка, запас под неё, без налезания текста; не уже 7,5rem (в «Финансах» список роли сжимался до 43 px) */
+select.in { appearance: none; -webkit-appearance: none; padding-inline-end: 34px; min-width: 7.5rem; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23887f72' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 12px 8px; }
+[dir=rtl] select.in, select.in:dir(rtl) { background-position: left 12px center; }
+select.in[multiple] { background-image: none; padding-inline-end: 12px; height: auto; }
 .in:focus { border-color: var(--deep-3); }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
 .check input { width: 18px; height: 18px; accent-color: var(--deep-3); margin-top: 1px; flex: none; }

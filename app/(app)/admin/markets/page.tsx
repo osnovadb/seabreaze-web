@@ -30,9 +30,11 @@ export default async function Markets() {
             <label className="check"><input type="checkbox" name="price_negotiation" defaultChecked={m.price_negotiation} disabled={!edit} /> {T('Переговоры о цене разрешены')}</label>
             <div className="tiny muted">{T('Выключено — скидку и бронь запрашивает руководитель Global')}</div>
             <div className="row" style={{ gap: 6 }}><label className="field"><span>{T('Рабочий день с')}</span><input className="in" type="time" name="work_from" defaultValue={m.wf} disabled={!edit} /></label><label className="field"><span>{T('до')}</span><input className="in" type="time" name="work_to" defaultValue={m.wt} disabled={!edit} /></label></div>
-            <label className="field"><span>{T('Рабочие дни (1 — пн … 7 — вс)')}</span><input className="in" name="workdays" defaultValue={m.workdays.join(', ')} disabled={!edit} /></label>
+            <div className="field"><span>{T('Рабочие дни')}</span><div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{/* Л9: дни недели словами, а не «7, 1, 2, 3, 4» */}
+              {['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'].map((d, i) => <label key={d} className="check"><input type="checkbox" name="wd" value={i + 1} defaultChecked={m.workdays.includes(i + 1)} disabled={!edit} /> {T(d)}</label>)}
+              <input type="hidden" name="wd_form" value="1" /></div></div>
             <label className="field"><span>{T('SLA первого ответа, мин')}</span><input className="in" name="sla_minutes" type="number" defaultValue={m.sla_minutes} disabled={!edit} /></label>
-            <label className="field"><span>{T('Ящик рынка (копия каждой заявки с сайта)')}</span><input className="in" name="mailbox" type="email" defaultValue={m.mailbox || ''} placeholder="de@getsestate.com" disabled={!edit} /></label>
+            <label className="field"><span>{T('Ящик рынка (копия каждой заявки с сайта)')}</span><input className="in" name="mailbox" type="email" defaultValue={m.mailbox || ''} placeholder={`${m.code === 'GLOBAL' ? 'info' : m.code.toLowerCase()}@getsestate.com`} disabled={!edit} /></label>
             <label className="field"><span>{T('Языки рынка')}</span><input className="in" name="languages" defaultValue={m.languages.join(', ')} disabled={!edit} /></label>
             {edit && <div><button className="btn btn--sm">{T('Сохранить')}</button></div>}
           </form>))}</div>
