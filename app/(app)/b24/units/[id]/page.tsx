@@ -49,8 +49,8 @@ export default async function Units(
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
       coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
       d.id deal_id, d.paid_pct::float paid, d.contract_no, d.contract_date::text contract_date,
-      -- 380: окно возврата комиссии — от даты договора, как в clawbackDeal (месяцы × 31 день)
-      (coalesce(d.contract_date, d.created_at::date) + coalesce((b.snapshot->>'clawback_months')::int, (portal.cur_conditions(b.project_id)).clawback_months, 3) * 31)::text claw_until,
+      -- 380: окно возврата комиссии — от даты договора, как в clawbackDeal (календарные месяцы)
+      (coalesce(d.contract_date, d.created_at::date) + coalesce((b.snapshot->>'clawback_months')::int, (portal.cur_conditions(b.project_id)).clawback_months, 3) * interval '1 month')::date::text claw_until,
       (select dd.stage from portal.deals dd where dd.booking_id = b.id order by dd.created_at desc limit 1) deal_stage
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'

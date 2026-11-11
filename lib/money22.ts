@@ -162,7 +162,12 @@ export async function clawbackDeal(dealId: string, by: string | null, reason = '
   const at = o.date ? new Date(o.date + 'T12:00:00Z').getTime() : Date.now()
   // 380: окно возврата комиссии — от даты договора (раньше от нажатия «Договор подписан»)
   const from = d.contract_date ? new Date(d.contract_date + 'T12:00:00Z').getTime() : new Date(d.created_at).getTime()
-  const inWindow = at - from <= c.clawback_months * 31 * 86400000 && o.refunded !== false
+  // календарные месяцы от даты договора (10.11 + 3 мес. = 10.02), последний день окна включительно
+  // как в Postgres (date + interval 'n month'): 30.11 + 3 мес. = 28.02 — день обрезается до конца месяца
+  const f0 = new Date(from), m = f0.getUTCMonth() + c.clawback_months
+  const last = new Date(Date.UTC(f0.getUTCFullYear(), m + 1, 0)).getUTCDate()
+  const until = Date.UTC(f0.getUTCFullYear(), m, Math.min(f0.getUTCDate(), last), 12)
+  const inWindow = at <= until && o.refunded !== false
   const res = await tx(async (t) => {
     await t.query(`update portal.deals set stage = 'cancelled', terminated_at = coalesce(terminated_at, now()), termination_date = coalesce($2::date, termination_date, current_date),
       termination_reason = coalesce($3, termination_reason), client_refunded = coalesce($4, client_refunded) where id = $1`, [dealId, o.date || null, reason, o.refunded ?? null])
