@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { t } from '@/lib/i18n'
 import { MATRIX, ROLE_NAMES, type Role } from '@/lib/perm'
@@ -6,6 +7,7 @@ import { AdminTabs } from '@/components/AdminTabs'
 
 export default async function Roles() {
   const c = await requireCtx()
+  if (!['owner', 'market_head'].includes(c.user.role)) redirect('/') // Б8: матрица ролей — только владельцу и руководителю рынка
   const L = c.lang, T = (s: string) => t(L, s)
   const roles = (Object.keys(ROLE_NAMES) as Role[]).filter((r): r is Exclude<Role, 'referrer'> => r !== 'referrer')
   const kind = (v: string) => (v === 'да' ? 'pill--ok' : v === '—' ? 'pill--off' : 'pill--warn')

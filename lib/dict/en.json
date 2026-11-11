@@ -2677,5 +2677,11 @@
 "Если это были не вы — срочно напишите вашему куратору или ответьте на это письмо.": "If this wasn't you — urgently write to your curator or reply to this e-mail.",
 "Партнёр {n} сменил банковские реквизиты — выплата на новые не раньше чем через 3 дня": "Partner {n} changed bank details — payout to the new ones no earlier than in 3 days",
 "Форма устарела или заполнена слишком быстро — обновите страницу и отправьте ещё раз": "The form is outdated or was filled in too quickly — reload the page and send again",
-"Слишком много заявок — попробуйте позже": "Too many applications — try later"
+"Слишком много заявок — попробуйте позже": "Too many applications — try later",
+"Выберите роль": "Choose a role",
+"Выберите": "Choose",
+"Данные удалены по запросу клиента {d}": "Data deleted at the client's request {d}",
+"Карточка закрыта: данные клиента удалены по его запросу. Договор и KYC по сделке, если она была, хранятся по закону — в разделе «Согласия и данные».": "The card is closed: the client's data was deleted at their request. The contract and KYC of a deal, if any, are kept by law — in «Consents and data».",
+"Ничего не отмечено — выгрузить весь список по фильтру: {n} строк?": "Nothing is checked — export the whole filtered list: {n} rows?",
+"Строк: {n}": "Rows: {n}"
 }

@@ -23,6 +23,9 @@ export function middleware(req: NextRequest) {
   // путь — в заголовке запроса: макет закрывает рекомендателю всё, кроме его кабинета
   const h = new Headers(req.headers)
   h.set('x-path', p)
+  // Б9: клиент вкладки Bitrix24 — из адреса: ?cl= или карточка клиента /b24/units/<id>
+  const cl = req.nextUrl.searchParams.get('cl') || (p.match(/^\/b24\/units\/([0-9a-f-]{36})/) || [])[1] || ''
+  if (/^[0-9a-f-]{36}$/.test(cl)) h.set('x-cl', cl); else h.delete('x-cl')
   return NextResponse.next({ request: { headers: h } })
 }
 export const config = { matcher: ['/((?!_next/static|_next/image).*)'] }

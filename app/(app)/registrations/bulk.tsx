@@ -5,13 +5,15 @@ import { t, type Lang } from '@/lib/i18n'
 
 // Выбор строк (галочки name="rid") → файл застройщику / полный список / «Отметить отправленными».
 // Ничего не выбрано — выгружается весь отфильтрованный список (query — текущие фильтры экрана)
-export function RegBulk({ lang, query, edit, canSend }: { lang: Lang; query: string; edit: boolean; canSend: boolean }) {
+export function RegBulk({ lang, query, edit, canSend, total = 0 }: { lang: Lang; query: string; edit: boolean; canSend: boolean; total?: number }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [fl, setFl] = useState('ru')
   const [pending, start] = useTransition()
   const picked = () => Array.from(document.querySelectorAll<HTMLInputElement>('input[name=rid]:checked')).map((x) => x.value)
   const dl = (kind: string) => {
     const ids = picked()
+    // Б3: действие над всем списком — с подтверждением и числом строк
+    if (!ids.length && !window.confirm(T('Ничего не отмечено — выгрузить весь список по фильтру: {n} строк?', { n: total }))) return
     window.location.href = `/api/registrations/export?${query}${query ? '&' : ''}kind=${kind}&lang=${fl}${ids.length ? '&ids=' + ids.join(',') : ''}`
   }
   const send = () => {

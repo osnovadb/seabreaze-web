@@ -58,7 +58,8 @@ export async function ingestLead(source: 'website' | 'quiz' | 'landing' | 'smart
     const owner = await one<{ id: string }>(`select id from portal.users where active and ((role = 'market_head' and market = $1) or role = 'owner') order by role = 'market_head' desc, created_at limit 1`, [market])
     ownerId = owner!.id
     const pid = project?.project_id || (await one<{ id: string }>(`select id from projects where slug = 'premium-residence'`))?.id
-    const months = (pid ? (await conditionsFor(pid))?.protect_months : null) ?? 3
+    // Б5 / 290 (Денис 11.11): срок закрепления — одна настройка, 6 месяцев (было — старое поле условий проекта, 3 мес.)
+    void pid; const months = 6
     const seq = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
     const reg = `R-${bakuYear()}-${String(seq!.n).padStart(4, '0')}`
     const r = await one<{ id: string; protected_until: string }>(`insert into portal.clients (reg_no, owner_id, name, phone, phone_norm, email, email_norm, language, market, consent_at, source, interest, stage, protected_until)

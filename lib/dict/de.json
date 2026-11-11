@@ -2677,5 +2677,11 @@
 "Если это были не вы — срочно напишите вашему куратору или ответьте на это письмо.": "Wenn Sie das nicht waren — schreiben Sie sofort Ihrem Betreuer oder antworten Sie auf diese E-Mail.",
 "Партнёр {n} сменил банковские реквизиты — выплата на новые не раньше чем через 3 дня": "Partner {n} hat die Bankverbindung geändert — Auszahlung auf die neue frühestens in 3 Tagen",
 "Форма устарела или заполнена слишком быстро — обновите страницу и отправьте ещё раз": "Das Formular ist veraltet oder wurde zu schnell ausgefüllt — Seite neu laden und erneut senden",
-"Слишком много заявок — попробуйте позже": "Zu viele Anfragen — später erneut versuchen"
+"Слишком много заявок — попробуйте позже": "Zu viele Anfragen — später erneut versuchen",
+"Выберите роль": "Rolle wählen",
+"Выберите": "Auswählen",
+"Данные удалены по запросу клиента {d}": "Daten auf Kundenwunsch gelöscht {d}",
+"Карточка закрыта: данные клиента удалены по его запросу. Договор и KYC по сделке, если она была, хранятся по закону — в разделе «Согласия и данные».": "Die Karte ist geschlossen: Die Kundendaten wurden auf Wunsch gelöscht. Vertrag und KYC einer Transaktion werden, falls vorhanden, gesetzlich aufbewahrt — unter «Einwilligungen und Daten».",
+"Ничего не отмечено — выгрузить весь список по фильтру: {n} строк?": "Nichts markiert — die ganze gefilterte Liste exportieren: {n} Zeilen?",
+"Строк: {n}": "Zeilen: {n}"
 }

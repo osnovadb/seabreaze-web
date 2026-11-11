@@ -145,8 +145,9 @@ async function partnerProgress(userId: string) {
   if (a) await queueApp(a.id)
 }
 async function stageGuard(c: Ctx, clientId: string) {
-  const cl = await one<{ id: string; owner_id: string; agency_id: string | null; name: string }>('select id, owner_id, agency_id, name from portal.clients where id = $1', [clientId])
+  const cl = await one<{ id: string; owner_id: string; agency_id: string | null; name: string; anon: boolean }>('select id, owner_id, agency_id, name, anonymized_at is not null anon from portal.clients where id = $1', [clientId])
   if (!cl) throw new Error('client')
+  if (cl.anon) throw new Error('anonymized') // Б12: после удаления данных по запросу карточка закрыта для правок
   const u = c.user
   const ok = u.role === 'owner' || u.role === 'market_head' || (u.role === 'office' || u.role === 'finance') || cl.owner_id === u.id || (u.role === 'agency_head' && cl.agency_id === u.agency_id)
     || (u.role === 'seller' && (await one('select 1 from portal.users where id = $1 and curator_id = $2', [cl.owner_id, u.id])))
@@ -806,7 +807,7 @@ export async function applyAgent(_: unknown, f: FormData) {
     return { ok: true, token, referrer: true }
   }
   // Владельцу, руководителю и менеджерам рынка заявки (проверку проводит менеджер рынка)
-  for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role in ('market_head','seller') and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
+  for (const o of await q<{ id: string }>(`select id from portal.users where active and (role = 'owner' or (role = 'market_head' and market = $1))`, [market])) await notify(o.id, 'application', 'Новая заявка: {n}', `/admin/agents/app/${app!.id}`, { n: s(f, 'name') })
   // QA 09.11: ссылка на статус была только на экране — дублируем письмом, на языке формы
   const al = (LANGS.includes(s(f, 'lang') as Lang) ? s(f, 'lang') : market === 'IL' ? 'he' : market === 'DE' ? 'de' : 'en') as Lang
   const link = `${(process.env.PUBLIC_URL || '').replace(/\/$/, '')}/apply/status/${token}?lang=${al}`
@@ -903,6 +904,7 @@ export async function saveConditions(_: unknown, f: FormData) {
 export async function createUser(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canManageUsers(c.user.role)) return { error: 'Только владелец' }
+  if (!s(f, 'role')) return { error: 'Выберите роль' } // Б10
   if (!ROLES_ALL.includes(s(f, 'role') as Role)) return { error: 'Нет прав' }
   let uid: string
   try {

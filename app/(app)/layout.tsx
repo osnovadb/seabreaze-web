@@ -1,3 +1,5 @@
+import { embedClient } from '@/lib/embed'
+import { EmbedCl } from '@/components/EmbedCl'
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
@@ -55,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24
   if ((await cookies()).get('ge_embed')?.value === '1') {
     // «Текущий клиент» вкладки Bitrix24: полоса сверху на всех экранах — подбор, шахматка, бронь идут для него
-    const cid = (await cookies()).get('ge_client')?.value
+    const cid = await embedClient() // Б9: из адреса вкладки, не из общей cookie
     const cur = cid && /^[0-9a-f-]{36}$/.test(cid) ? await one<{ id: string; name: string }>('select id, name from portal.clients where id = $1', [cid]) : null
     // меню раздела внутри фрейма — по роли (пункты левого меню Bitrix24 ведут в те же разделы)
     const R = u.role
@@ -64,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ['/finance', 'Финансы', ['owner', 'finance', 'market_head'].includes(R)], ['/reports', 'Отчёты', ['owner', 'market_head'].includes(R)], ['/news', 'Новости', true], ['/admin', 'Админка', ['owner', 'market_head', 'finance'].includes(R)]]
     return (
       <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>
+        <EmbedCl cl={cur?.id || null} />
         {/* QA 09.11: меню раздела во фрейме — крупнее и с подсветкой текущего раздела */}
         <nav className="embed-nav">{(() => { const path = xpath; const vis = em.filter((x) => x[2]); const cur = vis.map((x) => x[0]).filter((h) => path === h || path.startsWith(h + '/')).sort((a, b) => b.length - a.length)[0]; return vis.map(([h, l]) => <Link key={h} href={h} className={h === cur ? 'on' : ''}>{T(l)}</Link>) })()}</nav>
         {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
@@ -72,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href={`/b24/units/${cur.id}?tab=pick`} className="small" style={{ color: '#fff' }}>{T('Подбор')}</Link>
           <Link href={`/b24/units/${cur.id}?tab=units`} className="small" style={{ color: '#fff' }}>{T('Квартиры клиента')}</Link>
           {/* QA 09.11: выйти из клиента — иначе он «залипал» на 12 часов на всех экранах фрейма */}
-          <a href="/b24/ctx?clear=1&to=/catalog" className="small" style={{ color: '#fff', marginInlineStart: 'auto', opacity: .85 }}>{T('Выйти из клиента')} ×</a>
+          <a href="/catalog" data-nocl="1" className="small" style={{ color: '#fff', marginInlineStart: 'auto', opacity: .85 }}>{T('Выйти из клиента')} ×</a>
         </div>}
         {children}</div></div>
     );

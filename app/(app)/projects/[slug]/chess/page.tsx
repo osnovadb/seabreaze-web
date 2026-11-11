@@ -1,3 +1,4 @@
+import { embedClient } from '@/lib/embed'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -32,7 +33,7 @@ export default async function ChessPage(
   const b = bs.find((x) => x.id === searchParams.b) || [...bs].sort((a, z) => z.free - a.free)[0]
   const units = await unitsOfBuilding(b.id)
   const mode = viewMode(c.user, false)
-  const curClient = (await cookies()).get('ge_embed')?.value === '1' ? ((await cookies()).get('ge_client')?.value || '').replace(/[^0-9a-f-]/g, '') || null : null // QA 09.11: бронь другого клиента — не «ваша»
+  const curClient = await embedClient() // QA 09.11: бронь другого клиента — не «ваша»
   const free = units.filter((u) => codeFor(u, c.user, mode, curClient) === 'F')
   const sync = seesSource(c.user.role) ? await one<{ at: string; src: string }>(`select max(u.synced_at) at, min(u.source_id) src from units u where u.building_id = $1`, [b.id]) : null
   const ri = await riserInfo(b.id)

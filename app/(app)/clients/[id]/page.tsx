@@ -32,6 +32,9 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
   const cs = clientScope(c.user)
   const cl = await one<any>(`select cl.*, us.name as owner_name, us.role as owner_role from portal.clients cl join portal.users us on us.id = cl.owner_id where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
   if (!cl) notFound()
+  // Б12: после удаления данных по запросу карточка закрыта — без правок, квалификации и действий; история сделки — в «Согласия и данные»
+  if (cl.anonymized_at) return (<><Top title={cl.name} sub={T('Данные удалены по запросу клиента {d}', { d: date(L, cl.anonymized_at) })} />
+    <div className="page"><div className="note">{T('Карточка закрыта: данные клиента удалены по его запросу. Договор и KYC по сделке, если она была, хранятся по закону — в разделе «Согласия и данные».')}</div></div></>)
   const acts = await q<{ id: string; kind: string; text: string; vars: Record<string, string | number> | null; internal: boolean; created_at: string; who: string | null }>(`select a.id, a.kind, a.text, a.vars, a.internal, a.created_at, u.name as who from portal.activities a left join portal.users u on u.id = a.user_id where a.client_id = $1 ${ext ? 'and not a.internal' : ''} order by a.created_at desc`, [cl.id])
   const tasks = await q<{ id: string; title: string; vars: Record<string, string | number> | null; due: string | null; done: boolean }>('select id, title, vars, due, done from portal.tasks where client_id = $1 order by done, due nulls last', [cl.id])
   const fixes = await q<{ project_id: string; name: string; status: string; protected_until: string | null }>(`select f.project_id, p.name, f.status, f.protected_until from portal.fixations f join projects p on p.id = f.project_id where f.client_id = $1`, [cl.id])

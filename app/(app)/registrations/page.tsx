@@ -27,7 +27,10 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
   const today = new Date().toISOString().slice(0, 10)
   const groups: [string, string][] = [['today', 'К отправке'], ['wait', 'Ждём ответа'], ['silence', 'Молчание'], ['expiring', 'Истекают'], ['confirmed', 'Подтверждены'], ['rejected', 'Отказы'], ['all', 'Все']]
   const f = groups.some(([k]) => k === searchParams.f) ? searchParams.f! : 'today'
-  const shown = rows.filter((r) => groupOf(r, today)[f])
+  const all = rows.filter((r) => groupOf(r, today)[f])
+  // Б3 (ревью 10.11): постраничный вывод — на тестовой копии было 1 283 строки одной страницей (2,6 МБ)
+  const PAGE = 100, pages = Math.max(1, Math.ceil(all.length / PAGE)), pg = Math.min(pages, Math.max(1, Number((searchParams as { pg?: string }).pg) || 1))
+  const shown = all.slice((pg - 1) * PAGE, pg * PAGE)
   const edit = ['owner', 'office', 'finance'].includes(c.user.role)
   // текущие фильтры — в ссылки вкладок и в выгрузку
   const qs = (over: Partial<Record<(typeof KEYS)[number], string>>) => {
@@ -59,7 +62,7 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
           <button className="btn btn--sm btn--p">{T('Показать')}</button>
           {active > 0 && <Link className="btn btn--sm btn--ghost" href={`?f=${f}`}>{T('Сбросить ({n})', { n: active })}</Link>}
         </form>
-        <RegBulk lang={L} query={qs({})} edit={edit} canSend={f === 'today' || shown.some((r) => ['to_send', 'expired'].includes(r.status))} />
+        <RegBulk lang={L} query={qs({})} total={all.length} edit={edit} canSend={f === 'today' || shown.some((r) => ['to_send', 'expired'].includes(r.status))} />
         <div className="tbl-wrap mt16">
           <table className="tbl">
             <thead><tr><th><CheckAll /></th>{['Клиент', 'Застройщик · проект', 'Источник', 'Статус', 'Срок', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
@@ -94,6 +97,8 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
             </tbody>
           </table>
         </div>
+        {pages > 1 && <div className="row mt8" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><span className="small muted">{T('Строк: {n}', { n: all.length })} ·</span>
+          {Array.from({ length: pages }, (_, i) => i + 1).map((n) => <Link key={n} href={`?${qs({})}${qs({}) ? '&' : ''}pg=${n}`} className={'chip' + (n === pg ? ' on' : '')}>{n}</Link>)}</div>}
         {c.user.role === 'owner' && (
           <form action={massEnqueue} className="card mt24 row" style={{ gap: 12 }}>
             <div className="label">{T('Новый застройщик: вся база в регистрацию')}</div>

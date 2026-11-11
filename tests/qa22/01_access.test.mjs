@@ -26,6 +26,8 @@ const MATRIX = [
   ['/admin/markets', ['owner', 'market_head']],
   ['/admin/privacy', ['owner', 'office', 'finance']],
   ['/admin/b24', ['owner']],
+  ['/admin/roles', ['owner', 'market_head']], // Б8
+  ['/admin/agents', ['owner', 'market_head']], // Б7: сейлзу — нет
   ['/admin/developers', ['owner', 'market_head', 'office', 'finance']],
 ]
 for (const [path, allowed] of MATRIX) {

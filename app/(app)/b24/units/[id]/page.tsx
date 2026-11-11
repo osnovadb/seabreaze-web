@@ -122,7 +122,7 @@ export default async function Units(
                   <label className="field"><span>{T('до какого числа у застройщика')}</span><input name="until" type="date" className="in" /></label>
                   <button className="btn btn--sm btn--p">{T('Подтвердить бронь')}</button></form>
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('reject')}
-                  <label className="field"><span>{T('Причина отказа')}</span><select name="reason" className="in">{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+                  <label className="field"><span>{T('Причина отказа')}</span><select name="reason" className="in" required defaultValue="">{/* Б11: причина не выбрана заранее */}<option value="" disabled>{T('Выберите')}</option>{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <button className="btn btn--sm">{T('Отклонить')}</button></form></div>}
               {/* гл. 6 (решение 341): стадии после Selection двигает портал — кнопки по шагам: KYC → SPA approval → SPA signed */}
               {u.status === 'confirmed' && office && <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -149,7 +149,7 @@ export default async function Units(
           })}
           {['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <input type="hidden" name="client" value={cl.id} />
-            <label className="field"><span>{T('Отказ клиента — причина')}</span><select name="reason" className="in" defaultValue="Price">{B24_LOST.filter((x) => x !== 'Compliance').map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+            <label className="field"><span>{T('Отказ клиента — причина')}</span><select name="reason" className="in" required defaultValue=""><option value="" disabled>{T('Выберите')}</option>{B24_LOST.filter((x) => x !== 'Compliance').map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
             <button className="btn btn--sm">{T('Отказ')}</button>
             <span className="tiny muted">{T('Сделка в Bitrix24 уйдёт в Lost с этой причиной; руками стадии после Selection в Bitrix24 не двигаются.')}</span>
           </form>}

@@ -20,8 +20,7 @@ export default async function B24Tab(
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const r = await resolveClient(kind, Number(params.id))
   if (r.id) redirect(`/b24/ctx?client=${r.id}`) // запомнить клиента вкладки и открыть Units
-  // QA 09.11: карточка Bitrix24 без клиента портала — прежний «текущий клиент» (другой человек) сбрасываем, иначе подбор шёл ему
-  if ((await cookies()).get('ge_client')?.value && !searchParams.nc) redirect(`/b24/ctx?clear=1&to=${encodeURIComponent(`/b24/${kind}/${params.id}?nc=1${searchParams.err ? '&err=' + searchParams.err : ''}`)}`)
+  // Б9: клиента вкладки больше нет в общей cookie — сбрасывать нечего; без клиента портала адрес вкладки без ?cl=
   const what = kind === 'deal' ? T('Сделка') : kind === 'contact' ? T('Контакт') : T('Лид')
   return (
     <>

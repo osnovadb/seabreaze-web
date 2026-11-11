@@ -18,7 +18,8 @@ export const canBook = (r: Role) => ['owner', 'market_head', 'seller', 'office',
 export const canConfirmBooking = (r: Role) => ['owner', 'office', 'finance'].includes(r)
 export const canEditConditions = (r: Role) => r === 'owner'
 export const canManageUsers = (r: Role) => r === 'owner'
-export const canReviewAgents = (r: Role) => ['owner', 'market_head', 'seller'].includes(r)
+// Б7 (ревью 10.11): заявки партнёров — зона руководителя рынка (по ТЗ), сейлзу раздел не показываем
+export const canReviewAgents = (r: Role) => ['owner', 'market_head'].includes(r)
 export const canSeeJournal = (r: Role) => ['owner', 'market_head', 'finance'].includes(r)
 export const canSeeClients = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'finance', 'agency_head', 'agent'].includes(r)
 export const canSeeFinance = (r: Role) => ['owner', 'market_head', 'finance'].includes(r)
@@ -46,7 +47,7 @@ export const MATRIX: [string, Record<Exclude<Role, 'referrer'>, string>][] = [
   ['Выплаты агентам', { owner: 'да', market_head: 'чтение', seller: '—', office: '—', finance: 'да', content: '—', agency_head: 'свои', agent: 'свои' }],
   ['Коммерческие условия проектов', { owner: 'да', market_head: 'чтение', seller: '—', office: '—', finance: 'чтение', content: '—', agency_head: '—', agent: '—' }],
   ['Источники и синхронизация', { owner: 'да', market_head: '—', seller: '—', office: 'да', finance: '—', content: '—', agency_head: '—', agent: '—' }],
-  ['Заявки и аккаунты агентов', { owner: 'да', market_head: 'да', seller: 'проверка', office: '—', finance: '—', content: '—', agency_head: 'свои сотрудники', agent: '—' }],
+  ['Заявки и аккаунты агентов', { owner: 'да', market_head: 'да', seller: '—', office: '—', finance: '—', content: '—', agency_head: 'свои сотрудники', agent: '—' }],
   ['Пользователи и роли', { owner: 'да', market_head: '—', seller: '—', office: '—', finance: '—', content: '—', agency_head: '—', agent: '—' }],
   ['Журнал действий', { owner: 'да', market_head: 'свой рынок', seller: '—', office: '—', finance: 'финансы', content: '—', agency_head: '—', agent: '—' }],
 ]

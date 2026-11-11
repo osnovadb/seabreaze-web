@@ -30,7 +30,7 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
       (select portal.unit_no(bl.external_id, un.number) from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking,
       (select ends_at from portal.bookings b where b.client_id = cl.id and b.status in ('requested','confirmed') limit 1) as booking_ends,
       (select status from portal.fixations f where f.client_id = cl.id limit 1) as fix
-    from portal.clients cl join portal.users us on us.id = cl.owner_id where ${cs.sql} ${searchParams.q ? `and (cl.name ilike $${cs.params.length + 1} or cl.email ilike $${cs.params.length + 1} or cl.phone ilike $${cs.params.length + 1})` : ''} order by cl.last_activity_at desc`,
+    from portal.clients cl join portal.users us on us.id = cl.owner_id where ${cs.sql} and cl.anonymized_at is null ${searchParams.q ? `and (cl.name ilike $${cs.params.length + 1} or cl.email ilike $${cs.params.length + 1} or cl.phone ilike $${cs.params.length + 1})` : ''} order by cl.last_activity_at desc`,
     searchParams.q ? [...cs.params, `%${searchParams.q}%`] : cs.params)
   const view = searchParams.v || (ext ? 'kanban' : 'list')
   const live = rows.filter((r) => !r.pause_until && r.stage !== 'lost')
