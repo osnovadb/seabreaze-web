@@ -1,0 +1,442 @@
+{
+ "ui": {
+  "lang": "DE",
+  "brand": "GetsEstate · Portal",
+  "doc": "Anleitung für die Rolle",
+  "where": "Wo Sie arbeiten",
+  "menu": "Ihr Menü",
+  "how": "So arbeiten Sie",
+  "rules": "Regeln und Fristen",
+  "help": "Wenn etwas nicht klappt",
+  "foot": "Portal 2.2 · November 2026 · Entwurf zur Prüfung",
+  "team": "Team GetsEstate",
+  "partner": "Partner"
+ },
+ "roles": [
+  {
+   "id": "owner",
+   "name": "Inhaber",
+   "where": "In Bitrix24: Das Portal öffnet sich als App GetsEstate im linken Menü und als Reiter Units im Deal. „Im Vollbild öffnen“ zeigt das ganze Portal. Kein eigenes Passwort – Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Projektkonditionen",
+     "Verwaltung → Konditionen: Sätze, Rabatte nach Anzahlung und Laufzeit, Reservierungsfrist, Limit des Bauträgers. Jede Änderung ist eine neue Version; bestehende Deals behalten ihre."
+    ],
+    [
+     "Benutzer und Rollen",
+     "Verwaltung → Benutzer: einladen, Rolle und Markt ändern, deaktivieren. „Alle Sitzungen beenden“ meldet auf allen Geräten ab."
+    ],
+    [
+     "Rabatte über dem Limit",
+     "Anfragen von Vertrieb und Partnern kommen als Benachrichtigung und Aufgabe in Bitrix24 – genehmigen oder ablehnen."
+    ],
+    [
+     "Auszahlungsregister",
+     "Finanzen → Monatsregister: Nach Bestätigung durch die Märkte „Genehmigen“. Schulden eines Partners abschreiben dürfen nur Sie."
+    ],
+    [
+     "Kontrolle",
+     "Das Protokoll zeigt, wer was geändert hat. „Anmelden als“ zeigt das Portal aus Sicht eines Benutzers, nur lesend."
+    ]
+   ],
+   "rules": [
+    "Konditionen vor der ersten Reservierung im Projekt ändern – sonst gilt die neue Version erst für künftige Deals.",
+    "Interne Bauträgerkonditionen und den Rabattpool sehen nur Inhaber, Marktleitung und Finanzen.",
+    "Löschung von Kundendaten – Verwaltung → Löschanfragen, Frist 30 Tage."
+   ],
+   "help": "Technische Fragen – im Team-Chat von GetsEstate.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "CRM · Kunden",
+    "Reservierungen",
+    "Auswahllisten",
+    "Registrierungen",
+    "KYC",
+    "Warteliste & Suchen",
+    "Berichte",
+    "Finanzen",
+    "Partner",
+    "Objekte",
+    "Website-Anfragen",
+    "Quellen",
+    "Materialien",
+    "Vorlagen",
+    "Verwaltung"
+   ]
+  },
+  {
+   "id": "market_head",
+   "name": "Marktleitung",
+   "where": "In Bitrix24: Leads und Deals Ihres Marktes, die App GetsEstate im linken Menü, der Reiter Units im Deal. Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Neue Leads",
+     "Website-Anfragen werden nach Markt, Sprache und Auslastung verteilt. Achten Sie darauf, dass der Erstkontakt in der Frist des Marktes erfolgt."
+    ],
+    [
+     "Partneranträge",
+     "Partner → neuer Antrag: Agentur oder Partner prüfen und Zugang erteilen – das Konto öffnet sich automatisch."
+    ],
+    [
+     "Rabatte über dem Limit",
+     "Bittet Vertrieb oder ein Partner um mehr als den eigenen Rabatt, erhalten Sie eine Aufgabe. Im Rahmen des Marktlimits genehmigen oder mit Grund ablehnen."
+    ],
+    [
+     "Streit „Wessen Kunde“",
+     "Markierung Ownership dispute im Deal – entscheiden und festhalten, wem der Kunde zugeordnet ist."
+    ],
+    [
+     "Geld des Marktes",
+     "Finanzen → Monatsregister: Abrechnungen Ihres Marktes prüfen und bestätigen."
+    ]
+   ],
+   "rules": [
+    "Ein Kunde des Teams wird sofort für 6 Monate zugeordnet.",
+    "Ein Partnerkunde ist zunächst Kandidat (30 Tage Vorrang); die Zuordnung für 6 Monate folgt nach der Qualifizierung.",
+    "Ein Partner ohne neue qualifizierte Kunden in 6 Monaten wird Inactive; der Zugang bleibt."
+   ],
+   "help": "Fragen zu Konditionen – an den Inhaber, zu Reservierungen – an das Büro Baku.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "CRM · Kunden",
+    "Reservierungen",
+    "Auswahllisten",
+    "Registrierungen",
+    "Warteliste & Suchen",
+    "Berichte",
+    "Finanzen",
+    "Partner",
+    "Website-Anfragen",
+    "Materialien",
+    "Verwaltung"
+   ]
+  },
+  {
+   "id": "seller",
+   "name": "Vertriebsmanager",
+   "where": "In Bitrix24: Ihre Leads und Deals. Wohnungen, Auswahllisten und Reservierungen stehen im Reiter Units der Deal-Karte. Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Erstkontakt",
+     "Neuen Lead in der Frist des Marktes kontaktieren und das Ergebnis in Bitrix24 festhalten."
+    ],
+    [
+     "Einwilligung des Kunden",
+     "Senden Sie dem Kunden den Einwilligungslink aus der Karte – die Häkchen setzt er selbst. Ohne Einwilligung keine Registrierung beim Bauträger und kein Vertrag."
+    ],
+    [
+     "Auswahl",
+     "Units → Auswahl: Wohnungen aus Verfügbarkeit oder Katalog → „Zur Auswahl“. Der Kunde erhält einen Link in seiner Sprache, ohne Kontakte des Bauträgers."
+    ],
+    [
+     "Hold und Reservierung",
+     "Ein Hold hält die Wohnung 24 Stunden. Dann „Reservierung anfragen“ – das Büro Baku bestätigt sie beim Bauträger."
+    ],
+    [
+     "Rabatt",
+     "Im Rahmen Ihres Limits – sofort. Mehr – „Mehr anfragen“, die Marktleitung entscheidet."
+    ],
+    [
+     "KYC und Vertrag",
+     "Prüfung des Käufers anfordern. „Vertrag unterzeichnet“ setzt das Büro Baku erst nach KYC."
+    ]
+   ],
+   "rules": [
+    "Ein erneuter Hold auf dieselbe Wohnung – frühestens nach 24 Stunden.",
+    "Die Reservierungsfrist hängt vom Projekt ab und steht in der Wohnungskarte.",
+    "Die Phasen Reserved, SPA signed und Won setzt nur das Portal."
+   ],
+   "help": "Reservierung nicht bestätigt – Büro Baku; Rabatt – Marktleitung.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "CRM · Kunden",
+    "Reservierungen",
+    "Auswahllisten",
+    "Warteliste & Suchen",
+    "Berichte",
+    "Materialien"
+   ]
+  },
+  {
+   "id": "office",
+   "name": "Büro Baku",
+   "where": "In Bitrix24 (Backoffice-Aufgaben) und im Portal: Reservierungen, Registrierungen, KYC, Quellen. Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Reservierungen",
+     "Reservierungen → warten auf Bestätigung: beim Bauträger reservieren und „Bestätigen“ mit dessen Reservierungsnummer. Nicht möglich – „Ablehnen“ mit Grund."
+    ],
+    [
+     "Registrierungen",
+     "Registrierungen → Tagespaket: „Datei für den Bauträger (xlsx)“, senden und „Als gesendet markieren“. Antwort des Bauträgers – bestätigt oder abgelehnt."
+    ],
+    [
+     "KYC",
+     "Dokumente von Käufer und Mitkäufern prüfen. Ohne bestandenes KYC geht ein Deal nicht in „Vertrag unterzeichnet“."
+    ],
+    [
+     "Vertrag",
+     "„Als unterschrieben markieren“: Vertragsnummer und Datum nicht später als heute nach Bakuer Zeit."
+    ],
+    [
+     "Objekte und Quellen",
+     "Status und Preise kommen aus Profitbase. Bei Abweichungen – Quellen → Synchronisierung."
+    ]
+   ],
+   "rules": [
+    "Reservierung innerhalb eines Werktags bestätigen.",
+    "3 Tage vor Ende einer Reservierung und am letzten Tag kommt eine Aufgabe: verlängern oder aufheben.",
+    "Reservierungslimit des Bauträgers: darüber – Warteschlange bis 7 Tage."
+   ],
+   "help": "Fragen zu Konditionen – an Inhaber oder Marktleitung.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "CRM · Kunden",
+    "Reservierungen",
+    "Registrierungen",
+    "KYC",
+    "Objekte",
+    "Website-Anfragen",
+    "Quellen",
+    "Materialien"
+   ]
+  },
+  {
+   "id": "finance",
+   "name": "Finanzen",
+   "where": "Im Portal: Finanzen, Plan und Ist, Reservierungen mit Backoffice-Rechten. Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Zahlungseingänge",
+     "Finanzen → Tranchen des Bauträgers: Ist das Geld auf dem Konto – „Ja, Geld ist eingegangen“ und Eingangsdatum. Erst dann entstehen Abrechnungen für Partner."
+    ],
+    [
+     "Zahlungen der Kunden",
+     "Kundenzahlungen zum Deal erfassen – danach richten sich die Phasen Installments und Won."
+    ],
+    [
+     "Auszahlungsregister",
+     "Stichtagsmonat → Register erstellen, Märkte bestätigen, der Inhaber genehmigt, dann „Bezahlt (Bank)“."
+    ],
+    [
+     "Rückforderungen",
+     "Vertragsauflösung: Rückforderung der Provision zur Genehmigung. 3 Monate ohne Verrechnung – Rückforderungsrechnung stellen."
+    ],
+    [
+     "Schulden der Bauträger",
+     "Schulden älter als 10 Werktage – auf der Kontrollliste."
+    ]
+   ],
+   "rules": [
+    "Auszahlungen unter 100 $, ohne Abrechnung oder Rechnung oder mit Bankdaten jünger als 3 Tage – in den nächsten Monat.",
+    "Ohne Ansässigkeitsbescheinigung wird Steuer einbehalten.",
+    "Partnerbericht für Bauträger – monatlich als xlsx."
+   ],
+   "help": "Fragen zu Auszahlungsbedingungen – an den Inhaber.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "Reservierungen",
+    "Registrierungen",
+    "KYC",
+    "Plan und Ist",
+    "Finanzen",
+    "Objekte",
+    "Website-Anfragen",
+    "Quellen",
+    "Materialien",
+    "Verwaltung"
+   ]
+  },
+  {
+   "id": "content",
+   "name": "Inhalte",
+   "where": "Im Portal: Neuigkeiten für Partner, Materialien, Vorlagen. Anmeldung über Bitrix24.",
+   "steps": [
+    [
+     "Neuigkeiten",
+     "Neuigkeiten für Partner nach Markt und Sprache. Beim Speichern warnt das Portal vor verbotenen Wörtern."
+    ],
+    [
+     "Materialien",
+     "Präsentationen, Fotos, Videos und Pläne – Partner laden sie unter „Materialien“ herunter."
+    ],
+    [
+     "Vorlagen",
+     "Vorlagen für Dokumente und Nachrichten; Änderungen prüft der Inhaber."
+    ],
+    [
+     "Katalog",
+     "Katalog und Verfügbarkeit – nur lesend, um Texte mit dem Bestand abzugleichen."
+    ]
+   ],
+   "rules": [
+    "Für Deutschland und Israel – keine Rendite, kein Preisanstieg, kein Aufenthaltstitel durch Kauf, kein „Kapitalerhalt“.",
+    "Nur belegte Zahlen mit Quelle und Datum.",
+    "Werbung und Präsentationen zu BRABUS – nach Freigabe durch den Bauträger."
+   ],
+   "help": "Unsicher bei einer Formulierung – Marktleitung fragen.",
+   "group": "team",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "Materialien",
+    "Vorlagen"
+   ]
+  },
+  {
+   "id": "agency_head",
+   "name": "Agenturleitung",
+   "where": "Im Partnerportal – im Browser am Computer oder Telefon.",
+   "steps": [
+    [
+     "Anmeldung",
+     "Antrag auf der Website → nach Freigabe kommt eine E-Mail mit Link: Passwort festlegen (der Link gilt 7 Tage)."
+    ],
+    [
+     "Mitarbeiter",
+     "Mitarbeiter → „Mitarbeiter hinzufügen“: Name, E-Mail, Sprache. Kunden werden der Agentur zugeordnet; Sie sehen Kunden und Reservierungen Ihrer Mitarbeiter."
+    ],
+    [
+     "Kunde",
+     "Kunden → „Neuer Kunde“ → Einwilligungslink an den Kunden. Ziel, Budget, Zeitrahmen, Land und Sprache ausfüllen – dann ist der Kunde Ihnen für 6 Monate zugeordnet."
+    ],
+    [
+     "Auswahl und Reservierung",
+     "Wohnungen → „Zur Auswahl“ → Link für den Kunden unter Ihrer Agenturmarke. Hold für 24 Stunden → „Reservierung anfragen“."
+    ],
+    [
+     "Provision",
+     "Provision → Monatsabrechnung: prüfen, „Mit der Abrechnung einverstanden“, „Rechnung hochladen“."
+    ]
+   ],
+   "rules": [
+    "Bis zur Qualifizierung ist ein Kunde Kandidat: 30 Tage Vorrang ohne Schutz.",
+    "Auszahlung – nachdem der Bauträger GetsEstate vergütet hat, im gleichen Verhältnis.",
+    "Ohne Zustimmung zur Abrechnung oder Rechnung wird die Auszahlung in den nächsten Monat übertragen."
+   ],
+   "help": "Ihre Marktleitung – Kontakt im Profil.",
+   "group": "partner",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "Kunden",
+    "Reservierungen",
+    "Auswahllisten",
+    "Warteliste & Suchen",
+    "Provision",
+    "Meine Links",
+    "Mitarbeiter",
+    "Materialien"
+   ]
+  },
+  {
+   "id": "agent",
+   "name": "Partner",
+   "where": "Im Partnerportal – im Browser am Computer oder Telefon. Arbeiten Sie für eine Agentur, hat Sie die Agenturleitung eingeladen.",
+   "steps": [
+    [
+     "Kunde",
+     "Kunden → „Neuer Kunde“ und Einwilligungslink: Die Häkchen setzt der Kunde selbst. Ohne Einwilligung ist keine Registrierung möglich."
+    ],
+    [
+     "Qualifizierung",
+     "Ziel, Budget, Zeitrahmen, Land und Sprache ausfüllen – der Kunde ist Ihnen 6 Monate zugeordnet, wir registrieren ihn bei den Bauträgern."
+    ],
+    [
+     "Auswahl",
+     "Katalog oder Verfügbarkeit → „Zur Auswahl“ → „Link für den Kunden“ in seiner Sprache, auch per WhatsApp."
+    ],
+    [
+     "Hold und Reservierung",
+     "Ein Hold hält die Wohnung 24 Stunden. „Reservierung anfragen“ – das Büro Baku bestätigt sie beim Bauträger, Sie werden benachrichtigt."
+    ],
+    [
+     "Rabatt",
+     "Im Rahmen Ihres Anteils – sofort im Rechner. Mehr – „Mehr anfragen“."
+    ],
+    [
+     "Meine Links",
+     "Persönlicher Link zu einer Seite mit Wohnungen unter Ihrer Marke: Anfragen darüber kommen zu Ihnen."
+    ]
+   ],
+   "rules": [
+    "Betreut ein anderer Partner den Kunden bereits, zeigt das Portal „bereits zugeordnet“ – ohne Namen.",
+    "Deal und Zahlungen führt das Büro; Sie sehen die Phase.",
+    "Auszahlung – nach Zahlung des Bauträgers; Mitarbeiter einer Agentur über die Agenturleitung."
+   ],
+   "help": "Ihre Marktleitung – Kontakt im Profil.",
+   "group": "partner",
+   "menu": [
+    "Start",
+    "Neuigkeiten",
+    "Projekte",
+    "Katalog",
+    "Kunden",
+    "Reservierungen",
+    "Auswahllisten",
+    "Warteliste & Suchen",
+    "Provision",
+    "Meine Links",
+    "Materialien"
+   ]
+  },
+  {
+   "id": "referrer",
+   "name": "Tippgeber",
+   "where": "In Ihrem Bereich „Empfehlungen“. Anmeldung über einen Einmal-Link aus der E-Mail, ohne Passwort.",
+   "steps": [
+    [
+     "Empfehlen",
+     "„Jemanden empfehlen“: Name, Telefon, Wohnsitzland und wonach die Person sucht."
+    ],
+    [
+     "Einwilligung",
+     "Bestätigen Sie, dass die Person von der Empfehlung weiß und mit einer Kontaktaufnahme durch GetsEstate einverstanden ist."
+    ],
+    [
+     "Danach – wir",
+     "Ein Manager meldet sich bei der Person. Den Status jeder Empfehlung sehen Sie in der Liste."
+    ],
+    [
+     "Vergütung",
+     "Kauft die Person eine Wohnung, erscheint die erwartete Vergütung in Ihrem Bereich."
+    ]
+   ],
+   "rules": [
+    "Empfehlen Sie nur Personen, die mit einem Anruf einverstanden sind.",
+    "Vergütung – nach dem Kauf und der Zahlung des Bauträgers.",
+    "Der Anmeldelink kommt per E-Mail; einen neuen fordern Sie auf der Anmeldeseite an."
+   ],
+   "help": "Fragen – als Antwort auf die E-Mail von GetsEstate.",
+   "group": "partner",
+   "menu": [
+    "Empfehlungen",
+    "Benachrichtigungen"
+   ]
+  }
+ ]
+}

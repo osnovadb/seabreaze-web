@@ -1,0 +1,442 @@
+{
+ "ui": {
+  "lang": "EN",
+  "brand": "GetsEstate · portal",
+  "doc": "Role guide",
+  "where": "Where you work",
+  "menu": "Your menu",
+  "how": "How to work",
+  "rules": "Rules and deadlines",
+  "help": "If something goes wrong",
+  "foot": "Portal 2.2 · November 2026 · draft for review",
+  "team": "GetsEstate team",
+  "partner": "Partners"
+ },
+ "roles": [
+  {
+   "id": "owner",
+   "name": "Owner",
+   "where": "In Bitrix24: the portal opens as the GetsEstate app in the left menu and as the Units tab in a deal. “Open full screen” shows the full portal. No separate password — you sign in through Bitrix24.",
+   "steps": [
+    [
+     "Project terms",
+     "Admin → Terms: rates, discounts by down payment and term, reservation period, developer limit. Every change is a new version; existing deals keep their own."
+    ],
+    [
+     "Users and roles",
+     "Admin → Users: invite, change role and market, deactivate. “Sign out everywhere” ends all sessions on all devices."
+    ],
+    [
+     "Discounts above the limit",
+     "Requests from sales managers and partners arrive as a notification and a Bitrix24 task — approve or decline."
+    ],
+    [
+     "Payout register",
+     "Finance → monthly register: once markets have confirmed, click “Approve”. Only you can write off a partner’s debt."
+    ],
+    [
+     "Control",
+     "Log shows who changed what. “Log in as” shows the portal through a user’s eyes, read-only."
+    ]
+   ],
+   "rules": [
+    "Change terms before the first reservation on a project — otherwise it becomes a new version for future deals.",
+    "Internal developer terms and the discount pool are visible only to the owner, market heads and finance.",
+    "Client data deletion — Admin → deletion requests, within 30 days."
+   ],
+   "help": "Technical questions — in the GetsEstate team chat.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "CRM · clients",
+    "Bookings",
+    "Selections",
+    "Registrations",
+    "KYC",
+    "Waitlist & searches",
+    "Reports",
+    "Finance",
+    "Partners",
+    "Properties",
+    "Website leads",
+    "Sources",
+    "Materials",
+    "Templates",
+    "Admin"
+   ]
+  },
+  {
+   "id": "market_head",
+   "name": "Market head",
+   "where": "In Bitrix24: leads and deals of your market, the GetsEstate app in the left menu, the Units tab in a deal. Sign in through Bitrix24.",
+   "steps": [
+    [
+     "New leads",
+     "Website leads are assigned by market, language and workload. Make sure first contact happens within the market’s deadline."
+    ],
+    [
+     "Partner applications",
+     "Partners → new application: check the agency or agent and grant access — the account opens automatically."
+    ],
+    [
+     "Discounts above the limit",
+     "When a sales manager or partner asks for more than their discount, you get a task. Approve within the market limit or decline with a reason."
+    ],
+    [
+     "“Whose client” disputes",
+     "The Ownership dispute flag in a deal — decide and record who owns the client."
+    ],
+    [
+     "Market money",
+     "Finance → monthly register: check your market’s accruals and confirm."
+    ]
+   ],
+   "rules": [
+    "A team client is attached immediately for 6 months.",
+    "A partner’s client starts as a candidate (30-day priority); attachment for 6 months comes after qualification.",
+    "A partner with no new qualified clients for 6 months becomes Inactive; access stays."
+   ],
+   "help": "Questions about terms — the owner; about reservations — the Baku office.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "CRM · clients",
+    "Bookings",
+    "Selections",
+    "Registrations",
+    "Waitlist & searches",
+    "Reports",
+    "Finance",
+    "Partners",
+    "Website leads",
+    "Materials",
+    "Admin"
+   ]
+  },
+  {
+   "id": "seller",
+   "name": "Sales manager",
+   "where": "In Bitrix24: your leads and deals. Units, selections and reservations are in the Units tab of the deal card. Sign in through Bitrix24.",
+   "steps": [
+    [
+     "First contact",
+     "Contact a new lead within the market’s deadline and record the result in Bitrix24."
+    ],
+    [
+     "Client consent",
+     "Send the client the consent link from the card — the client ticks the boxes. Without consent there is no developer registration and no contract."
+    ],
+    [
+     "Selection",
+     "Units → Selection: units from the availability grid or catalogue → “Add to selection”. The client gets a link in their language, without developer contacts."
+    ],
+    [
+     "Hold and reservation",
+     "A hold keeps a unit for 24 hours. Then “Request reservation” — the Baku office confirms it with the developer."
+    ],
+    [
+     "Discount",
+     "Within your limit — immediately. More — “Ask for more”; the market head decides."
+    ],
+    [
+     "KYC and contract",
+     "Request the buyer check. “Contract signed” is set by the Baku office only after KYC."
+    ]
+   ],
+   "rules": [
+    "A repeat hold on the same unit — no earlier than 24 hours later.",
+    "The reservation period depends on the project and is shown on the unit card.",
+    "Reserved, SPA signed and Won stages are set only by the portal."
+   ],
+   "help": "Reservation not confirmed — the Baku office; discount — the market head.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "CRM · clients",
+    "Bookings",
+    "Selections",
+    "Waitlist & searches",
+    "Reports",
+    "Materials"
+   ]
+  },
+  {
+   "id": "office",
+   "name": "Baku office",
+   "where": "In Bitrix24 (back-office tasks) and in the portal: reservations, registrations, KYC, sources. Sign in through Bitrix24.",
+   "steps": [
+    [
+     "Reservations",
+     "Bookings → awaiting confirmation: reserve with the developer and click “Confirm” with the developer’s reservation number. Not possible — “Reject” with a reason."
+    ],
+    [
+     "Registrations",
+     "Registrations → daily batch: “File for developer (xlsx)”, send it and “Mark as sent”. The developer’s answer — confirmed or rejected."
+    ],
+    [
+     "KYC",
+     "Check the documents of the buyer and co-buyers. Without passed KYC a deal cannot move to “Contract signed”."
+    ],
+    [
+     "Contract",
+     "“Mark as signed”: contract number and a date no later than today in Baku time."
+    ],
+    [
+     "Properties and sources",
+     "Statuses and prices come from Profitbase. If they differ — Sources → sync."
+    ]
+   ],
+   "rules": [
+    "Confirm a reservation within one working day.",
+    "3 days before a reservation ends and on the last day you get a task: extend or release.",
+    "Developer reservation limit: above it — a queue of up to 7 days."
+   ],
+   "help": "Questions about terms — the owner or the market head.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "CRM · clients",
+    "Bookings",
+    "Registrations",
+    "KYC",
+    "Properties",
+    "Website leads",
+    "Sources",
+    "Materials"
+   ]
+  },
+  {
+   "id": "finance",
+   "name": "Finance",
+   "where": "In the portal: Finance, Plan vs actual, reservations with back-office rights. Sign in through Bitrix24.",
+   "steps": [
+    [
+     "Incoming payments",
+     "Finance → developer tranches: when the money is in the account — “Yes, funds received” and the date received. Partner accruals appear only after that."
+    ],
+    [
+     "Client payments",
+     "Enter client payments for the deal — they drive the Installments and Won stages."
+    ],
+    [
+     "Payout register",
+     "Cut-off month → build the register, markets confirm, the owner approves, then “Paid in bank”."
+    ],
+    [
+     "Refunds",
+     "Termination: commission refund goes for approval. 3 months without offset — issue a refund invoice."
+    ],
+    [
+     "Developer debts",
+     "Debt older than 10 working days — on the watch list."
+    ]
+   ],
+   "rules": [
+    "Payouts under $100, without a statement or invoice, or with bank details changed less than 3 days ago — move to the next month.",
+    "Tax is withheld if there is no residence certificate.",
+    "Agent report for developers — monthly xlsx."
+   ],
+   "help": "Questions about payout terms — the owner.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "Bookings",
+    "Registrations",
+    "KYC",
+    "Plan vs actual",
+    "Finance",
+    "Properties",
+    "Website leads",
+    "Sources",
+    "Materials",
+    "Admin"
+   ]
+  },
+  {
+   "id": "content",
+   "name": "Content",
+   "where": "In the portal: news for partners, materials, templates. Sign in through Bitrix24.",
+   "steps": [
+    [
+     "News",
+     "News for partners by market and language. When you save, the portal warns about forbidden words."
+    ],
+    [
+     "Materials",
+     "Presentations, photos, videos and plans — partners download them from “Materials”."
+    ],
+    [
+     "Templates",
+     "Document and message templates; the owner reviews changes."
+    ],
+    [
+     "Catalogue",
+     "Catalogue and availability grid — read-only, to check texts against availability."
+    ]
+   ],
+   "rules": [
+    "For Germany and Israel — no yields, no price growth, no residence permit for purchase, no “capital preservation”.",
+    "Only confirmed figures with a source and date.",
+    "BRABUS ads and presentations — after the developer’s approval."
+   ],
+   "help": "Unsure about wording — ask the market head.",
+   "group": "team",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "Materials",
+    "Templates"
+   ]
+  },
+  {
+   "id": "agency_head",
+   "name": "Agency head",
+   "where": "In the partner portal — in a browser on a computer or phone.",
+   "steps": [
+    [
+     "Sign in",
+     "Apply on the website → after approval you get an email with a link: set your password (the link is valid for 7 days)."
+    ],
+    [
+     "Staff",
+     "Staff → “Add a colleague”: name, email, language. Clients are attached to the agency; you see your staff’s clients and reservations."
+    ],
+    [
+     "Client",
+     "Clients → “New client” → consent link to the client. Fill in goal, budget, timing, country and language — then the client is attached to you for 6 months."
+    ],
+    [
+     "Selection and reservation",
+     "Units → “Add to selection” → link for the client under your agency brand. Hold for 24 hours → “Request reservation”."
+    ],
+    [
+     "Commission",
+     "Commission → monthly statement: check it, “I agree with the statement”, “Upload invoice”."
+    ]
+   ],
+   "rules": [
+    "Until qualified, a client is a candidate: 30-day priority without protection.",
+    "Payout — after the developer has paid GetsEstate its fee, in the same proportion.",
+    "Without agreeing to the statement or an invoice, the payout moves to the next month."
+   ],
+   "help": "Your market head — contact in your profile.",
+   "group": "partner",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "Clients",
+    "Bookings",
+    "Selections",
+    "Waitlist & searches",
+    "Commission",
+    "My links",
+    "Staff",
+    "Materials"
+   ]
+  },
+  {
+   "id": "agent",
+   "name": "Partner",
+   "where": "In the partner portal — in a browser on a computer or phone. If you work for an agency, your agency head invited you.",
+   "steps": [
+    [
+     "Client",
+     "Clients → “New client” and the consent link: the client ticks the boxes. Registration is not possible without consent."
+    ],
+    [
+     "Qualification",
+     "Fill in goal, budget, timing, country and language — the client is attached to you for 6 months and we register them with developers."
+    ],
+    [
+     "Selection",
+     "Catalogue or availability grid → “Add to selection” → “Link for the client” in their language; you can send it via WhatsApp."
+    ],
+    [
+     "Hold and reservation",
+     "A hold keeps a unit for 24 hours. “Request reservation” — the Baku office confirms it with the developer; you get a notification."
+    ],
+    [
+     "Discount",
+     "Within your share — straight away in the calculator. More — “Ask for more”."
+    ],
+    [
+     "My links",
+     "A personal link to a page of units under your brand: enquiries from it come to you."
+    ]
+   ],
+   "rules": [
+    "If another partner already has the client, the portal says “already attached” — without the owner’s name.",
+    "The office runs the deal and payments; you see the stage.",
+    "Payout — after the developer pays; agency staff are paid through the agency head."
+   ],
+   "help": "Your market head — contact in your profile.",
+   "group": "partner",
+   "menu": [
+    "Home",
+    "News",
+    "Projects",
+    "Catalogue",
+    "Clients",
+    "Bookings",
+    "Selections",
+    "Waitlist & searches",
+    "Commission",
+    "My links",
+    "Materials"
+   ]
+  },
+  {
+   "id": "referrer",
+   "name": "Referrer",
+   "where": "In your “Referrals” account. Sign in with a one-time link from the email; no password needed.",
+   "steps": [
+    [
+     "Refer",
+     "“Refer someone”: name, phone, country of residence and what they are looking for."
+    ],
+    [
+     "Consent",
+     "Confirm that the person knows about the referral and agrees to be contacted by GetsEstate."
+    ],
+    [
+     "Then it’s on us",
+     "A manager will contact the person. The status of each referral is in the list."
+    ],
+    [
+     "Reward",
+     "If the person buys a unit, the expected reward appears in your account."
+    ]
+   ],
+   "rules": [
+    "Refer only people who agree to a call.",
+    "Reward — after the purchase and the developer’s payment.",
+    "The sign-in link comes by email; request a new one on the sign-in page."
+   ],
+   "help": "Questions — reply to the GetsEstate email.",
+   "group": "partner",
+   "menu": [
+    "Referrals",
+    "Notifications"
+   ]
+  }
+ ]
+}
