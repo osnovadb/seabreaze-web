@@ -138,7 +138,11 @@ export default async function Units(
                 {cl.kyc_status === 'passed' && !u.spa_approval_at && <form action={bookingAction}>{h('spa_approval')}<button className="btn btn--sm">{T('Договор на согласовании')}</button></form>}
                 {cl.kyc_status === 'passed' && u.spa_approval_at && <span className="small okc">{T('Договор на согласовании с {d}', { d: date(L, u.spa_approval_at) })}</span>}
                 {cl.consent_status !== 'given' ? <span className="small warnc">{T('«Договор подписан» — после согласия клиента')}</span> : cl.kyc_status === 'passed'
-                  ? <form action={bookingAction}>{h('contract')}<ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: u.no })}>{T('Договор подписан')}</ConfirmBtn></form>
+                  ? <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>{h('contract')}{/* 380: дата и номер договора обязательны, файл — по желанию */}
+                      <label className="field"><span>{T('Дата договора')}</span><input className="in" type="date" name="contract_date" required defaultValue={new Date().toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} /></label>
+                      <label className="field"><span>{T('Номер договора')}</span><input className="in" name="contract_no" required maxLength={80} style={{ width: 150 }} /></label>
+                      <label className="field"><span>{T('Файл договора (по желанию)')}</span><input className="in" type="file" name="contract_file" accept=".pdf,.jpg,.jpeg,.png,.heic" style={{ paddingTop: 6 }} /></label>
+                      <ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: u.no })}>{T('Договор подписан')}</ConfirmBtn></form>
                   : <span className="small muted">{T('«Договор на согласовании» и «Договор подписан» — после пройденного KYC')}</span>}
               </div>}
               {['confirmed', 'converted'].includes(u.status!) && office && staff.length > 0 && <form action={setEscort} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.booking_id!} />

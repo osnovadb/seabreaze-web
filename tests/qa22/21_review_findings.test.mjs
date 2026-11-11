@@ -95,3 +95,21 @@ test('383: без согласия клиента бронь не запраши
   assert.equal((await lastBooking(cl)).status, 'requested', 'с согласием бронь не ушла')
   await act(S, 'bookingAction', { id: (await lastBooking(cl)).id, act: 'cancel' })
 })
+
+// 380 (Денис 12.11): без даты и номера договор не отмечается; окно возврата комиссии — от даты договора
+test('380: «Договор подписан» — только с датой и номером; дата сохраняется в сделке', async () => {
+  const pr = await one(`select p.id from projects p where p.slug = 'premium-residence'`)
+  const OF = await user('office'), S = await user('seller')
+  const cl = (await register(S)).result.id
+  await q(`update portal.clients set kyc_status = 'passed' where id = $1`, [cl])
+  const u = await freeUnit()
+  await act(S, 'createBooking', { unit: u.id, client: cl, discount: 0 })
+  const b = await lastBooking(cl)
+  await act(OF, 'bookingAction', { id: b.id, act: 'confirm' })
+  await act(OF, 'bookingAction', { id: b.id, act: 'contract', contract_date: '', contract_no: '' })
+  assert.equal((await one('select status from portal.bookings where id = $1', [b.id])).status, 'confirmed', 'договор отмечен без даты и номера')
+  await act(OF, 'bookingAction', { id: b.id, act: 'contract', contract_date: '2026-10-01', contract_no: 'SPA-QA-380' })
+  const d = await one('select contract_date::text, contract_no from portal.deals where booking_id = $1', [b.id])
+  assert.equal(d?.contract_no, 'SPA-QA-380'); assert.equal(d?.contract_date, '2026-10-01')
+  void pr
+})

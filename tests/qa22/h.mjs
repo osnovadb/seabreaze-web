@@ -36,6 +36,8 @@ export async function cookie(u) {
 export const formTok = () => { const ts = String(Date.now() - 5000); return ts + '.' + crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev').update('form:' + ts).digest('hex').slice(0, 24) }
 export async function act(u, action, fields = {}, extra = {}) {
   // 383 (12.11): бронь — только после согласия клиента. В наборах согласие ставим как будто клиент нажал ссылку; без согласия — поле __noConsent
+  // 380 (12.11): «Договор подписан» — с датой и номером договора; наборы передают их сами, когда проверяют
+  if (action === 'bookingAction' && fields.act === 'contract' && !('contract_no' in fields)) fields = { ...fields, contract_date: new Date().toISOString().slice(0, 10), contract_no: 'QA-' + Math.random().toString(36).slice(2, 8) }
   if (action === 'createBooking' && fields.client && !fields.__noConsent) await q(`update portal.clients set consent_status = 'given', consent_at = coalesce(consent_at, now()) where id = $1 and consent_status <> 'given'`, [fields.client])
   const sig = crypto.createHmac('sha256', process.env.SESSION_SECRET).update('qa:' + action).digest('hex')
   const r = await fetch(`${BASE}/api/internal/qa`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qa': sig }, body: JSON.stringify({ as: u?.id || null, action, fields, ...extra }) })

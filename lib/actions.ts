@@ -650,6 +650,10 @@ export async function bookingAction(f: FormData) {
     // Договор — только после пройденного KYC (v2)
     const kc = await one<{ kyc_status: string; consent_status: string }>('select kyc_status, consent_status from portal.clients where id = $1', [b.client_id])
     if (kc?.kyc_status !== 'passed' || kc?.consent_status !== 'given') return // 383: договор — только после согласия клиента
+    // 380 (Денис 12.11): дата и номер договора обязательны, файл — по желанию; от даты договора считается окно возврата комиссии
+    const cDate = s(f, 'contract_date'), cNo = s(f, 'contract_no').slice(0, 80)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cDate) || cDate > new Date().toISOString().slice(0, 10) || !cNo) return
+    const cFile = isFile(f.get('contract_file')) ? await storeFile(f.get('contract_file') as File, c.user.id, { exts: ['pdf', 'jpg', 'jpeg', 'png', 'heic'], max: 15 * 1024 * 1024 }).catch(() => null) : null
     // Пакет: подтверждённые брони того же клиента с тем же group_id оформляются одним договором — по сделке на квартиру
     const g = (await one<{ group_id: string | null }>('select group_id from portal.bookings where id = $1', [id]))?.group_id
     const list = g ? await q<{ id: string; unit_id: string; project_id: string; agent_id: string; final_price: number; snapshot: any }>(`select id, unit_id, project_id, agent_id, final_price, snapshot from portal.bookings where group_id = $1 and client_id = $2 and status = 'confirmed'`, [g, b.client_id])
@@ -662,8 +666,8 @@ export async function bookingAction(f: FormData) {
         // Бронь уже оформлена параллельно (вторая вкладка) — пропускаем
         // Взнос за платную бронь засчитывается в цену по договору
         if (!(await t.query(`update portal.bookings set status = 'converted', fee_status = case when fee_status = 'paid' then 'credited' else fee_status end where id = $1 and status = 'confirmed'`, [x.id])).rowCount) continue
-        const d = await t.query<{ id: string }>(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount, group_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
-          [x.id, b.client_id, x.unit_id, x.project_id, isExternal((seller?.role || 'seller') as any) ? x.agent_id : null, seller?.curator_id || x.agent_id, x.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0), g])
+        const d = await t.query<{ id: string }>(`insert into portal.deals (booking_id, client_id, unit_id, project_id, agent_id, seller_id, final_price, agent_amount, our_amount, seller_amount, group_id, contract_date, contract_no, contract_file_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
+          [x.id, b.client_id, x.unit_id, x.project_id, isExternal((seller?.role || 'seller') as any) ? x.agent_id : null, seller?.curator_id || x.agent_id, x.final_price, Math.round(sp.agent || 0), Math.round(sp.ours || 0), Math.round(sp.seller || 0), g, cDate, cNo, cFile])
         made.push(d.rows[0].id)
         await pbEnqueue(x.unit_id, 'sold', x.id, c.user.id) // М4: «продано через GetsEstate» в Profitbase
       }

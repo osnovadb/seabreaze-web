@@ -9,7 +9,7 @@ type Cond = SplitCond & {
 }
 type DealRow = {
   id: string; client_id: string; project_id: string; agent_id: string | null; seller_id: string | null; escort_id: string | null; booking_id: string | null
-  final_price: number; paid_pct: number; stage: string; created_at: string; snapshot: Partial<Cond> | null; list: number | null; disc: number | null
+  final_price: number; paid_pct: number; stage: string; created_at: string; contract_date: string | null; snapshot: Partial<Cond> | null; list: number | null; disc: number | null
   owner_type: string; referrer_id: string | null; cl_created: string; market: string | null; b_escort: string | null
   owner_id: string; owner_role: string; previous_partner_id: string | null; attached_at: string | null
 }
@@ -18,7 +18,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100
 const num = (x: unknown, d = 0) => (x === null || x === undefined || x === '' || Number.isNaN(Number(x)) ? d : Number(x))
 
 async function dealRow(dealId: string) {
-  return one<DealRow>(`select d.id, d.client_id, d.project_id, d.agent_id, d.seller_id, d.escort_id, d.booking_id, d.final_price::float, d.paid_pct::float, d.stage, d.created_at,
+  return one<DealRow>(`select d.id, d.client_id, d.project_id, d.agent_id, d.seller_id, d.escort_id, d.booking_id, d.final_price::float, d.paid_pct::float, d.stage, d.created_at, d.contract_date::text,
       b.snapshot, b.price_list::float list, b.discount_pct::float disc, b.escort_id b_escort, cl.owner_type, cl.referrer_id, cl.created_at cl_created, cl.market,
       cl.owner_id, ou.role owner_role, cl.previous_partner_id, cl.attached_at
     from portal.deals d left join portal.bookings b on b.id = d.booking_id join portal.clients cl on cl.id = d.client_id join portal.users ou on ou.id = cl.owner_id where d.id = $1`, [dealId])
@@ -160,7 +160,9 @@ export async function clawbackDeal(dealId: string, by: string | null, reason = '
   if (!d) return null
   const c = await condOf(d)
   const at = o.date ? new Date(o.date + 'T12:00:00Z').getTime() : Date.now()
-  const inWindow = at - new Date(d.created_at).getTime() <= c.clawback_months * 31 * 86400000 && o.refunded !== false
+  // 380: окно возврата комиссии — от даты договора (раньше от нажатия «Договор подписан»)
+  const from = d.contract_date ? new Date(d.contract_date + 'T12:00:00Z').getTime() : new Date(d.created_at).getTime()
+  const inWindow = at - from <= c.clawback_months * 31 * 86400000 && o.refunded !== false
   const res = await tx(async (t) => {
     await t.query(`update portal.deals set stage = 'cancelled', terminated_at = coalesce(terminated_at, now()), termination_date = coalesce($2::date, termination_date, current_date),
       termination_reason = coalesce($3, termination_reason), client_refunded = coalesce($4, client_refunded) where id = $1`, [dealId, o.date || null, reason, o.refunded ?? null])
