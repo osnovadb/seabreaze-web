@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { genplanOf, viewIndex } from '@/lib/genplan'
 import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
@@ -19,7 +20,7 @@ const LANG_FLAG: Record<string, string> = { all: 'RU EN DE HE', ru: 'RU', en: 'E
 // Рабочая страница проекта (ТЗ, «Портал и CMS»): генплан и шахматка, условия, материалы для клиента, документы и ссылка на страницу проекта на сайте рынка.
 // Полный контент и дизайн проекта — в CMS и на сайте.
 export default async function ProjectPage(
-  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string; l?: string }> }
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string; l?: string; v?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
@@ -75,12 +76,16 @@ export default async function ProjectPage(
   )
 
   async function PlanTab() {
-    const gp = await one<{ image: string; polygons: { block: string; points: [number, number][]; label: [number, number] }[]; note: string; marks: unknown }>('select image, polygons, note, marks from portal.genplans where project_id = $1', [p!.id])
+    const g0 = await genplanOf(p!.id)
+    // Денис 11.11: ракурсы генплана — переключатель над картинкой; окружение (метки) — только на основном виде
+    const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
+    const gp = g0 ? { ...g0.views[vi], note: g0.note, marks: vi === 0 ? g0.marks : [] } : null
     const byExt = Object.fromEntries(bs.map((b) => [b.external_id || b.name, b]))
     return (
       <div className="split">
         <div>
           {gp && cleanMarks(gp.marks).length > 0 && <><input type="checkbox" id="sur" className="sur-t" defaultChecked /><label htmlFor="sur" className="chip sur-l">{T('Окружение')}</label></>}
+          {g0 && g0.views.length > 1 && <div className="chips" style={{ marginBottom: 8 }}>{g0.views.map((v, i) => <Link key={i} href={`?v=${i}`} scroll={false} className={'chip' + (i === vi ? ' on' : '')}>{i === 0 ? '' : '↻ '}{T(v.title || 'Ракурс {n}', { n: i + 1 })}</Link>)}</div>}
           {gp ? (
             <div className="gp">
               {cleanMarks(gp.marks).map((m, i) => <span key={i} className="smark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}><i>{markIcon(m.kind)}</i><b>{markText(L, m)}</b></span>)}

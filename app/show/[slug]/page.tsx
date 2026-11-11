@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { genplanOf, viewIndex } from '@/lib/genplan'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
@@ -10,7 +11,7 @@ import { FacadeView } from '@/components/FacadeView'
 import { Legend } from '@/components/ui'
 
 export default async function ShowProject(
-  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; r?: string; u?: string; view?: string }> }
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string; r?: string; u?: string; view?: string; v?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
@@ -20,7 +21,9 @@ export default async function ShowProject(
   if (!p || !['sales', 'stop'].includes(p.sales_status)) notFound()
   const bs = await buildingsOf(p.id, c.user, { show: true })
   const b = bs.find((x) => x.id === searchParams.b)
-  const gp = await one<{ image: string; polygons: { block: string; points: [number, number][]; label: [number, number] }[] }>('select image, polygons from portal.genplans where project_id = $1', [p.id])
+  const g0 = await genplanOf(p.id)
+  const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
+  const gp = g0 ? g0.views[vi] : null // Денис 11.11: ракурсы генплана
   const byExt = Object.fromEntries(bs.map((x) => [x.external_id || x.name, x]))
   const units = b ? await unitsOfBuilding(b.id) : []
   const rooms = Number(searchParams.r) || undefined
@@ -35,6 +38,7 @@ export default async function ShowProject(
       <h1 className="h2" style={{ fontSize: 30 }}>{p.name}{b ? ' · ' + b.name : ''}</h1>
       <p className="muted">{T('Цены застройщика в USD, расходы на сделку отдельно · визуализации')}</p>
       <div className="chips mt16">{bs.map((x) => <Link key={x.id} href={`?b=${x.id}`} className={'chip' + (x.id === b?.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>
+      {!b && g0 && g0.views.length > 1 && <div className="chips mt16">{g0.views.map((v, i) => <Link key={i} href={`?v=${i}`} scroll={false} className={'chip' + (i === vi ? ' on' : '')}>{i === 0 ? '' : '↻ '}{T(v.title || 'Ракурс {n}', { n: i + 1 })}</Link>)}</div>}
       {!b && gp && (
         <div className="gp mt16">
           <img src={gp.image} alt="" />
