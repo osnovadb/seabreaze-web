@@ -473,9 +473,11 @@ export async function createBooking(_: unknown, f: FormData) {
   const cl = await stageGuard(c, clientId).catch(() => null)
   if (!cl) return { error: 'Этот клиент не закреплён за вами' }
   // §10: кандидата застройщикам не передаём — сначала квалификация
-  const st = await one<{ a: string; anon: boolean }>('select attach_status a, anonymized_at is not null anon from portal.clients where id = $1', [clientId])
+  const st = await one<{ a: string; anon: boolean; consent: string }>('select attach_status a, anonymized_at is not null anon, consent_status consent from portal.clients where id = $1', [clientId])
   if (st?.anon) return { error: 'Данные клиента удалены по запросу — бронь невозможна' } // QA 10.11
   if (st?.a === 'candidate') return { error: 'Сначала квалифицируйте клиента: цель, бюджет, срок, страна и язык' }
+  // 383 (Денис 12.11): с запросом брони имя клиента уходит застройщику — только после согласия клиента (как регистрации, 313); холд 24 ч — без согласия
+  if (st?.consent !== 'given') return { error: 'Нет согласия клиента на обработку данных — отправьте ему ссылку согласия. Бронь можно запросить после согласия; придержать квартиру на 24 часа можно и сейчас.' }
   // §7 п.1: свой холд превращается в запрос; чужой холд блокирует запрос на 24 часа — можно встать в лист ожидания
   const myHold = unit.booking_status === 'hold' && unit.booking_agent === c.user.id
   if (unit.booking_status === 'hold' && !myHold) return { error: 'Квартиру придержал другой — запрос станет доступен после снятия холда; можно встать в лист ожидания' }
@@ -646,7 +648,8 @@ export async function bookingAction(f: FormData) {
     await q('update portal.bookings set spa_approval_at = coalesce(spa_approval_at, now()), spa_approval_by = coalesce(spa_approval_by, $2) where id = $1', [id, c.user.id])
   } else if (act === 'contract' && canConfirmBooking(c.user.role) && b.status === 'confirmed') { // «Договор подписан» ставит бэк-офис (§14)
     // Договор — только после пройденного KYC (v2)
-    if ((await one<{ kyc_status: string }>('select kyc_status from portal.clients where id = $1', [b.client_id]))?.kyc_status !== 'passed') return
+    const kc = await one<{ kyc_status: string; consent_status: string }>('select kyc_status, consent_status from portal.clients where id = $1', [b.client_id])
+    if (kc?.kyc_status !== 'passed' || kc?.consent_status !== 'given') return // 383: договор — только после согласия клиента
     // Пакет: подтверждённые брони того же клиента с тем же group_id оформляются одним договором — по сделке на квартиру
     const g = (await one<{ group_id: string | null }>('select group_id from portal.bookings where id = $1', [id]))?.group_id
     const list = g ? await q<{ id: string; unit_id: string; project_id: string; agent_id: string; final_price: number; snapshot: any }>(`select id, unit_id, project_id, agent_id, final_price, snapshot from portal.bookings where group_id = $1 and client_id = $2 and status = 'confirmed'`, [g, b.client_id])

@@ -10,7 +10,7 @@ import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
 import { ConfirmBtn } from '@/components/ConfirmBtn'
 
-type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; plan_pool: number | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
+type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; plan_pool: number | null; kyc_status: string; consent_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
 const PAGE = 200 // QA 10.11: «Все» у руководителя рынка — тысяча строк одним списком
 export default async function Bookings(
@@ -22,7 +22,7 @@ export default async function Bookings(
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const bs = bookingScope(c.user)
   const rows = await q<B>(`select b.id, b.status, b.ends_at, b.starts_at, b.extended, b.final_price::float, b.options_usd::float, b.group_id, b.fee_status, b.fee_usd::float, b.fee_amount::float, b.fee_currency, b.price_list::float, b.discount_pct::float, portal.unit_no(bl.external_id, un.number) unit, un.id unit_id, un.status unit_status,
-      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, cl.kyc_status
+      cl.name client, cl.id client_id, us.name agent, us.id agent_id, cl.market, (b.snapshot->'split'->>'agent')::float agent_amount, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, cl.kyc_status, cl.consent_status
     from portal.bookings b join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users us on us.id = b.agent_id
     where ${bs.sql} order by case when b.status in ('hold','queued','requested','confirmed','release_pending') then 0 else 1 end, b.ends_at`, bs.params)
   const active = rows.filter((r) => ['hold', 'queued', 'requested', 'confirmed', 'release_pending'].includes(r.status))
@@ -91,7 +91,7 @@ export default async function Bookings(
                       {r.status === 'hold' && (r.agent_id === c.user.id || c.user.role === 'market_head') && act('release_hold', 'Снять холд')}
                       {r.status === 'hold' && r.agent_id === c.user.id && <Link className="btn btn--sm btn--p" href={`/units/${r.unit_id}/book`}>{T('Запросить бронь')}</Link>}
                       {r.status === 'confirmed' && !r.extended && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('extend', 'Продлить')}
-                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && (r.kyc_status === 'passed' ? act('contract', 'Договор подписан', false, T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: r.unit })) : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}
+                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && (r.consent_status !== 'given' ? <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после согласия клиента')}</Link> : r.kyc_status === 'passed' ? act('contract', 'Договор подписан', false, T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: r.unit })) : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}
                       {(live || r.status === 'queued') && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('cancel', 'Снять')}
                     </div></td>
                   </tr>

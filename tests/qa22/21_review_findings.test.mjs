@@ -2,7 +2,7 @@
 // Б12 обезличенный клиент — карточка закрыта
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { user, register, q, one, close, act, cookie, BASE, uniq } from './h.mjs'
+import { user, register, q, one, close, act, cookie, BASE, uniq, freeUnit, lastBooking } from './h.mjs'
 
 after(close)
 const get = async (u, path, extra = '') => {
@@ -76,4 +76,22 @@ test('генплан: второй ракурс по ?v=1, переключат�
     await q(`update portal.genplans set title = null, views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify(g.views || [])])
     await q(`delete from portal.files where filename = 'QA ракурс'`)
   }
+})
+
+// 383 (Денис 12.11): запрос брони — только после согласия клиента; холд на 24 часа — без согласия
+test('383: без согласия клиента бронь не запрашивается, холд ставится; с согласием — бронь уходит', async () => {
+  await q(`update portal.conditions set max_bookings_total = 100000, max_bookings_client = 100`)
+  const S = await user('seller')
+  const cl = (await register(S)).result.id
+  assert.notEqual((await one('select consent_status from portal.clients where id = $1', [cl])).consent_status, 'given')
+  const u = await freeUnit()
+  const r = await act(S, 'createBooking', { unit: u.id, client: cl, discount: 0, __noConsent: '1' })
+  assert.match(JSON.stringify(r.result || r), /согласи/, 'бронь без согласия клиента прошла')
+  assert.equal(await lastBooking(cl), null, 'бронь создана без согласия')
+  await act(S, 'holdUnit', { unit: u.id, client: cl })
+  const h = await lastBooking(cl)
+  assert.equal(h?.status, 'hold', 'холд без согласия не поставился')
+  await act(S, 'createBooking', { unit: u.id, client: cl, discount: 0 })
+  assert.equal((await lastBooking(cl)).status, 'requested', 'с согласием бронь не ушла')
+  await act(S, 'bookingAction', { id: (await lastBooking(cl)).id, act: 'cancel' })
 })

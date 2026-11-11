@@ -137,7 +137,7 @@ export default async function Units(
                 {cl.kyc_status === 'pending' && <span className="small muted">{T('KYC на проверке')} · <Link href={`/clients/${cl.id}?tab=kyc`}>KYC</Link></span>}
                 {cl.kyc_status === 'passed' && !u.spa_approval_at && <form action={bookingAction}>{h('spa_approval')}<button className="btn btn--sm">{T('Договор на согласовании')}</button></form>}
                 {cl.kyc_status === 'passed' && u.spa_approval_at && <span className="small okc">{T('Договор на согласовании с {d}', { d: date(L, u.spa_approval_at) })}</span>}
-                {cl.kyc_status === 'passed'
+                {cl.consent_status !== 'given' ? <span className="small warnc">{T('«Договор подписан» — после согласия клиента')}</span> : cl.kyc_status === 'passed'
                   ? <form action={bookingAction}>{h('contract')}<ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: u.no })}>{T('Договор подписан')}</ConfirmBtn></form>
                   : <span className="small muted">{T('«Договор на согласовании» и «Договор подписан» — после пройденного KYC')}</span>}
               </div>}

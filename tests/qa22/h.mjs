@@ -35,6 +35,8 @@ export async function cookie(u) {
 // 358: подписанная метка времени показа публичной формы (как lib/formGuard), «показана» 5 секунд назад
 export const formTok = () => { const ts = String(Date.now() - 5000); return ts + '.' + crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev').update('form:' + ts).digest('hex').slice(0, 24) }
 export async function act(u, action, fields = {}, extra = {}) {
+  // 383 (12.11): бронь — только после согласия клиента. В наборах согласие ставим как будто клиент нажал ссылку; без согласия — поле __noConsent
+  if (action === 'createBooking' && fields.client && !fields.__noConsent) await q(`update portal.clients set consent_status = 'given', consent_at = coalesce(consent_at, now()) where id = $1 and consent_status <> 'given'`, [fields.client])
   const sig = crypto.createHmac('sha256', process.env.SESSION_SECRET).update('qa:' + action).digest('hex')
   const r = await fetch(`${BASE}/api/internal/qa`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qa': sig }, body: JSON.stringify({ as: u?.id || null, action, fields, ...extra }) })
   const j = await r.json()
