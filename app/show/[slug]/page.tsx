@@ -44,7 +44,7 @@ export default async function ShowProject(
           <img src={gp.image} alt="" />
           {g0!.views.map((v, i) => i !== vi && <img key={i} src={v.image} alt="" aria-hidden="true" className="gp__pre" />)}
           <svg viewBox="0 0 1 1" preserveAspectRatio="none">{gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}</svg>
-          {gp.polygons.map((g) => byExt[g.block] && <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}><b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} доступно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>{/* обход 11.11: на картинке только название, цифры — в чипах над ней (как О58 на странице проекта) */}</div>)}
+          {gp.polygons.map((g) => byExt[g.block] && <Link key={g.block} href={`?b=${byExt[g.block].id}`} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}><b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} доступно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>{/* обход 11.11: на картинке только название, цифры — в чипах над ней (как О58 на странице проекта) */}</Link>)}
         </div>
       )}
       {!b && files.length > 0 && (

@@ -96,9 +96,9 @@ export default async function ProjectPage(
                 {gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`/projects/${p!.slug}/chess?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}
               </svg>
               {gp.polygons.map((g) => byExt[g.block] && (
-                <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}>
+                <Link key={g.block} href={`/projects/${p!.slug}/chess?b=${byExt[g.block].id}`} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}>{/* О90: подпись — ссылка на свой блок */}
                   <b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} свободно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>
-                </div>
+                </Link>
               ))}
             </div>
           ) : <div className="card small muted">{T('Генплан с контурами домов появится после загрузки — пока выберите блок ниже.')}</div>}
