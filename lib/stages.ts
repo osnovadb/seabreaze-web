@@ -28,6 +28,21 @@ export function partnerCol(c: { b24_stage?: string | null; attach_status?: strin
   if (c.booking === 'requested' || c.booking === 'queued') return 'request'
   return c.regs_sent ? 'registration' : 'selection'
 }
+// 382 (Денис 12.11, «ок»): одна шкала. Сотрудникам везде (шапка карточки, воронка, главная, отчёты) — стадии сделки Bitrix24
+// (до сделки — лид), партнёру — короткая шкала PARTNER_STAGES. [ключ = имя стадии в Bitrix24, подпись]
+export const STAFF_STAGES: [string, string][] = [
+  ['Lead', 'Lead'], ['Selection', 'Selection'], ['Developer registration', 'Developer registration'], ['Reservation request', 'Reservation request'],
+  ['Reserved', 'Reserved'], ['KYC', 'KYC'], ['SPA approval', 'SPA approval'], ['SPA signed', 'SPA signed'], ['Payments', 'Payments'], ['Won', 'Won'],
+]
+const P_TO_STAFF: Record<string, string> = { candidate: 'Lead', selection: 'Selection', registration: 'Developer registration', request: 'Reservation request', reserved: 'Reserved', kyc: 'KYC', spa: 'SPA signed', won: 'Won' }
+export function staffCol(c: { b24_stage?: string | null; b24_deal_id?: number | string | null; attach_status?: string | null; booking?: string | null; paid?: boolean; regs_sent?: boolean; kyc?: string | null; spa?: boolean; qualified?: boolean }) {
+  if (c.b24_stage && STAFF_STAGES.some(([k]) => k === c.b24_stage)) return c.b24_stage
+  const p = partnerCol({ ...c, b24_stage: null })
+  if (p === 'reserved' && c.spa && c.kyc === 'passed') return 'SPA approval'
+  if (p === 'reserved' && c.kyc && ['pending', 'passed'].includes(c.kyc)) return 'KYC'
+  if (p === 'selection' && !c.b24_deal_id && !c.qualified) return 'Lead' // до квалификации в Bitrix24 — лид, сделки нет
+  return P_TO_STAFF[p] || 'Selection'
+}
 // Причины отказа (ТЗ, «Воронка клиента саб-агента») — из них отчёт по проектам и рынкам
 export const LOST_REASONS = ['дорого', 'не то место', 'купил другое', 'не выходит на связь', 'сроки сдачи', 'другое']
 

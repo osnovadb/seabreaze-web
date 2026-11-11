@@ -9,9 +9,9 @@ import { isExternal, canRegisterClient, canSeeClients } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
 import { Kanban, type KCard, type KCol } from '@/components/Kanban'
-import { partnerCol } from '@/lib/stages'
+import { partnerCol, staffCol, STAFF_STAGES } from '@/lib/stages'
 
-type Row = { has_deal: boolean; qualified: boolean; id: string; name: string; reg_no: string; stage: string; country: string | null; budget: string | null; interest: string | null; protected_until: string; pause_until: string | null; lost_reason: string | null; last_activity_at: string; owner: string; opened: number | null; booking: string | null; booking_ends: string | null; fix: string | null; b24_stage: string | null; attach_status: string; bstatus: string | null; paid: boolean; regs_sent: boolean }
+type Row = { has_deal: boolean; qualified: boolean; id: string; name: string; reg_no: string; stage: string; country: string | null; budget: string | null; interest: string | null; protected_until: string; pause_until: string | null; lost_reason: string | null; last_activity_at: string; owner: string; opened: number | null; booking: string | null; booking_ends: string | null; fix: string | null; b24_stage: string | null; attach_status: string; bstatus: string | null; paid: boolean; regs_sent: boolean; b24_deal_id: number | null; kyc_status: string | null; spa: boolean }
 
 export default async function Clients(props: { searchParams: Promise<{ v?: string; q?: string }> }) {
   const searchParams = await props.searchParams;
@@ -24,7 +24,8 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
       (select max(opened) from portal.selections s where s.client_id = cl.id) as opened,
       exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled') as has_deal,
       (coalesce(cl.goal, '') <> '' and coalesce(cl.budget, '') <> '' and coalesce(cl.timeline, '') <> '' and coalesce(cl.country, '') <> '' and coalesce(cl.language, '') <> '') as qualified,
-      cl.b24_stage, cl.attach_status,
+      cl.b24_stage, cl.attach_status, cl.b24_deal_id, cl.kyc_status,
+      exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('confirmed','release_pending') and b.spa_approval_at is not null) as spa,
       (select b.status from portal.bookings b where b.client_id = cl.id and b.status in ('queued','requested','confirmed','release_pending','converted') order by array_position(array['converted','release_pending','confirmed','requested','queued'], b.status) limit 1) as bstatus,
       exists (select 1 from portal.deals d where d.client_id = cl.id and d.stage <> 'cancelled' and d.paid_pct > 0) as paid,
       exists (select 1 from portal.registrations r where r.client_id = cl.id and r.status <> 'to_send') as regs_sent,
@@ -37,6 +38,7 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
   const live = rows.filter((r) => !r.pause_until && r.stage !== 'lost')
   const paused = rows.filter((r) => r.pause_until), lost = rows.filter((r) => r.stage === 'lost')
   const now = Date.now()
+  const sc = (r: Row) => ({ b24_stage: r.b24_stage, b24_deal_id: r.b24_deal_id, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent, kyc: r.kyc_status, spa: r.spa, qualified: r.qualified })
   const signal = (r: Row): [string, string] | null => {
     if (r.booking_ends && new Date(r.booking_ends).getTime() - now < 3 * 86400000) return ['badc', T('бронь {u}: осталось {d} дн.', { u: r.booking!, d: Math.max(0, Math.ceil((new Date(r.booking_ends).getTime() - now) / 86400000)) })]
     if (r.opened && r.opened >= 2 && r.stage === 'selection') return ['okc', T('открыл подборку {n} раза — позвонить', { n: r.opened })]
@@ -58,13 +60,14 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
         {/* импорт — отдельной формой вне поиска (вложенные формы ломают гидратацию) */}
         {['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) && <div style={{ marginBottom: 16 }}><ImportExport lang={L} /></div>}
         {view === 'kanban' ? (
-          <Kanban role={c.user.role} lang={L} readOnly={!ext}
-            cols={PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: T(l), who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))}
+          <Kanban role={c.user.role} lang={L} readOnly /* 382: перетаскивания нет — стадии двигают кнопки в карточке и Bitrix24 */
+            cols={ext ? PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: T(l), who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))
+              : STAFF_STAGES.map(([k, l]): KCol => ({ key: k, label: l, who: '', target: '' }))} /* 382: сотрудникам — стадии Bitrix24, партнёру — короткая шкала */
             cards={rows.map((r): KCard => ({
               id: r.id, name: r.name,
               sub: r.pause_until ? T('вернуться') + ' ' + date(L, r.pause_until) : r.stage === 'lost' ? (r.lost_reason ? T(r.lost_reason) : '') : [countryName(r.country, L), r.budget, r.booking].filter(Boolean).join(' · '),
               owner: ext ? undefined : r.owner, signal: r.pause_until || r.stage === 'lost' ? null : signal(r),
-              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent }), // 288: и у команды — стадии Bitrix24
+              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : ext ? partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent }) : staffCol(sc(r)), // 288: и у команды — стадии Bitrix24
               ctx: { stage: r.stage, paused: !!r.pause_until, hasBooking: !!r.booking, hasDeal: r.has_deal, qualified: r.qualified },
             }))} />
         ) : (
@@ -76,7 +79,7 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/clients/${r.id}`}><b>{r.name}</b></Link><div className="tiny muted">{r.reg_no}</div></td>
-                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] && T((PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1])}</td>
+                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? T((PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1]) : staffCol(sc(r))}</td>
                     <td>{ext ? countryName(r.country, L) : r.owner}</td><td className="small">{r.budget || '—'}</td><td>{r.booking || '—'}</td>
                     <td className="small">{date(L, r.protected_until)}</td><td className="small muted">{date(L, r.last_activity_at)}</td>
                     <td className="small">{sg && <span className={sg[0]}>{sg[1]}</span>}</td>

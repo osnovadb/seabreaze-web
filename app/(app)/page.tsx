@@ -6,7 +6,9 @@ import { isExternal, canConfirmBooking, canSeeFinance, canSeeClients } from '@/l
 import { clientScope, bookingScope } from '@/lib/scope'
 import { listProjects } from '@/lib/catalog'
 import { expectedAgent, type SplitCond } from '@/lib/money'
-import { Top, AGENT_STAGES, STAGES } from '@/components/ui'
+import { Top, PARTNER_STAGES } from '@/components/ui'
+import { STAFF_STAGES } from '@/lib/stages'
+import { STAGE_COLS_SQL, colOf, type StageColsRow } from '@/lib/stageCols'
 import { readAll, toggleTask, startShow } from '@/lib/actions'
 import { feed } from '@/lib/posts'
 import { payoutGaps } from '@/lib/money22'
@@ -17,8 +19,9 @@ export default async function Home() {
   const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const ext = isExternal(u.role)
   const cs = clientScope(u), bs = bookingScope(u)
-  const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null }>(
-    `select id, name, stage, last_activity_at, protected_until, pause_until from portal.clients cl where ${cs.sql} and cl.anonymized_at is null`, cs.params) // О7: удалённые по запросу — не в «Требует внимания»
+  // 382: для воронки — те же поля, что у списка клиентов (стадия Bitrix24 или факты портала)
+  const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null } & StageColsRow>(
+    `select id, name, stage, last_activity_at, protected_until, pause_until, ${STAGE_COLS_SQL} from portal.clients cl where ${cs.sql} and cl.anonymized_at is null`, cs.params) // О7: удалённые по запросу — не в «Требует внимания»
   const bookings = await q<{ id: string; status: string; ends_at: string; unit: string; client: string; client_id: string; price_list: number; discount_pct: number; snapshot: SplitCond; ext: boolean }>(
     `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, portal.unit_no(bl.external_id, un.number) as unit, cl.name as client, cl.id as client_id, ag.role in ('agent','agency_head') ext from portal.bookings b
      join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users ag on ag.id = b.agent_id
@@ -73,9 +76,8 @@ export default async function Home() {
   // QA 09.11: начисление есть, а платить некуда — первым пунктом у партнёра
   if (ext && (u.role === 'agency_head' || !u.agency_id)) { const g = await payoutGaps(u.id); if (g.waiting > 0 && g.missing.length) attention.unshift({ kind: 'bad', title: T('{a} ждут выплаты — укажите данные для выплаты', { a: usd(L, g.waiting) }), sub: g.missing.map((m) => T(m)).join(', '), href: '/commission#payout' }) }
 
-  const funnel = ext
-    ? AGENT_STAGES.map(([k, l, sts]) => [l, active.filter((x) => sts.includes(x.stage)).length] as [string, number])
-    : STAGES.map(([k, l]) => [l, active.filter((x) => x.stage === k).length] as [string, number]).filter(([, n], i) => n || i < 9)
+  // 382: одна шкала — партнёру короткая (8 шагов), сотрудникам стадии Bitrix24
+  const funnel = (ext ? PARTNER_STAGES.map(([k, l]) => [k, l]) : STAFF_STAGES).map(([k, l]) => [l, active.filter((x) => colOf(x, ext) === k).length] as [string, number])
   const maxF = Math.max(1, ...funnel.map(([, n]) => n))
   // Ожидаемая комиссия агента: сделки в работе (до выплаты) + активные брони по снимку условий; агентская доля — только у броней партнёров.
   // Та же формула — на странице «Комиссия» (lib/money expectedAgent)

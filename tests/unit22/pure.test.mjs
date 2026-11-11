@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { split } from '../../lib/money.ts'
-import { partnerCol, stageBlock, PARTNER_STAGES } from '../../lib/stages.ts'
+import { partnerCol, stageBlock, PARTNER_STAGES, staffCol, STAFF_STAGES } from '../../lib/stages.ts'
 import { kycMissing } from '../../lib/kyc.ts'
 
 const C = { fix_pct: 5, pool_pct: 20, agent_fix_pct: 2, agent_pool_pct: 10, agent_our_pool_share: 0, seller_share_pct: 15 }
@@ -217,4 +217,17 @@ test('384: режим within — база полная, акция станов�
   assert.equal(r1.final, 184000); assert.equal(r1.needsApproval, true)
   const r2 = calcVariant({ list: 200000, plans: [], downPct: 100, months: 0, disc: 15, promo, mode: 'within', poolPct: 10, cap: 3, ceiling: 10, ext: false })
   assert.equal(r2.disc, 10, 'итог больше максимума')
+})
+
+// 382 (Денис 12.11): сотрудникам — стадии Bitrix24: зеркало стадии сделки, без сделки — по фактам портала (до квалификации — лид)
+test('382: staffCol — стадия Bitrix24, иначе по фактам', () => {
+  assert.equal(staffCol({ b24_stage: 'SPA approval' }), 'SPA approval')
+  assert.equal(staffCol({ attach_status: 'protected', qualified: false }), 'Lead')
+  assert.equal(staffCol({ attach_status: 'protected', qualified: true }), 'Selection')
+  assert.equal(staffCol({ attach_status: 'candidate' }), 'Lead')
+  assert.equal(staffCol({ booking: 'confirmed', qualified: true }), 'Reserved')
+  assert.equal(staffCol({ booking: 'confirmed', kyc: 'pending', qualified: true }), 'KYC')
+  assert.equal(staffCol({ booking: 'confirmed', kyc: 'passed', spa: true, qualified: true }), 'SPA approval')
+  assert.equal(staffCol({ booking: 'converted', paid: true }), 'Won')
+  assert.ok(STAFF_STAGES.every(([k]) => k === 'Lead' || ['Selection', 'Developer registration', 'Reservation request', 'Reserved', 'KYC', 'SPA approval', 'SPA signed', 'Payments', 'Won'].includes(k)))
 })

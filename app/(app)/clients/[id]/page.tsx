@@ -6,8 +6,8 @@ import { q, one } from '@/lib/db'
 import { t, date, dateTime, usd, fmtVars, tzOf } from '@/lib/i18n'
 import { isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
-import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
-import { partnerCol, REG_ST, SOURCE_LABEL } from '@/lib/stages'
+import { Top, Pill, PARTNER_STAGES, stageName } from '@/components/ui'
+import { partnerCol, staffCol, STAFF_STAGES, REG_ST, SOURCE_LABEL } from '@/lib/stages'
 import { StageStepper } from '@/components/StageStepper'
 import { ConsentBox } from '@/components/ConsentBox'
 import { EditContacts } from './contacts'
@@ -57,7 +57,10 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
     join public.projects p on p.id = r.project_id where r.client_id = $1 order by d.name, p.name`, [cl.id])
   const pcol = partnerCol({ b24_stage: cl.b24_stage, attach_status: cl.attach_status, booking: bst?.status, paid: deals.some((d) => d.paid_pct > 0 && d.stage !== 'cancelled'), regs_sent: regs.some((r) => r.status !== 'to_send') })
   const agentIdx = PARTNER_STAGES.findIndex(([k]) => k === pcol)
-  const teamIdx = STAGES.findIndex(([k]) => k === cl.stage)
+  // 382: сотрудникам — стадии сделки Bitrix24 (до сделки — лид)
+  const scol = staffCol({ b24_stage: cl.b24_stage, b24_deal_id: cl.b24_deal_id, attach_status: cl.attach_status, booking: bst?.status, paid: deals.some((d) => d.paid_pct > 0 && d.stage !== 'cancelled'), regs_sent: regs.some((r) => r.status !== 'to_send'),
+    kyc: cl.kyc_status, spa: !!(bst && ['confirmed', 'release_pending'].includes(bst.status) && (bst as { spa_approval_at?: string | null }).spa_approval_at), qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) })
+  const staffIdx = STAFF_STAGES.findIndex(([k]) => k === scol)
   const docs = await q<{ id: string; file_id: string; kind: string; note: string | null; internal: boolean; created_by: string; created_at: string; filename: string }>(`select d.id, d.file_id, d.kind, d.note, d.internal, d.created_by, d.created_at, f.filename from portal.client_documents d join portal.files f on f.id = d.file_id where d.client_id = $1 ${ext ? 'and not d.internal' : ''} order by d.created_at desc`, [cl.id])
   const tours = acts.filter((a) => a.text.startsWith('Заявка на тур')).slice(0, 5)
   const docKinds = Array.from(new Set(docs.map((d) => d.kind)))
@@ -78,8 +81,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
     <>
       <Top crumbs={[[ext ? T('Клиенты') : T('CRM · клиенты'), '/clients'], [cl.name]]} title={cl.name}
         sub={<span className="row" style={{ gap: 8, marginTop: 6 }}>
-          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((PARTNER_STAGES[agentIdx] || ['', cl.stage])[1]) : stageName(L, cl.stage)}</Pill>
-          {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
+          <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((PARTNER_STAGES[agentIdx] || ['', cl.stage])[1]) : scol}</Pill>
           {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат · приоритет до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
           {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
           <Pill kind={cl.kyc_status === 'passed' ? 'ok' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'отказ' : 'не начат')}</Pill>
@@ -96,7 +98,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
           steps={PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: T(l), target }))}
           current={agentIdx}
           ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) }} />
-          : <div className="card card--tight"><div className="steps" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{PARTNER_STAGES.map(([k, l], i) => <span key={k} className={'pill ' + (i === agentIdx ? 'pill--ink' : i < agentIdx ? 'pill--ok' : 'pill--off')} title={T(l)}>{T(l)}</span>)}</div>
+          : <div className="card card--tight"><div className="steps" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{STAFF_STAGES.map(([k, l], i) => <span key={k} className={'pill ' + (i === staffIdx ? 'pill--ink' : i < staffIdx ? 'pill--ok' : 'pill--off')} title={l}>{l}</span>)}</div>
             <div className="tiny muted mt8">{T('Стадия — из Bitrix24, здесь только для чтения. Шаги после подбора ставит портал кнопками во вкладке Units сделки.')}</div></div>}
         <div className="cgrid mt16">
           <div className="stack">

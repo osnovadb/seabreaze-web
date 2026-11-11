@@ -142,10 +142,10 @@ export function Kanban({ cols, cards, role, lang, readOnly = false }: { cols: KC
         {cols.map((c) => column(c.key, c.label, c.who, c.empty))}
       </div>
       <div className="grid g2 mt16">
-        {column('pause', T('Пауза'), T('Перетащите сюда — спросим дату возврата'), undefined, true)}
-        {column('lost', T('Отказ'), T('Перетащите сюда — спросим причину'), undefined, true)}
+        {column('pause', T('Пауза'), readOnly ? '' : T('Перетащите сюда — спросим дату возврата'), undefined, true)}
+        {column('lost', T('Отказ'), readOnly ? '' : T('Перетащите сюда — спросим причину'), undefined, true)}
       </div>
-      <div className="tiny muted mt8">{T('Перетаскивайте карточки между этапами; на планшете — долгим нажатием. Серые колонки сейчас недоступны.')}</div>
+      {!readOnly && <div className="tiny muted mt8">{T('Перетаскивайте карточки между этапами; на планшете — долгим нажатием. Серые колонки сейчас недоступны.')}</div>}
       {drag && dragged && <div className="kcard kcard--ghost" style={{ left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.w }}>{body(dragged, true)}</div>}
       {dialog && <StageDialog lang={lang} target={dialog.target} name={card(dialog.id).name} onCancel={() => setDialog(null)} onOk={(extra) => { move(dialog.id, dialog.key, extra); setDialog(null) }} />}
       {toast && <div className="toast" role="status">{toast}</div>}

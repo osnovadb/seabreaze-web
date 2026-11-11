@@ -3,9 +3,11 @@ import { SOURCE_LABEL } from '@/lib/stages'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { t, usd, pct } from '@/lib/i18n'
-import { canSeeFinance } from '@/lib/perm'
+import { canSeeFinance, isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
-import { Top, STAGES, stageName } from '@/components/ui'
+import { Top, PARTNER_STAGES } from '@/components/ui'
+import { STAFF_STAGES } from '@/lib/stages'
+import { STAGE_COLS_SQL, colOf, type StageColsRow } from '@/lib/stageCols'
 import { split, type SplitCond } from '@/lib/money'
 
 const SRC = SOURCE_LABEL
@@ -26,7 +28,11 @@ export default async function Reports() {
     from portal.clients cl join portal.users us on us.id = cl.owner_id left join portal.agencies ag on ag.id = cl.agency_id
     where ${cs.sql} group by 1 order by clients desc`, cs.params)
   const [byOwner, bySource, byMarket] = await Promise.all([by(`us.name || coalesce(' · ' || ag.name, '')`), by(`case when cl.source in ('site','website') or cl.source like 'site%' then 'site' else coalesce(cl.source, '—') end`), by(`coalesce(cl.market, '—')`)])
-  const stages = await q<{ stage: string; n: number }>(`select stage, count(*)::int n from portal.clients cl where ${cs.sql} and cl.pause_until is null group by 1`, cs.params) // как воронка на главной: без клиентов на паузе
+  // 382: шкала — как на главной (сотрудникам стадии Bitrix24, партнёру — короткая); без клиентов на паузе
+  const ext = isExternal(c.user.role)
+  const cols = ext ? PARTNER_STAGES.map(([k, l]) => [k, T(l)] as [string, string]) : STAFF_STAGES
+  const crow = await q<{ stage: string } & StageColsRow>(`select cl.stage, ${STAGE_COLS_SQL} from portal.clients cl where ${cs.sql} and cl.pause_until is null`, cs.params)
+  const stages = [...cols.map(([k]) => k), 'lost'].map((k) => ({ stage: k, n: crow.filter((x) => (x.stage === 'lost' ? 'lost' : colOf(x, ext)) === k).length }))
   const lost = await q<{ reason: string; n: number }>(`select coalesce(nullif(lost_reason, ''), '—') reason, count(*)::int n from portal.clients cl where ${cs.sql} and stage = 'lost' group by 1 order by 2 desc`, cs.params)
   const fin = canSeeFinance(c.user.role)
   const deals = fin ? await q<{ our: number; agent: number; seller: number }>(`select d.our_amount::float our, d.agent_amount::float agent, d.seller_amount::float seller from portal.deals d join portal.clients cl on cl.id = d.client_id where ${cs.sql} and d.stage not in ('cancelled','paid_out')`, cs.params) : []
@@ -56,8 +62,8 @@ export default async function Reports() {
         )}
         <div className="card">
           <div className="h3">{T('Воронка')}</div>
-          {[...STAGES.map(([k]) => k), 'lost'].map((k) => { const n = stages.find((s) => s.stage === k)?.n || 0; return (
-            <div key={k} className="row mt8" style={{ gap: 10 }}><span className="small" style={{ width: 200 }}>{k === 'lost' ? T('Отказ') : stageName(L, k)}</span><div style={{ flex: 1, height: 10, background: 'var(--stone)', borderRadius: 5 }}><div style={{ width: `${(n / total) * 100}%`, height: 10, borderRadius: 5, background: k === 'lost' ? 'var(--bad-line)' : 'var(--deep-3)' }} /></div><span className="num small" style={{ width: 30, textAlign: 'end' }}>{n}</span></div>
+          {stages.map(({ stage: k, n }) => { return (
+            <div key={k} className="row mt8" style={{ gap: 10 }}><span className="small" style={{ width: 200 }}>{k === 'lost' ? T('Отказ') : cols.find(([x]) => x === k)?.[1] || k}</span><div style={{ flex: 1, height: 10, background: 'var(--stone)', borderRadius: 5 }}><div style={{ width: `${(n / total) * 100}%`, height: 10, borderRadius: 5, background: k === 'lost' ? 'var(--bad-line)' : 'var(--deep-3)' }} /></div><span className="num small" style={{ width: 30, textAlign: 'end' }}>{n}</span></div>
           ) })}
         </div>
         <Table title={T('По владельцу клиента')} rows={byOwner} />
