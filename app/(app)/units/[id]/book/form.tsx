@@ -132,7 +132,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         </div>
         {/* 355 (Денис 11.11): вместо «тур + 3 дня» — запрос длинной брони: портал показывает крайнюю дату по условиям, дольше — согласует бэк-офис */}
         <label className="field mt8"><span>{T('Нужна бронь до (если дольше обычного)')}</span><input className="in" type="date" name="want_until" min={new Date().toISOString().slice(0, 10)} style={{ maxWidth: 200 }} /></label>
-        <div className="tiny muted">{T('По условиям проекта бронь — до {d} (срок и одно продление). Дольше — запрос, бэк-офис согласует с застройщиком.', { d: new Date(Date.now() + (days + ext_days) * 86400000).toLocaleDateString(lang === 'en' ? 'en-GB' : lang) })}</div>
+        <div className="tiny muted">{T('По условиям проекта бронь — до {d} (срок и одно продление). Дольше — запрос, бэк-офис согласует с застройщиком.', { d: date(lang, new Date(Date.now() + (days + ext_days) * 86400000)) })}</div>
         <label className="field mt8"><span>{T('Подписание')}</span><select className="in" name="signing" defaultValue=""><option value="">—</option><option value="in_person">{T('лично в Баку')}</option><option value="remote">{T('дистанционно')}</option><option value="power_of_attorney">{T('по доверенности')}</option></select></label>
         <label className="field mt8"><span>{T('Комментарий для бэк-офиса')}</span><input className="in" name="comment" /></label>
         <div className="mt16"><Submit pending={pending} label={asking ? T('Запросить бронь — скидка на согласовании') : T('Запросить бронь по {p}', { p: usd(lang, sp.final) })} /></div>

@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, usd, pct, date, monthName } from '@/lib/i18n'
+import { t, usd, pct, date, monthName, num } from '@/lib/i18n'
 import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { Pager, pageOf } from '@/components/Pager'
@@ -162,7 +162,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
           <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет — номера присваиваются при утверждении реестра')}</td></tr> : acts.map((a) => (
             <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td><td className="small">{a.who || '—'}<div className="tiny muted">{T(ROLE_LABEL[a.role] || a.role)}{a.market ? ' · ' + a.market : ''}</div></td>
               <td className="small"><a href={`?tab=register&m=${a.reg_month.slice(0, 7)}`}>{monthName(L, a.reg_month.slice(0, 7))}</a></td>
-              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
+              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur != null ? num(L, a.amount_cur) : ''} {a.currency}</div> : null}</td>
               <td><Pill kind={a.reg_status === 'paid' && !a.carried ? 'ink' : a.carried ? 'warn' : a.agreed ? 'ok' : 'warn'}>{T(a.reg_status === 'paid' && !a.carried ? 'выплачено' : a.carried ? 'перенесено' : a.agreed ? 'согласован' : 'ждём согласия')}</Pill>{a.needs_inv && <div className="tiny muted">{T(a.invoice ? 'счёт есть' : 'ждём счёт')}</div>}</td>
               <td><a className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</a></td></tr>))}</tbody></table></div>
           <div className="row mt16" style={{ gap: 8 }}><form action="/api/money/report" className="row" style={{ gap: 8 }}><label className="field"><span>{T('Отчёт агента застройщикам за месяц')}</span><input className="in" type="month" name="month" defaultValue={month} /></label><button className="btn btn--sm">{T('Скачать xlsx')}</button></form></div></div>}

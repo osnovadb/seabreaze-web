@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, usd, date, pct } from '@/lib/i18n'
+import { t, usd, date, pct, num } from '@/lib/i18n'
 import { bookingScope } from '@/lib/scope'
 import { conditionsFor, listProjects } from '@/lib/catalog'
 import { expectedAgent, type SplitCond } from '@/lib/money'
@@ -68,7 +68,7 @@ export default async function Commission() {
           <div className="h2 mt24" id="acts">{T('Акты за месяц')}</div>
           <div className="tbl-wrap mt8"><table className="tbl"><thead><tr>{['Акт', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
             <tbody>{myActs.map((a) => <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td>
-              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
+              <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur != null ? num(L, a.amount_cur) : ''} {a.currency}</div> : null}</td>
               <td><Pill kind={a.paid ? 'ink' : a.carried ? 'warn' : a.agreed_at ? 'ok' : 'warn'}>{T(a.paid ? 'выплачено' : a.carried ? 'перенесено' : a.agreed_at ? 'согласован — ждёт оплаты' : 'нужно согласие')}</Pill></td>
               <td><Link className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</Link></td></tr>)}</tbody></table></div>
         </>}

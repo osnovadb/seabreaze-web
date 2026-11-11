@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Unit, Code } from '@/lib/catalog'
 import { riser, codeFor, unitNo } from '@/lib/catalog'
 import type { User } from '@/lib/auth'
-import { t, type Lang } from '@/lib/i18n'
+import { t, num, type Lang } from '@/lib/i18n'
 
 // Шахматка блока: этажи сверху вниз, стояки по позиции на этаже
 export function Chess({ units, viewer, mode, lang, cellMode, hrefFor, rooms, selected, match }: {
@@ -30,7 +30,7 @@ export function Chess({ units, viewer, mode, lang, cellMode, hrefFor, rooms, sel
                 const dim = code === 'F' && ((rooms && u.rooms !== rooms) || (match && !match.has(u.id)))
                 const label = code === 'X' ? '' : riser(u)
                 const val = code === 'X' ? '' : cellMode === 'rooms' ? `${u.rooms ?? '–'}${t(lang, 'к')}` : cellMode === 'm2' ? (u.usd && u.area ? '$' + Math.round(u.usd / (u.area + (u.plot_area || u.ext_area || 0))) : '') : code === 'F' || mode === 'team' ? (u.usd ? k(u.usd) : '') : ''
-                const title = code === 'X' ? '' : `${unitNo(u)} · ${u.rooms ?? ''}${t(lang, 'к')} · ${u.area} m²${u.usd ? ' · $' + Math.round(u.usd).toLocaleString('en') : ''}${mode === 'team' && u.external_status ? ' · ' + t(lang, 'в источнике') + ': ' + u.external_status : ''}${mode === 'team' && u.hidden ? ' · ' + t(lang, 'скрыта от партнёров') : ''}`
+                const title = code === 'X' ? '' : `${unitNo(u)} · ${u.rooms ?? ''}${t(lang, 'к')} · ${u.area} m²${u.usd ? ' · $' + num(lang, Math.round(u.usd)) : ''}${mode === 'team' && u.external_status ? ' · ' + t(lang, 'в источнике') + ': ' + u.external_status : ''}${mode === 'team' && u.hidden ? ' · ' + t(lang, 'скрыта от партнёров') : ''}`
                 const cell = <span className={`cell c-${code}${u.id === selected ? ' sel' : ''}`} style={dim ? { opacity: 1, background: 'var(--paper)' } : undefined} title={title}><b>{label}</b>{val}</span>
                 return <td key={c}>{code === 'X' ? cell : <Link href={hrefFor(u)} scroll={false}>{cell}</Link>}</td>
               })}
