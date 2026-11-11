@@ -13,6 +13,7 @@ import { EditContacts } from './contacts'
 import { TourForm, DocUpload } from './extra'
 import { MakeDoc, DocStatus } from './docs'
 import { split, type SplitCond } from '@/lib/money'
+import { CountrySelect } from '@/components/CountrySelect'
 import { KYC_DOCS, KYC_DOC_NAMES, kycMissing, canReviewKyc, type Buyer } from '@/lib/kyc'
 import { BuyersBox } from '@/components/BuyersBox'
 
@@ -113,7 +114,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               {cl.attach_status === 'candidate' && <div className="tiny muted">{T('Обязательно для закрепления: цель, бюджет, срок, страна проживания, язык')}</div>}
               {[['goal', 'Цель'], ['budget', 'Бюджет'], ['timeline', 'Срок покупки'], ['country', 'Страна проживания'], ['language', 'Язык'], ['payment', 'Оплата'], ['interest', 'Интерес']].map(([k, l]) => <label key={k} className="field"><span>{T(l)}</span>{k === 'language'
                 ? <select key={`language:${String(cl.language || '')}`} className="in" name="language" defaultValue={cl.language || ''}><option value="">—</option>{[['de', 'Deutsch'], ['en', 'English'], ['ru', 'Русский'], ['he', 'עברית']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>
-                : <input className="in" name={k} defaultValue={cl[k] || ''} />}</label>)}
+                : k === 'country' ? <CountrySelect lang={L} value={cl.country} /> : <input className="in" name={k} defaultValue={cl[k] || ''} />}</label>)}
               <button className="btn btn--p">{T(cl.attach_status === 'candidate' ? 'Сохранить и закрепить клиента' : 'Сохранить квалификацию')}</button>
             </form>
           </div>

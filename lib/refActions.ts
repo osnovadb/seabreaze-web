@@ -9,6 +9,7 @@ const norm = { phone: (p: string) => p.replace(/\D/g, '').replace(/^00/, ''), em
 import { bakuYear, type Lang } from './i18n'
 import { pushDeal } from './b24sync'
 import { requestConsent } from './consent'
+import { marketOfCountry } from './country'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 
@@ -42,7 +43,7 @@ async function referClientLocked(f: FormData) {
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const r = await one<{ id: string }>(`insert into portal.clients (reg_no, owner_id, name, phone, phone_norm, email, email_norm, market, country, interest, source, stage, owner_type, attach_status, protected_until, attached_at, referrer_id)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'referral','lead','referrer','protected', current_date + interval '6 months', now(), $11) returning id`,
-    [reg, owner!.id, name, phone, pn, email, em, c.user.market, s(f, 'country') || null, s(f, 'comment') || null, c.user.id])
+    [reg, owner!.id, name, phone, pn, email, em, marketOfCountry(s(f, 'country')) || c.user.market /* 378 */, s(f, 'country') || null, s(f, 'comment') || null, c.user.id])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Рекомендация от {p} ({r}): ведёт команда',$3)`, [r!.id, c.user.id, { p: c.user.name, r: reg }])
   if (s(f, 'comment')) await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'note',$3)`, [r!.id, c.user.id, s(f, 'comment').slice(0, 2000)])
   await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id])

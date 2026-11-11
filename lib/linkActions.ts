@@ -9,6 +9,7 @@ import { isExternal } from './perm'
 import { listProjects } from './catalog'
 import { bakuYear } from './i18n'
 import { pushDeal } from './b24sync'
+import { marketOfCountry } from './country'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const norm = { phone: (p: string) => p.replace(/\D/g, '').replace(/^00/, ''), email: (e: string) => e.trim().toLowerCase() }
@@ -67,7 +68,7 @@ async function linkLeadLocked(f: FormData) {
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const cl = await one<{ id: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, marketing_consent_at, source, interest, stage, owner_type, attach_status, candidate_until)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), case when $12 then now() end, 'partner_link', $13, 'lead', 'partner', 'candidate', current_date + 30) returning id`,
-    [reg, l.user_id, l.agency_id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'lang') || null, l.market, false, [s(f, 'project'), s(f, 'comment')].filter(Boolean).join(' · ') || null])
+    [reg, l.user_id, l.agency_id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'lang') || null, marketOfCountry(s(f, 'country')) || l.market, /* 378 */ false, [s(f, 'project'), s(f, 'comment')].filter(Boolean).join(' · ') || null])
   await q(`update portal.inbound_leads set result = 'partner_client', client_id = $2 where id = $1`, [lead!.id, cl!.id])
   // галочки поставил сам клиент — журнал согласий
   await q(`update portal.clients set consent_status = 'given' where id = $1`, [cl!.id])

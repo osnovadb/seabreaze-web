@@ -26,6 +26,17 @@ export async function answerConsent(_: unknown, f: FormData) {
     await pushDeal(cl.id, 'клиент отказался от согласия на обработку данных — Do not contact')
     return { ok: 'declined' }
   }
+  // 386 (Денис 12.11): клиент отзывает согласие на обработку данных. Новых передач застройщикам нет (регистрации и брони требуют согласия),
+  // офису — задача уведомить застройщиков; подтверждённая бронь остаётся (договорное основание)
+  if (act === 'withdraw' && cl.consent_status === 'given') {
+    await q(`update portal.clients set consent_status = 'withdrawn', marketing_consent_at = null where id = $1`, [cl.id])
+    await log('data', false, 'withdraw'); if (cl.marketing_consent_at) await log('marketing', false, 'withdraw')
+    await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1, null, 'system', 'Клиент отозвал согласие на обработку данных')`, [cl.id])
+    await notify(cl.owner_id, 'client', 'Клиент {c} отозвал согласие на обработку данных — новые регистрации и брони недоступны', `/clients/${cl.id}`, { c: cl.name })
+    await queueTask(cl.id, `Consent withdrawn · ${cl.name}`, 'Клиент отозвал согласие на обработку данных. Уведомите застройщиков, у которых он зарегистрирован. Подтверждённая бронь остаётся; новых передач данных нет.', 'office')
+    await pushDeal(cl.id, 'клиент отозвал согласие на обработку данных — новых передач застройщикам нет, уведомить застройщиков')
+    return { ok: 'withdrawn' }
+  }
   if (act === 'marketing_off') {
     await q('update portal.clients set marketing_consent_at = null where id = $1', [cl.id])
     await log('marketing', false, 'withdraw')

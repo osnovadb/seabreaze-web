@@ -2,6 +2,7 @@
 import { useActionState } from 'react'
 import { updateClientContacts } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
+import { CountrySelect } from '@/components/CountrySelect'
 
 // Правка контактов клиента — с проверкой, что телефон или e-mail не принадлежит другому клиенту
 export function EditContacts({ lang, cl }: { lang: Lang; cl: { id: string; name: string; phone: string | null; email: string | null; country: string | null; language: string | null } }) {
@@ -18,7 +19,7 @@ export function EditContacts({ lang, cl }: { lang: Lang; cl: { id: string; name:
         <label className="field"><span>{T('Телефон')}</span><input className="in" name="phone" type="tel" defaultValue={cl.phone || ''} /></label>
         <label className="field"><span>E-mail</span><input className="in" name="email" type="email" defaultValue={cl.email || ''} /></label>
         <div className="row" style={{ gap: 6 }}>
-          <label className="field" style={{ flex: 1 }}><span>{T('Страна')}</span><input className="in" name="country" defaultValue={cl.country || ''} /></label>
+          <label className="field" style={{ flex: 1 }}><span>{T('Страна')}</span><CountrySelect lang={lang} value={cl.country} /></label>
           <label className="field" style={{ flex: 1 }}><span>{T('Язык общения')}</span><select key={`language:${String(cl.language || 'de')}`} className="in" name="language" defaultValue={cl.language || 'de'}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
         </div>
         <div><button className="btn btn--sm">{T('Сохранить')}</button></div>

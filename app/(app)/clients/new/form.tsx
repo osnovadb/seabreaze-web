@@ -4,6 +4,7 @@ import { useFormStatus } from 'react-dom'
 import { useActionState, startTransition } from 'react'
 import { registerClient, requestDispute } from '@/lib/actions'
 import { t, date, type Lang } from '@/lib/i18n'
+import { CountrySelect } from '@/components/CountrySelect'
 
 function Submit({ lang }: { lang: Lang }) {
   const { pending } = useFormStatus()
@@ -20,7 +21,7 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
       <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); startTransition(() => act(fd)) }} className="card stack">
         {st?.error && <div className="err">{T(st.error)}</div>}
         <div className="grid g2">
-          {F('name', 'Имя и фамилия *')}{F('country', 'Страна')}
+          {F('name', 'Имя и фамилия *')}<label className="field"><span>{T('Страна проживания')}</span><CountrySelect lang={lang} /></label>{/* 378 */}
           {F('phone', 'Телефон', 'tel')}{F('email', 'E-mail', 'email')}
           <label className="field"><span>{T('Язык общения')}</span><select key={`language:${String(lang)}`} className="in" name="language" defaultValue={lang}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
           {F('budget', 'Бюджет', 'text', '$150–200 тыс.')}

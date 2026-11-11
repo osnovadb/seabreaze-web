@@ -13,7 +13,7 @@ test('setup', async () => {
   assert.equal(Number(BR.rates_by_market?.IL), 2.5, 'у BRABUS нет ставки Израиля 2,5 % (базовые условия 11.11)')
 })
 test('бронь клиента из Израиля по BRABUS: фикс 2,5 % от прайса, партнёру 1 %, рекомендателю 0,5 %', async () => {
-  const cl = (await register(SIL)).result.id
+  const cl = (await register(SIL, { country: 'IL' })).result.id // 378: рынок — от страны проживания клиента
   assert.equal((await one('select market from portal.clients where id = $1', [cl])).market, 'IL')
   const u = await freeUnit('brabus-island-baku')
   const r = await act(SIL, 'createBooking', { unit: u.id, client: cl, discount: '0' })
@@ -37,4 +37,19 @@ test('ревью 11.11: партнёр и рекомендатель прове�
   const row = await one(`select id from portal.agent_rates where project_id = $1 and market = 'IL' and agent_id is null and agent_fix_pct = 1.5`, [BR.id])
   assert.ok(row, 'ставка рынка не сохранилась')
   await q(`delete from portal.agent_rates where id = $1`, [row.id])
+})
+
+// 378 (Денис 12.11): ставка рынка — от страны проживания клиента, а не от рынка сотрудника; офис правит страну до подтверждения брони
+test('378: клиент из Израиля у сейлза DE — рынок IL и ставка Арада 2,5 %; страну правят до подтверждения брони', async () => {
+  const SDE = await user('seller', { market: 'DE' })
+  const cl = (await register(SDE, { country: 'IL' })).result.id
+  assert.equal((await one('select market from portal.clients where id = $1', [cl])).market, 'IL', 'рынок взят у сотрудника, а не по стране клиента')
+  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: '+972500000378', email: '', country: 'AT', language: 'de' })
+  assert.equal((await one('select market from portal.clients where id = $1', [cl])).market, 'DE', 'страну поправили — рынок не пересчитан')
+  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: '+972500000378', email: '', country: 'IL', language: 'de' })
+  const u = await freeUnit('brabus-island-baku')
+  await act(SDE, 'createBooking', { unit: u.id, client: cl, discount: '0' })
+  const b = await lastBooking(cl)
+  assert.equal(Number(b.snapshot.fix_pct), 2.5, 'фикс не по рынку Израиля: ' + b.snapshot.fix_pct)
+  await act(SDE, 'bookingAction', { id: b.id, act: 'cancel' })
 })

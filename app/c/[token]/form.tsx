@@ -13,6 +13,7 @@ export function ConsentForm({ lang, token, status, marketing, ads = true }: { la
   const [st, act] = useActionState(answerConsent, null)
   const T = (s: string) => t(lang, s)
   if (st?.ok === 'declined') return <div className="okbox mt16" role="status">{T('Мы записали ваш отказ и не будем с вами связываться.')}</div>
+  if (st?.ok === 'withdrawn') return <div className="okbox mt16" role="status">{T('Согласие отозвано. Мы больше не передаём ваши данные застройщикам. Если у вас есть подтверждённая бронь, она сохраняется — консультант свяжется с вами.')}</div>
   if (st?.ok === 'saved') return <div className="okbox mt16" role="status">{T('Спасибо! Ваш выбор сохранён.')}</div>
   return (
     <form action={act} className="card stack mt16" style={{ gap: 12 }}>
@@ -25,6 +26,7 @@ export function ConsentForm({ lang, token, status, marketing, ads = true }: { la
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <Btn lang={lang} label="Подтвердить" act="give" />
         {status === 'given' && marketing && <Btn lang={lang} label="Отозвать согласие на рекламу" act="marketing_off" kind="btn" />}
+        {status === 'given' && <Btn lang={lang} label="Отозвать согласие на обработку данных" act="withdraw" kind="btn btn--ghost" />}{/* 386 */}
         {status !== 'given' && <Btn lang={lang} label="Не согласен" act="decline" kind="btn btn--ghost" />}
       </div>
     </form>

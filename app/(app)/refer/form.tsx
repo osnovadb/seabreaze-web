@@ -3,6 +3,7 @@ import { useActionState, useEffect, useRef } from 'react'
 import { useFormStatus } from 'react-dom'
 import { referClient } from '@/lib/refActions'
 import { t, type Lang } from '@/lib/i18n'
+import { CountrySelect } from '@/components/CountrySelect'
 
 function Submit({ lang }: { lang: Lang }) {
   const { pending } = useFormStatus()
@@ -20,7 +21,7 @@ export function ReferForm({ lang }: { lang: Lang }) {
       {st?.ok && <div className="okbox">{T('Спасибо! Контакт передан команде — менеджер свяжется с человеком. Статус — в списке ниже.')}</div>}
       <div className="grid g2">
         <label className="field"><span>{T('Имя и фамилия')} *</span><input className="in" name="name" required /></label>
-        <label className="field"><span>{T('Страна проживания')}</span><input className="in" name="country" /></label>
+        <label className="field"><span>{T('Страна проживания')}</span><CountrySelect lang={lang} /></label>
         <label className="field"><span>{T('Телефон')}</span><input className="in" name="phone" type="tel" /></label>
         <label className="field"><span>E-mail</span><input className="in" name="email" type="email" /></label>
       </div>

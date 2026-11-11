@@ -13,7 +13,7 @@ export function ConsentBox({ lang, cl }: { lang: Lang; cl: { id: string; consent
   return (
     <div className="stack" style={{ gap: 6 }}>
       <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-        <Pill kind={st === 'given' ? 'ok' : st === 'declined' ? 'bad' : 'warn'}>{T(st === 'given' ? 'согласие получено' : st === 'declined' ? 'отказ от согласия' : st === 'pending' ? 'ждём согласие клиента' : 'согласия нет')}</Pill>
+        <Pill kind={st === 'given' ? 'ok' : st === 'declined' || st === 'withdrawn' ? 'bad' : 'warn'}>{T(st === 'given' ? 'согласие получено' : st === 'declined' ? 'отказ от согласия' : st === 'withdrawn' ? 'согласие отозвано' : st === 'pending' ? 'ждём согласие клиента' : 'согласия нет')}</Pill>
         {st === 'given' && <Pill kind={cl.marketing_consent_at ? 'ok' : 'off'}>{T(cl.marketing_consent_at ? 'реклама: да' : 'реклама: нет')}</Pill>}
         {cl.do_not_contact && <Pill kind="bad">Do not contact</Pill>}
       </div>

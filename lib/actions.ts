@@ -18,6 +18,7 @@ import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mail
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
 import { LANGS, t, bakuYear, dateTime, tzOf, type Lang } from './i18n'
+import { marketOfCountry } from './country'
 import { stageBlock, LOST_REASONS, B24_LOST } from './stages'
 import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
 import { autoPost } from './posts'
@@ -224,7 +225,7 @@ async function registerClientLocked(f: FormData) {
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, null, $12,$13,$14,$15,$16,$17,'lead',
       $19, $20, case when $20 = 'protected' then current_date + ($18 || ' months')::interval end, case when $20 = 'candidate' then current_date + 30 end, /* 362: приоритет партнёра — кандидаты не старше 30 дней */
       case when $20 = 'protected' then now() end, $21, $22) returning id, protected_until::text, candidate_until::text`,
-    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, ext ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months,
+    [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), marketOfCountry(s(f, 'country')) || c.user.market, /* 378: рынок — от страны проживания клиента */ ext ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months,
       ext ? 'partner' : 'team', ext ? 'candidate' : 'protected', rival, s(f, 'segment') || null])
   if (ext) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Кандидат заведён ({r}): квалифицируйте — тогда клиент закрепится за вами; приоритет за вами до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.candidate_until! }])
   else {
@@ -343,6 +344,7 @@ export async function saveQualification(f: FormData) {
   await stageGuard(c, id)
   await q(`update portal.clients set goal = $2, budget = $3, timeline = $4, payment = $5, interest = $6, country = coalesce(nullif($7, ''), country), language = coalesce(nullif($8, ''), language),
     segment = coalesce(nullif($9, ''), segment), last_activity_at = now() where id = $1`, [id, s(f, 'goal'), s(f, 'budget'), s(f, 'timeline'), s(f, 'payment'), s(f, 'interest'), s(f, 'country'), langCode(s(f, 'language')), s(f, 'segment')])
+  await syncClientMarket(id)
   if (!(await qualifyIfReady(c.user.id, id))) await q('select portal.enqueue_registrations($1, null, false, $2)', [id, c.user.id]) // страна стала известна — к застройщикам без продаж в АЗ
   await pushDeal(id) // сегмент и регистрации — в контакт и сделку
   revalidatePath(`/clients/${id}`)
@@ -463,6 +465,16 @@ export async function holdUnit(f: FormData) {
 }
 
 const PARTNER_ASK_MAX = 50 // % — нейтральный потолок запроса скидки партнёром
+// 378 (Денис 12.11): рынок клиента — от страны проживания; офис может поправить страну до подтверждения брони —
+// после подтверждённой брони или сделки рынок (и ставка застройщика в ней) не меняется
+async function syncClientMarket(clientId: string) {
+  const cl = await one<{ country: string | null; market: string | null; locked: boolean }>(`select country, market,
+      exists (select 1 from portal.bookings b where b.client_id = c.id and b.status in ('confirmed','release_pending','converted'))
+      or exists (select 1 from portal.deals d where d.client_id = c.id and d.stage <> 'cancelled') locked from portal.clients c where c.id = $1`, [clientId])
+  const mk = cl ? marketOfCountry(cl.country) : null
+  if (!cl || cl.locked || !mk || mk === cl.market) return
+  await q('update portal.clients set market = $2 where id = $1', [clientId, mk])
+}
 export async function createBooking(_: unknown, f: FormData) {
   const c = await writeCtx()
   if (!canBook(c.user.role)) return { error: 'Нет прав на бронь' }
@@ -598,7 +610,7 @@ export async function createBooking(_: unknown, f: FormData) {
 export async function bookingAction(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'id'), act = s(f, 'act')
-  const b = await one<{ id: string; agent_id: string; client_id: string; status: string; extended: boolean; unit_id: string; final_price: number; project_id: string; snapshot: any; approval: string | null; discount_pct: number; fee_status: string }>('select * from portal.bookings where id = $1', [id])
+  const b = await one<{ id: string; agent_id: string; client_id: string; status: string; extended: boolean; unit_id: string; final_price: number; project_id: string; snapshot: any; approval: string | null; discount_pct: number; fee_status: string; price_list: number }>('select * from portal.bookings where id = $1', [id])
   if (!b) return
   const mine = b.agent_id === c.user.id || c.user.role === 'owner'
   if ((act === 'approve' || act === 'decline') && canApproveDiscount(c.user.role) && b.approval === 'pending' && b.status === 'requested') {
@@ -618,6 +630,16 @@ export async function bookingAction(f: FormData) {
   } else if ((act === 'fee_refund' || act === 'fee_keep') && ['owner', 'finance'].includes(c.user.role) && b.fee_status === 'paid' && ['cancelled', 'expired'].includes(b.status)) {
     await q(`update portal.bookings set fee_status = $2, fee_by = $3 where id = $1 and fee_status = 'paid'`, [id, act === 'fee_refund' ? 'refunded' : 'kept', c.user.id])
   } else if (act === 'confirm' && canConfirmBooking(c.user.role) && b.status === 'requested' && b.approval !== 'pending' && b.fee_status !== 'due') {
+    // 378: офис мог поправить страну клиента до подтверждения — ставки брони пересчитываем по текущему рынку клиента
+    const ag = await one<{ id: string; agency_id: string | null; role: string; market: string | null }>('select id, agency_id, role, market from portal.users where id = $1', [b.agent_id])
+    const cm = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [b.client_id]))?.m || 'GLOBAL'
+    const extB = !!ag && isExternal(ag.role as never)
+    const nc = await conditionsFor(b.project_id, extB ? (ag as never) : null, cm)
+    if (nc && b.snapshot && (Number(nc.fix_pct) !== Number(b.snapshot.fix_pct) || (nc.rate_market || null) !== (b.snapshot.rate_market || null) || Number(nc.agent_fix_pct) !== Number(b.snapshot.agent_fix_pct))) {
+      const merged = { ...b.snapshot, fix_pct: nc.fix_pct, rate_market: nc.rate_market || null, agent_fix_pct: nc.agent_fix_pct, referrer_pct: nc.referrer_pct ?? b.snapshot.referrer_pct }
+      const sp2 = split(merged, Number(b.price_list), Number(b.discount_pct), extB)
+      await q(`update portal.bookings set snapshot = $2::jsonb where id = $1`, [id, JSON.stringify({ ...merged, split: sp2 })])
+    }
     // §7 п.5: номер и срок брони застройщика; цена брони фиксируется
     const until = s(f, 'until')
     await q(`update portal.bookings set status = 'confirmed', confirmed_by = $2, confirmed_at = now(), dev_booking_no = nullif($3, ''),
@@ -1134,6 +1156,7 @@ export async function updateClientContacts(_: unknown, f: FormData) {
   const dup = await one(`select 1 from portal.clients where id <> $3 and ((length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or (email_norm <> '' and email_norm = $2)) limit 1`, [pn, em, id])
   if (dup) return { error: 'Этот телефон или e-mail уже есть у другого клиента' }
   await q(`update portal.clients set name = $2, phone = $3, phone_norm = $4, email = $5, email_norm = $6, country = $7, language = $8 where id = $1`, [id, name, phone, pn, email, em, s(f, 'country') || null, langCode(s(f, 'language')) || null])
+  await syncClientMarket(id)
   await audit(c.real.id, 'client.contacts', 'client', id, null, c.impersonating ? c.user.id : null)
   revalidatePath(`/clients/${id}`)
   return { ok: true }

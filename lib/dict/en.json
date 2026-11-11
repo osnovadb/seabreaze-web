@@ -2807,5 +2807,18 @@
 "Ссылка на согласие создана — отправьте её клиенту": "Consent link created — send it to the client",
 "Со стороны пляжа": "Beach side",
 "Со стороны набережной": "Promenade side",
-"Ракурс {n}": "View {n}"
+"Ракурс {n}": "View {n}",
+"Отозвать согласие на обработку данных": "Withdraw consent to data processing",
+"Согласие отозвано. Мы больше не передаём ваши данные застройщикам. Если у вас есть подтверждённая бронь, она сохраняется — консультант свяжется с вами.": "Consent withdrawn. We no longer pass your data to developers. If you have a confirmed reservation, it remains in place — a consultant will contact you.",
+"согласие отозвано": "consent withdrawn",
+"Клиент отозвал согласие на обработку данных": "The client withdrew consent to data processing",
+"Клиент {c} отозвал согласие на обработку данных — новые регистрации и брони недоступны": "Client {c} withdrew consent to data processing — new registrations and reservations are unavailable",
+"Нет согласия клиента на обработку данных — отправьте ему ссылку согласия. Бронь можно запросить после согласия; придержать квартиру на 24 часа можно и сейчас.": "No client consent to data processing — send them the consent link. A reservation can be requested after consent; you can hold the unit for 24 hours now.",
+"договор — после согласия клиента": "contract — after client consent",
+"«Договор подписан» — после согласия клиента": "“Contract signed” — after client consent",
+"Дата договора": "Contract date",
+"Номер договора": "Contract number",
+"Файл договора (по желанию)": "Contract file (optional)",
+"Отметить подписанным": "Mark as signed",
+"— выберите страну —": "— select country —"
 }

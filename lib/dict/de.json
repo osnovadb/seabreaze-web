@@ -2807,5 +2807,18 @@
 "Ссылка на согласие создана — отправьте её клиенту": "Einwilligungslink erstellt – senden Sie ihn an den Kunden",
 "Со стороны пляжа": "Strandseite",
 "Со стороны набережной": "Promenadenseite",
-"Ракурс {n}": "Ansicht {n}"
+"Ракурс {n}": "Ansicht {n}",
+"Отозвать согласие на обработку данных": "Einwilligung zur Datenverarbeitung widerrufen",
+"Согласие отозвано. Мы больше не передаём ваши данные застройщикам. Если у вас есть подтверждённая бронь, она сохраняется — консультант свяжется с вами.": "Einwilligung widerrufen. Wir geben Ihre Daten nicht mehr an Bauträger weiter. Eine bestätigte Reservierung bleibt bestehen – ein Berater meldet sich bei Ihnen.",
+"согласие отозвано": "Einwilligung widerrufen",
+"Клиент отозвал согласие на обработку данных": "Der Kunde hat die Einwilligung zur Datenverarbeitung widerrufen",
+"Клиент {c} отозвал согласие на обработку данных — новые регистрации и брони недоступны": "Kunde {c} hat die Einwilligung widerrufen – neue Registrierungen und Reservierungen sind nicht möglich",
+"Нет согласия клиента на обработку данных — отправьте ему ссылку согласия. Бронь можно запросить после согласия; придержать квартиру на 24 часа можно и сейчас.": "Keine Einwilligung des Kunden zur Datenverarbeitung – senden Sie ihm den Einwilligungslink. Reservierung nach Einwilligung möglich; 24-Stunden-Hold geht schon jetzt.",
+"договор — после согласия клиента": "Vertrag – nach Einwilligung des Kunden",
+"«Договор подписан» — после согласия клиента": "„Vertrag unterschrieben“ – nach Einwilligung des Kunden",
+"Дата договора": "Vertragsdatum",
+"Номер договора": "Vertragsnummer",
+"Файл договора (по желанию)": "Vertragsdatei (optional)",
+"Отметить подписанным": "Als unterschrieben markieren",
+"— выберите страну —": "— Land wählen —"
 }

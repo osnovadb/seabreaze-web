@@ -2807,5 +2807,18 @@
 "Ссылка на согласие создана — отправьте её клиенту": "Razılıq keçidi yaradıldı — zəhmət olmasa, onu müştəriyə göndərin",
 "Со стороны пляжа": "Çimərlik tərəfdən",
 "Со стороны набережной": "Sahil bulvarı tərəfdən",
-"Ракурс {n}": "Görünüş {n}"
+"Ракурс {n}": "Görünüş {n}",
+"Отозвать согласие на обработку данных": "Məlumatların emalına razılığı geri götür",
+"Согласие отозвано. Мы больше не передаём ваши данные застройщикам. Если у вас есть подтверждённая бронь, она сохраняется — консультант свяжется с вами.": "Razılıq geri götürüldü. Məlumatlarınızı artıq tikinti şirkətlərinə ötürmürük. Təsdiqlənmiş bronunuz varsa, o qüvvədə qalır — məsləhətçi Sizinlə əlaqə saxlayacaq.",
+"согласие отозвано": "razılıq geri götürülüb",
+"Клиент отозвал согласие на обработку данных": "Müştəri məlumatların emalına razılığı geri götürdü",
+"Клиент {c} отозвал согласие на обработку данных — новые регистрации и брони недоступны": "Müştəri {c} məlumatların emalına razılığı geri götürdü — yeni qeydiyyatlar və bronlar mümkün deyil",
+"Нет согласия клиента на обработку данных — отправьте ему ссылку согласия. Бронь можно запросить после согласия; придержать квартиру на 24 часа можно и сейчас.": "Müştərinin məlumatların emalına razılığı yoxdur — zəhmət olmasa, ona razılıq keçidini göndərin. Bron razılıqdan sonra sorğulana bilər; mənzili 24 saatlıq müvəqqəti saxlamaq indi də mümkündür.",
+"договор — после согласия клиента": "müqavilə — müştərinin razılığından sonra",
+"«Договор подписан» — после согласия клиента": "“Müqavilə imzalanıb” — müştərinin razılığından sonra",
+"Дата договора": "Müqavilənin tarixi",
+"Номер договора": "Müqavilənin nömrəsi",
+"Файл договора (по желанию)": "Müqavilə faylı (istəyə görə)",
+"Отметить подписанным": "İmzalanmış kimi qeyd et",
+"— выберите страну —": "— ölkəni seçin —"
 }
