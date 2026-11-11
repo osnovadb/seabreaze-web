@@ -20,3 +20,5 @@ insert into payment_plans (project_id, name, down_payment_pct, months, sort, sou
   select p.id, x.name, x.down, x.months, x.sort, 'базовые условия 11.11 (318)', true
   from projects p cross join (values ('Полная оплата', 100, 0, 0), ('Рассрочка до 60 мес.', 20, 60, 1)) x(name, down, months, sort)
   where p.slug = 'premium-residence' and not exists (select 1 from payment_plans q where q.project_id = p.id);
+-- Ревью 11.11 (п. 6): Marina Village — тоже Арада, застройщик как у BRABUS (тестовый проект стенда)
+update projects set developer_id = (select developer_id from projects where slug = 'brabus-island-baku') where slug = 'test-marina';

@@ -71,7 +71,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   return (
     <div className={'stack vcalc' + (compact ? '' : ' card')} style={{ gap: 12 }}>
       {!compact && <div className="h3" style={{ margin: 0 }}>{title ?? T(client ? 'Рассрочка и платежи' : 'Калькулятор вариантов')}</div>}
-      {plans.length > 0 && <div className="chips noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === r.plan?.id ? ' on' : '')} onClick={() => pickPlan(p)}>{planLabel(T, p.name)}</button>)}</div>}
+      {plans.length > 0 && <div className="chips noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === r.plan?.id ? ' on' : '')} onClick={() => pickPlan(p)}>{planLabel(T, p.name, p)}</button>)}</div>}
       {r.approx && <div className="note small">{T(r.plan ? 'Срок рассрочки у застройщика не задан — расчёт ориентировочный.' : 'Условия рассрочки у застройщика не заданы — расчёт ориентировочный.')}</div>}
       <div className="vcalc__ctrls noprint">
         <label className="field"><span>{T('Первый взнос')} · <b>{pct(lang, r.downPct)}</b>{r.minDown > 0 && r.minDown < 100 ? <span className="tiny muted"> · {T('мин. {p}', { p: pct(lang, r.minDown) })}</span> : null}</span>

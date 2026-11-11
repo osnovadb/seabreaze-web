@@ -94,7 +94,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
             <label className="check"><input type="checkbox" checked={!!f.c} onChange={(e) => set('c', e.target.checked ? '1' : '')} /> <span>{T('Угловая')}</span></label>
           </div>
         </div>}
-        <div className="legend">{STATUS.filter(([c]) => counts[c]).map(([c, l0]) => { const l = !team && c === 'O' ? 'Бронь' : l0 /* 312: у партнёра — «Бронь» */; return (
+        <div className="legend">{STATUS.filter(([c]) => counts[c] && (team || c !== 'X') /* 312: пустые клетки партнёру не подписываем */).map(([c, l0]) => { const l = !team && c === 'O' ? 'Бронь' : l0 /* 312: у партнёра — «Бронь» */; return (
           <button key={c} type="button" className="legend__b" style={{ opacity: hide.includes(c) ? 0.4 : 1 }} title={T('Скрыть или показать')} onClick={() => setHide((a) => (a.includes(c) ? a.filter((x) => x !== c) : [...a, c]))}><i className={`c-${c}`} />{T(l)} <b>{counts[c]}</b></button>) })}
           <span className="small muted" style={{ marginInlineStart: 'auto' }}>{active ? T('Под фильтр: {n} свободных', { n: shown.length }) : T('Свободно {f} из {n}', { f: counts.F || 0, n: units.length })}</span>
         </div>

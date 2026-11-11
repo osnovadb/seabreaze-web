@@ -71,7 +71,7 @@ export function Calculator({ plans, price, lang, fx, discountPct = 0, initialPla
   return (
     <div className="card">
       <div className="h3">{title ?? T('Калькулятор и график платежей')}</div>
-      <div className="chips mt8 noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => { setPlanId(p.id); setOpen(false) }}>{planLabel(T, p.name)}</button>)}</div>
+      <div className="chips mt8 noprint">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => { setPlanId(p.id); setOpen(false) }}>{planLabel(T, p.name, p)}</button>)}</div>
       <div className="small muted mt8">
         {isFull(plan)
           ? (ch.planAmt > 0 ? T('Скидка застройщика за 100%: {p} — цена {a}', { p: pct(lang, Number(plan.full_payment_discount_pct)), a: usd(lang, base) }) : T('Полная оплата'))

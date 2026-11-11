@@ -42,10 +42,10 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const [st, act, pending] = useActionState(createBooking, null)
   const askN = Number(askPct.replace(',', '.')) || 0
   const eff = ext && ask && askN > disc ? askN : disc // скидка, с которой уходит бронь
-  const sp = split(pc, list, eff, ext)
+  const sp = split(pc, list, eff, ext, priceList)
   // QA 10.11: запрос сверх своей части — цену и доход показываем по согласуемой скидке, запрошенная — «на согласовании»
   const asking = ext && ask && askN > disc
-  const shown = asking ? split(pc, list, disc, ext) : sp
+  const shown = asking ? split(pc, list, disc, ext, priceList) : sp
   // QA 10.11: React 19 сбрасывал <form action> после ошибки — список показывал «Выберите клиента», а уходил прежний. Отправляем без автосброса
   const submit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const fd = new FormData(e.currentTarget); startTransition(() => act(fd)) }
   const [picked, setPicked] = useState<string[]>([])
@@ -59,7 +59,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         {plans.length > 0 && (
           <div className="mt0" style={{ marginBottom: 16 }}>
             <div className="h3">{T('План оплаты')}</div>
-            <div className="chips mt8">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => setPlanId(p.id)}>{planLabel(T, p.name)}</button>)}</div>
+            <div className="chips mt8">{plans.map((p) => <button type="button" key={p.id} className={'chip' + (p.id === planId ? ' on' : '')} onClick={() => setPlanId(p.id)}>{planLabel(T, p.name, p)}</button>)}</div>
             <input type="hidden" name="plan" value={planId} />
             {plan && <div className="small muted mt8">{isFull(plan) ? (Number(plan.full_payment_discount_pct) && !ext ? T('Полная оплата — максимальная скидка по плану {p}', { p: pct(lang, Number(plan.full_payment_discount_pct)) }) : T('Полная оплата'))
               : termUnknown(plan) ? T('Первый взнос {p}; срок и платежи — по графику застройщика', { p: pct(lang, Number(plan.down_payment_pct)) })

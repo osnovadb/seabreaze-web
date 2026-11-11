@@ -119,7 +119,7 @@ export function calcVariant(i: CalcIn): CalcOut {
   const ceilingEff = i.ext ? (i.askMax ?? capEff) : Math.min(i.ceiling ?? 100, pool.pct)
   let disc = clamp(Number(i.disc) || 0, 0, poolAllowed ? ceilingEff : 0)
   if (disc !== (Number(i.disc) || 0)) clamped.push(poolAllowed ? 'Скидка не больше {c} — максимум по плану и вашему порогу' : 'По условиям акции скидка из пула не применяется')
-  const final = base * (1 - disc / 100)
+  const final = Math.max(0, base - i.list * disc / 100) // ревью 11.11: скидка в % — от прайса, как в договорах
   const total = final + (i.optionsUsd || 0)
   // график: свой план застройщика (этапы) или «взнос + равные платежи»
   const p: Plan = fixed && plan ? plan : { id: 'calc', project_id: '', building_id: null, name: '', down_payment_pct: downPct, months: months || null, full_payment_discount_pct: null, valid_from: null, valid_to: null, source_note: null, sort: 0, schedule: null }
@@ -133,7 +133,7 @@ export function calcVariant(i: CalcIn): CalcOut {
     poolPct: pool.pct, poolSource: pool.source, capEff, ceilingEff,
     base: r2(base), final: r2(final), total: r2(total), down, monthly, last, rows,
     needsApproval: disc > capEff + 1e-9, clamped,
-    split: i.cond ? split(planCond(i.cond, pool.pct), base, disc, i.ext !== false) : null,
+    split: i.cond ? split(planCond(i.cond, pool.pct), base, disc, i.ext !== false, i.list) : null,
   }
 }
 

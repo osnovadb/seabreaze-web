@@ -164,7 +164,10 @@ export function marketOverflow(c: { fix_pct: number; agent_fix_pct: number; cons
   for (const m of ['DE', 'IL', 'GLOBAL']) {
     const rm = Number(c.rates_by_market?.[m]), fix = Number.isFinite(rm) && rm > 0 ? rm : Number(c.fix_pct)
     const row = rates.find((x) => x.market === m)
-    const total = Number(row?.agent_fix_pct ?? c.agent_fix_pct) + Number(c.consultant_pct ?? 1) + Number(row?.referrer_pct ?? c.referrer_pct ?? 2)
+    // ревью 11.11: партнёр и рекомендатель в одной сделке не встречаются (ТЗ, П9 — клиента рекомендателя ведёт наш сейлз),
+    // поэтому проверяем раздельно: партнёр + консультант ≤ фикс рынка и рекомендатель + консультант ≤ фикс рынка
+    const cons = Number(c.consultant_pct ?? 1)
+    const total = Math.max(Number(row?.agent_fix_pct ?? c.agent_fix_pct), Number(row?.referrer_pct ?? c.referrer_pct ?? 2)) + cons
     if (total > fix + 1e-9) out.push({ market: m, fix, total: Math.round(total * 100) / 100 })
   }
   return out

@@ -11,10 +11,20 @@ export const isFull = (p: Plan) => Number(p.down_payment_pct ?? 0) >= 100
 export const termUnknown = (p: Plan) => !isFull(p) && !p.months && !p.schedule?.length
 export const hasSchedule = (p: Plan) => !isFull(p) && !!p.schedule?.some((m) => Number(m.pct) > 0)
 // Названия и примечания планов приходят из каталога по-русски: переводим по словарю, «Рассрочка N мес.» — по шаблону
-export function planLabel(T: (s: string, v?: Record<string, string | number>) => string, name: string | null | undefined) {
+// Ревью 11.11 (п. 10): название плана вводят в базе по-русски — на других языках переводим по шаблону, а незнакомое
+// название собираем из взноса и срока («Взнос 35 % · до 60 мес.»), чтобы на иврите не было «Рассрочка до 60 мес.»
+export function planLabel(T: (s: string, v?: Record<string, string | number>) => string, name: string | null | undefined,
+  p?: { down_payment_pct?: number | string | null; months?: number | string | null } | null) {
   if (!name) return ''
-  const m = name.match(/^Рассрочка (\d+) мес\.?$/)
-  return m ? T('Рассрочка {m} мес.', { m: m[1] }) : T(name)
+  const m = name.trim().match(/^Рассрочка (до )?(\d+) мес\.?$/)
+  if (m) return T(m[1] ? 'Рассрочка до {m} мес.' : 'Рассрочка {m} мес.', { m: m[2] })
+  if (/^(100 ?% сразу|Полная оплата|100 ?%)$/i.test(name.trim())) return T('Полная оплата')
+  const tr = T(name)
+  const ru = T('Полная оплата') === 'Полная оплата'
+  if (ru || tr !== name || !/[а-яё]/i.test(name) || !p) return tr
+  const down = Number(p.down_payment_pct) || 0, months = Number(p.months) || 0
+  if (down >= 100) return T('Полная оплата')
+  return months ? T('Взнос {d} % · до {m} мес.', { d: down, m: months }) : T('Взнос {d} %', { d: down })
 }
 // Скидка застройщика за полную оплату уменьшает цену до раздела денег: фикс и пул считаются от неё
 // 361 (11.11): «скидка за 100 %» — максимум скидки, а не цена; график считается от прайса

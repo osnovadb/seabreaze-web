@@ -3,14 +3,19 @@
 export type SplitCond = { fix_pct: number; pool_pct: number; agent_fix_pct: number; agent_pool_pct: number; agent_our_pool_share: number; seller_share_pct: number; fix_base?: 'list' | 'final' | null }
 // Разбивка денег по сделке: фикс — от прайса или цены клиента (условия проекта); пул — от прайса.
 // pool_pct здесь — пул выбранного плана (planCond): по договорам сетка «взнос и срок → скидка» и есть максимум скидки
-export function split(c: SplitCond, list: number, discPct: number, withAgent = true) {
-  const final = list * (1 - discPct / 100)
-  const fixBase = c.fix_base === 'list' ? list : final
+// list — цена до скидки из пула (прайс или цена после акции застройщика); ref — прайс застройщика: от него по договорам
+// считаются скидка в %, пул и фикс «от прайса» (ревью 11.11: при акции скидка шла от цены после акции, а подпись максимума — от прайса).
+// В снимке брони прайс лежит в list_original — тогда ref берётся оттуда
+export function split(c: SplitCond, list: number, discPct: number, withAgent = true, ref0?: number | null) {
+  const lo = Number((c as { list_original?: unknown }).list_original)
+  const ref = ref0 && ref0 > 0 ? ref0 : lo > 0 ? lo : list
+  const final = Math.max(0, list - ref * discPct / 100)
+  const fixBase = c.fix_base === 'list' ? ref : final
   const fix = fixBase * c.fix_pct / 100
   const agentFix = withAgent ? fixBase * c.agent_fix_pct / 100 : 0
-  const agentPoolLeft = withAgent ? Math.max(0, c.agent_pool_pct - discPct) * list / 100 : 0
+  const agentPoolLeft = withAgent ? Math.max(0, c.agent_pool_pct - discPct) * ref / 100 : 0
   const ourPoolPct = withAgent ? c.pool_pct - Math.max(c.agent_pool_pct, discPct) : c.pool_pct - discPct
-  const ourPool = Math.max(0, ourPoolPct) * list / 100
+  const ourPool = Math.max(0, ourPoolPct) * ref / 100
   const shareToAgent = withAgent ? ourPool * (c.agent_our_pool_share || 0) / 100 : 0
   const agent = agentFix + agentPoolLeft + shareToAgent
   const ours = fix - agentFix + ourPool - shareToAgent

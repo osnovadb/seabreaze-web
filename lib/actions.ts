@@ -545,7 +545,7 @@ export async function createBooking(_: unknown, f: FormData) {
   const pkg = pkgId ? await one<{ id: string; group_id: string | null }>(`select id, group_id from portal.bookings where id = $1 and client_id = $2 and status in ('requested','confirmed')`, [pkgId, clientId]) : null
   if (pkgId && !pkg) return { error: t(c.lang, 'Бронь для пакета уже неактивна — обновите страницу') }
   const usdPrice = ch.base
-  const sp = split(pc, usdPrice, disc, isExternal(c.user.role))
+  const sp = split(pc, usdPrice, disc, isExternal(c.user.role), unit.usd)
   // Опции (группа 4): только действующие для этой квартиры, цена в USD — на сервере, не из формы
   const want = f.getAll('options').map(String)
   const avail = want.length ? await optionsFor(unit) : []
@@ -869,7 +869,7 @@ export async function saveConditions(_: unknown, f: FormData) {
     const num0 = (k: string, d: number) => (s(f, k) === '' || Number.isNaN(n(k)) ? d : n(k))
     const over = marketOverflow({ fix_pct: n('fix_pct'), agent_fix_pct: n('agent_fix_pct'), consultant_pct: num0('consultant_pct', 1), referrer_pct: num0('referrer_pct', 2), rates_by_market: rbm },
       await q<{ market: string | null; agent_fix_pct: number; referrer_pct: number | null }>(`select market, agent_fix_pct::float, referrer_pct::float from portal.agent_rates where project_id = $1 and market is not null and agent_id is null and agency_id is null`, [pid]))
-    if (over.length) return { error: 'Доли больше нашего фикса: ' + over.map((o) => `${o.market} — партнёр + консультант + рекомендатель ${o.total}% при фиксе ${o.fix}%`).join('; ') + '. Задайте ставки рынка в исключениях' }
+    if (over.length) return { error: 'Доли больше нашего фикса: ' + over.map((o) => `${o.market} — партнёр или рекомендатель + консультант — ${o.total}% при фиксе ${o.fix}%`).join('; ') + '. Задайте ставки рынка в исключениях' }
   }
   if (n('booking_fee') < 0) return { error: 'Взнос за бронь не может быть отрицательным' }
   const feeCur = ['USD', 'AZN', 'EUR'].includes(s(f, 'booking_fee_currency')) ? s(f, 'booking_fee_currency') : 'USD'
@@ -1101,7 +1101,7 @@ export async function saveAgentRateState(_: unknown, f: FormData): Promise<{ ok?
       const k = await one<{ fix_pct: number; agent_fix_pct: number; consultant_pct: number | null; referrer_pct: number | null; rates_by_market: Record<string, number> | null }>(
         'select fix_pct::float, agent_fix_pct::float, consultant_pct::float, referrer_pct::float, rates_by_market from portal.cur_conditions($1)', [s(f, 'project')])
       const over = k ? marketOverflow(k, [{ market: id, agent_fix_pct: fix, referrer_pct: ref }]).filter((o) => o.market === id) : []
-      if (over.length) return { error: `${id}: партнёр + консультант + рекомендатель ${over[0].total}% больше нашего фикса ${over[0].fix}%` }
+      if (over.length) return { error: `${id}: партнёр или рекомендатель + консультант — ${over[0].total}%, больше нашего фикса ${over[0].fix}%` }
     }
     await q(`insert into portal.agent_rates (project_id, agent_id, agency_id, market, agent_fix_pct, agent_pool_pct, referrer_pct, note) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [s(f, 'project'), kind === 'user' ? id : null, kind === 'agency' ? id : null, kind === 'market' ? id : null, fix, pool, ref, s(f, 'note') || null])

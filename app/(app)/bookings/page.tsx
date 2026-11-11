@@ -45,7 +45,7 @@ export default async function Bookings(
     [rows.filter((r) => r.status === 'queued').map((r) => r.id)])).map((x) => [x.id, x.at]))
   return (
     <>
-      <Top title={T('Брони')} sub={ext ? T('Ваши брони. Лимит — в условиях проекта.') : T('Активные брони по всем проектам. Лимит одновременных броней — в условиях проекта.')} />
+      <Top title={T('Брони')} sub={ext ? T('Ваши брони и холды.') : T('Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.')} />
       <div className="page">
         {searchParams.created && <div className="okbox" style={{ marginBottom: 16 }}>{rows.find((r) => r.id === searchParams.created)?.approval === 'pending' ? T('Бронь поставлена. Скидка сверх вашего порога ушла на согласование; после решения офис в Баку подтвердит бронь у застройщика.') : T('Бронь поставлена. Офис в Баку подтвердит её у застройщика — вы получите уведомление.')}</div>}
         <div className="grid g4">

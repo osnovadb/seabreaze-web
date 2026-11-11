@@ -30,3 +30,10 @@ test('ставка рынка, при которой доли больше на�
   assert.match(JSON.stringify(r.result || r), /больше нашего фикса/, 'ставка 2 % + консультант + рекомендатель при фиксе 2,5 % сохранилась')
   assert.equal((await one(`select count(*)::int n from portal.agent_rates where project_id = $1 and market = 'IL' and agent_fix_pct = 2`, [BR.id])).n, 0)
 })
+test('ревью 11.11: партнёр и рекомендатель проверяются раздельно — 1,5 % партнёру и 1 % рекомендателю при фиксе 2,5 % сохраняются', async () => {
+  const r = await act(OW, 'saveAgentRateState', { project: BR.id, who: 'market:IL', fix: '1.5', pool: '10', ref: '1' })
+  assert.ok(!/больше нашего фикса/.test(JSON.stringify(r.result || r)), 'партнёр 1,5 + консультант 1 = 2,5 и рекомендатель 1 + консультант 1 = 2 не прошли: ' + JSON.stringify(r.result || r))
+  const row = await one(`select id from portal.agent_rates where project_id = $1 and market = 'IL' and agent_id is null and agent_fix_pct = 1.5`, [BR.id])
+  assert.ok(row, 'ставка рынка не сохранилась')
+  await q(`delete from portal.agent_rates where id = $1`, [row.id])
+})

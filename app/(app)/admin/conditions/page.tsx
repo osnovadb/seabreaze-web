@@ -45,7 +45,7 @@ export default async function Conditions(props: { searchParams: Promise<{ p?: st
       <Top title={T('Админка')} sub={T('Условия договора по проекту: версии с датой вступления; до SPA signed действует последняя версия, после — условия сделки фиксируются')} />
       <div className="page">
         <AdminTabs lang={L} on="conditions" role={c.user.role} />
-        {over.length > 0 && <div className="note mt8">{T('Доли больше нашего фикса')}: {over.map((o) => T('{m} — партнёр + консультант + рекомендатель {t} при фиксе {f}', { m: o.market, t: pct(L, o.total), f: pct(L, o.fix) })).join('; ')}. {T('Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.')}</div>}
+        {over.length > 0 && <div className="note mt8">{T('Доли больше нашего фикса')}: {over.map((o) => T('{m} — партнёр или рекомендатель + консультант {t} при фиксе {f}', { m: o.market, t: pct(L, o.total), f: pct(L, o.fix) })).join('; ')}. {T('Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.')}</div>}
         <div className="chips">{ps.map((x) => <Link key={x.id} href={`?p=${x.slug}`} className={'chip' + (x.id === p.id ? ' on' : '')}>{x.name}</Link>)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0,1fr)', gap: 16, alignItems: 'start' }} className="mt16">
           <div className="card stack" style={{ gap: 8 }}>

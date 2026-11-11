@@ -2654,7 +2654,6 @@
 "Рекомендатель на этом рынке, % от цены (пусто — как в условиях)": "Referrer on this market, % of price (empty — as in terms)",
 "рекоменд.": "referrer",
 "Доли больше нашего фикса": "Shares exceed our fixed fee",
-"{m} — партнёр + консультант + рекомендатель {t} при фиксе {f}": "{m} — partner + consultant + referrer {t} with fixed fee {f}",
 "Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.": "Set a market rate in the exceptions — otherwise a new terms version cannot be saved.",
 "Проверьте числа": "Check the numbers",
 "Нет согласия клиента — отправьте ссылку согласия": "No client consent — send the consent link",
@@ -2760,5 +2759,11 @@
 "Пересчитать доли": "Recalculate shares",
 "Корректировка долей по {u}": "Adjust shares for {u}",
 "Ещё фильтры": "More filters",
-"Меню": "Menu"
+"Меню": "Menu",
+"{m} — партнёр или рекомендатель + консультант {t} при фиксе {f}": "{m} — partner or referrer + consultant {t} with fixed fee {f}",
+"Рассрочка до {m} мес.": "Instalments up to {m} months",
+"Взнос {d} % · до {m} мес.": "Down payment {d}% · up to {m} months",
+"Взнос {d} %": "Down payment {d}%",
+"Ваши брони и холды.": "Your reservations and holds.",
+"Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Active reservations across all projects. The developer limit is shared across all of their projects; 24-hour holds do not count towards it."
 }

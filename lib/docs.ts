@@ -8,7 +8,8 @@ import path from 'node:path'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { q, one, tx } from './db'
-import { num, date, bakuYear, type Lang } from './i18n'
+import { num, date, bakuYear, t, type Lang } from './i18n'
+import { planLabel } from './plans'
 import { roomsSql } from './catalog'
 
 export const DOC_KINDS = ['booking_offer', 'fixation_act', 'commission_act'] as const
@@ -105,7 +106,7 @@ async function collect(kind: DocKind, lang: Lang, src: { clientId: string; booki
       // скидка за 100% = прайс − акция − цена брони до скидки из пула (цена брони уже после неё и акции)
       'booking.price_list': money(lang, list0), 'booking.plan_discount': money(lang, Math.max(0, list0 - Number(promo?.amount || 0) - Number(b.price_list))), 'booking.promo': promo ? `${promo.name} (−${money(lang, promo.amount)})` : '',
       'booking.discount_pct': num(lang, Number(b.discount_pct), Number(b.discount_pct) % 1 ? 1 : 0), 'booking.discount': money(lang, Number(b.price_list) - Number(b.final_price)),
-      'booking.final': money(lang, b.final_price), 'booking.currency': 'USD', 'booking.plan': plan?.name || '',
+      'booking.final': money(lang, b.final_price), 'booking.currency': 'USD', 'booking.plan': planLabel((x, vv) => t(lang, x, vv), plan?.name, plan ? { down_payment_pct: plan.down, months: plan.months } : null),
       'booking.options': (b.options || []).map((o: { title: string; usd: number }) => `${o.title} — ${money(lang, o.usd)}`).join('; '), 'booking.options_total': money(lang, Number(b.options_usd || 0)), 'booking.total': money(lang, Number(b.final_price) + Number(b.options_usd || 0)), 'booking.fee': Number(b.fee_amount) ? `${b.fee_currency} ${num(lang, Number(b.fee_amount))}` : '',
       'booking.starts_at': date(lang, b.starts_at), 'booking.ends_at': date(lang, b.ends_at), 'booking.days': String(b.snapshot?.booking_days ?? ''),
     })

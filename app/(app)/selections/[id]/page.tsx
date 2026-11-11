@@ -83,7 +83,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
                     <label className="field mt8"><span>{T('График платежей для клиента')}</span>
                       <select key={`plan:${u.id}:${String(i.plan_id || '')}`} className="in" name={`plan:${u.id}`} defaultValue={i.plan_id || ''}>
                         <option value="">{T('Не показывать')}</option>
-                        {plansBy.get(u.project_id + ':' + (u.building_id || ''))!.map((p) => <option key={p.id} value={p.id}>{planLabel(T, p.name)}</option>)}
+                        {plansBy.get(u.project_id + ':' + (u.building_id || ''))!.map((p) => <option key={p.id} value={p.id}>{planLabel(T, p.name, p)}</option>)}
                       </select></label>
                   )}
                 </div>

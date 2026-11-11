@@ -49,7 +49,7 @@ export async function computeShares(dealId: string) {
   // агентству платим целиком — руководителю агентства
   const payee = partnerUser ? (await one<{ id: string }>(`select coalesce((select h.id from portal.users h where h.agency_id = a.agency_id and h.role = 'agency_head' and h.active and a.agency_id is not null limit 1), a.id) id from portal.users a where a.id = $1`, [partnerUser]))?.id || partnerUser : null
   const list = d.list || d.final_price, disc = d.disc ?? (list ? (1 - d.final_price / list) * 100 : 0)
-  const sp = split(c, list, disc, partnerSale)
+  const sp = split(c, list, disc, partnerSale, Number((d.snapshot as { list_original?: unknown } | null)?.list_original) || null)
   const total = sp.agent + sp.ours
   const final = d.final_price
   const out: { role: string; user_id: string | null; recipient: string | null; pct: number | null; amount: number }[] = []

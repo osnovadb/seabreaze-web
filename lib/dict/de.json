@@ -2654,7 +2654,6 @@
 "Рекомендатель на этом рынке, % от цены (пусто — как в условиях)": "Empfehler auf diesem Markt, % vom Preis (leer — wie in den Konditionen)",
 "рекоменд.": "Empfehler",
 "Доли больше нашего фикса": "Anteile übersteigen unser Fixum",
-"{m} — партнёр + консультант + рекомендатель {t} при фиксе {f}": "{m} — Partner + Berater + Empfehler {t} bei Fixum {f}",
 "Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.": "Legen Sie einen Marktsatz in den Ausnahmen fest — sonst kann keine neue Konditionsversion gespeichert werden.",
 "Проверьте числа": "Prüfen Sie die Zahlen",
 "Нет согласия клиента — отправьте ссылку согласия": "Keine Einwilligung des Kunden — Einwilligungslink senden",
@@ -2760,5 +2759,11 @@
 "Пересчитать доли": "Anteile neu berechnen",
 "Корректировка долей по {u}": "Anteile für {u} korrigieren",
 "Ещё фильтры": "Weitere Filter",
-"Меню": "Menü"
+"Меню": "Menü",
+"{m} — партнёр или рекомендатель + консультант {t} при фиксе {f}": "{m} — Partner oder Empfehler + Berater {t} bei Fixum {f}",
+"Рассрочка до {m} мес.": "Ratenzahlung bis {m} Monate",
+"Взнос {d} % · до {m} мес.": "Anzahlung {d} % · bis {m} Monate",
+"Взнос {d} %": "Anzahlung {d} %",
+"Ваши брони и холды.": "Ihre Reservierungen und Holds.",
+"Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Aktive Reservierungen in allen Projekten. Das Limit des Bauträgers gilt für alle seine Projekte zusammen; 24-Stunden-Holds zählen nicht dazu."
 }

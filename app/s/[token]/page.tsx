@@ -91,7 +91,7 @@ export default async function PublicSelection(
                   </div>)}
                 {free && u.usd && planOf.get(u.id) && !(sv.get(u.id) || []).some((v) => calcs.has(v.variant_id)) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
-                    <div className="label">{T('График платежей')} · {planLabel(T, p.name)}</div>
+                    <div className="label">{T('График платежей')} · {planLabel(T, p.name, p)}</div>
                     <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).base} lang={L} fx={fx} />
                     <div className="tiny muted mt8">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
                   </div>) })()}

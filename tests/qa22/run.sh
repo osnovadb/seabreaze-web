@@ -12,6 +12,8 @@ if [ "$1" != "--no-b24" ]; then
   set -a; . /opt/ge-portal22/qa-b24.env; set +a; export QA_URL=http://127.0.0.1:3044
   node --test --test-concurrency=1 tests/qa22/11_b24.test.mjs > tests/qa22/out/b24.tap 2>&1
 fi
+# после прогона — снять брони автотестов (ревью 11.11: «Premium 14 / 10» на ручной приёмке), затем настоящие лимиты
+docker exec -i seabreeze-postgres-1 psql -q -U seabreeze -d seabreeze_qa22 < tests/qa22/cleanup.sql >> tests/qa22/out/cleanup.log 2>&1
 # после прогона — настоящие лимиты стенда (366: Арад 5 на всех и 1 на человека, Premium 10 и 3), чтобы ручная приёмка на :3043 видела их
 docker exec -i seabreeze-postgres-1 psql -q -U seabreeze -d seabreeze_qa22 -c "update portal.developers set max_bookings_total = case when name = 'Sabah Investment Group' then 5 else 10 end, max_bookings_person = case when name = 'Sabah Investment Group' then 1 else 3 end; update portal.conditions k set max_bookings_total = case when p.slug in ('brabus-island-baku','test-marina') then 5 else 10 end, max_bookings_client = 3 from projects p where p.id = k.project_id" >> tests/qa22/out/cleanup.log 2>&1
 {

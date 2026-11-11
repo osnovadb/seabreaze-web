@@ -180,3 +180,25 @@ test('график платежей клиента: оплачено, следу
   assert.equal(scheduleOf({ ...d, paid_pct: 100 }, '2026-04-20').overdue.length, 0)
   assert.equal(scheduleOf({ ...d, snapshot: null }), null, 'без плана — графика нет')
 })
+
+// Ревью 11.11 (п. 1): при акции скидка в % — от прайса, как в договорах и в подписи максимума
+test('split/calcVariant: акция 5 % и скидка 20 % — клиент получает 20 % от прайса, а не от цены после акции', () => {
+  const s = split(C, 232000 * 0.95, 20, false, 232000)
+  assert.equal(Math.round(s.discount), 46400)
+  assert.equal(Math.round(s.final), 232000 * 0.95 - 46400)
+  const sn = split({ ...C, list_original: 232000 }, 232000 * 0.95, 20, false) // снимок брони: прайс в list_original
+  assert.equal(Math.round(sn.discount), 46400)
+  const promo = { id: 'p', name: 'p', badge: null, kind: 'pct', pct: 5, usd: 0, ends_on: null }
+  const r = calcVariant({ list: 232000, plans: [], promo, downPct: 35, months: 60, disc: 20, ceiling: 100, cap: 100, ext: false, poolPct: 20 })
+  assert.equal(Math.round(r.base - r.final), 46400, 'скидка 20 % не от прайса: ' + (r.base - r.final))
+})
+import { planLabel } from '../../lib/plans.ts'
+test('planLabel: название плана из базы переводится или собирается из взноса и срока (ревью 11.11, п. 10)', () => {
+  const he = { 'Рассрочка до {m} мес.': 'תשלומים עד {m} חודשים', 'Полная оплата': 'תשלום מלא', 'Взнос {d} % · до {m} мес.': 'מקדמה {d}% · עד {m} חודשים' }
+  const T = (s, v = {}) => (he[s] || s).replace(/\{(\w+)\}/g, (_, k) => String(v[k]))
+  assert.equal(planLabel(T, 'Рассрочка до 60 мес.'), 'תשלומים עד 60 חודשים')
+  assert.equal(planLabel(T, '100% сразу'), 'תשלום מלא')
+  assert.equal(planLabel(T, 'Своя схема Арада', { down_payment_pct: 35, months: 60 }), 'מקדמה 35% · עד 60 חודשים')
+  const R = (s, v = {}) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k]))
+  assert.equal(planLabel(R, 'Своя схема Арада', { down_payment_pct: 35, months: 60 }), 'Своя схема Арада', 'по-русски название не меняем')
+})
