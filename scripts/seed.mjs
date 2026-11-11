@@ -70,7 +70,7 @@ await q(`insert into portal.agent_rates (project_id, agency_id, agent_fix_pct, a
 
 // Генплан Premium: рендер 1800×1202, контуры домов в долях (привязка блоков — пример)
 const poly = (pts) => pts.map(([x, y]) => [+(x / 1800).toFixed(4), +(y / 1202).toFixed(4)])
-await q(`insert into portal.genplans (project_id, image, polygons, note) values ($1, '/img/pr-aerial.jpg', $2, 'Привязка блоков к домам — пример, уточнить по генплану застройщика')`, [pr.id, JSON.stringify([
+await q(`insert into portal.genplans (project_id, image, polygons, note) values ($1, '/img/pr-aerial.jpg', $2, null)`, [pr.id, JSON.stringify([
   { block: 'A', points: poly([[0, 100], [640, 100], [640, 1050], [0, 1050]]), label: [0.14, 0.43] },
   { block: 'B', points: poly([[600, 150], [770, 150], [770, 520], [600, 520]]), label: [0.31, 0.22] },
   { block: 'C', points: poly([[1050, 150], [1230, 150], [1230, 520], [1050, 520]]), label: [0.55, 0.22] },

@@ -2800,5 +2800,6 @@
 "Клиент или номер": "Client or number",
 "Продаж: {n}": "Sales: {n}",
 "Со свободными · {n}": "With available units · {n}",
-"Фильтры": "Filters"
+"Фильтры": "Filters",
+"Кому исключение": "Exception for"
 }

@@ -5,6 +5,8 @@ import { isRtl, isLang, type Lang } from '@/lib/i18n'
 import { cookies, headers } from 'next/headers'
 import { one } from '@/lib/db'
 import { TableCards } from '@/components/TableCards'
+import { authLang } from '@/components/AuthLayout'
+import { tokenUser } from '@/lib/access'
 
 const serif = Source_Serif_4({ subsets: ['latin', 'cyrillic'], weight: ['500'], variable: '--font-serif' })
 const sans = IBM_Plex_Sans({ subsets: ['latin', 'cyrillic'], weight: ['400', '500', '600', '700'], variable: '--font-sans' })
@@ -42,6 +44,9 @@ async function publicLang(path: string, ql: string, lc: string | undefined): Pro
     return ['de', 'en', 'ru', 'he'].includes(l) ? l : 'de'
   }
   if (path.startsWith('/legal')) { const c = ql || lc || 'en'; return ['ru', 'en', 'de'].includes(c) ? c : 'en' }
+  // остаток ревью 11.11: вход и пароль — тот же язык, что у текста страницы (ссылка → cookie → язык браузера)
+  if (path.startsWith('/set-password/')) return (await tokenUser(seg))?.locale || authLang(ql) // как на странице: язык пользователя из ссылки
+  if (['/login', '/forgot'].some((x) => path.startsWith(x))) return authLang(ql)
   if (path.startsWith('/apply')) return four.includes(ql) ? ql : isLang(lc) ? lc : 'de'
   return null
 }

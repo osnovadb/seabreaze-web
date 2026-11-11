@@ -28,7 +28,7 @@ export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand
   return (
     <div className="tbl-wrap mt8">
       <table className="tbl tbl--keep sched">
-        <thead><tr><th>{T('Платёж')}</th><th>{T('Дата')}</th><th style={{ textAlign: 'end' }}>USD</th>{fx && <th style={{ textAlign: 'end' }}>≈ {fx.cur}</th>}</tr></thead>
+        <thead><tr><th>{T('Платёж')}</th><th>{T('Дата')}</th><th style={{ textAlign: 'end' }}>USD</th>{fx && <th className="fxc" style={{ textAlign: 'end' }}>≈ {fx.cur}</th>}</tr></thead>
         <tbody>
           {rows.map((r, i) => {
             const more = hidden > 0 && i >= SHOW && i < rows.length - 1
@@ -37,7 +37,7 @@ export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand
                 <td>{rowLabel(T, r, rows[0]?.kind === 'down')}</td>
                 <td className="small">{r.due ? date(lang, r.due) : '—'}</td>
                 <td className="num" style={{ textAlign: 'end' }}>{usd(lang, r.amount)}</td>
-                {fx && <td className="num small muted" style={{ textAlign: 'end' }}>{money(lang, fx, r.amount)}</td>}
+                {fx && <td className="num small muted fxc" style={{ textAlign: 'end' }}>{money(lang, fx, r.amount)}</td>}
               </tr>
             )
           })}
@@ -46,7 +46,7 @@ export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand
               ? <button type="button" className="btn btn--sm" onClick={onExpand}>{T('Показать весь график (платежей: {n})', { n: rows.length })}</button>
               : <span className="small muted">{T('… и ещё платежей: {n}, по {x}', { n: hidden, x: usd(lang, rows[SHOW].amount) })}</span>}</td></tr>
           )}
-          <tr><td><b>{T('Итого')}</b></td><td /><td className="num" style={{ textAlign: 'end' }}><b>{usd(lang, rows.reduce((a, r) => a + r.amount, 0))}</b></td>{fx && <td className="num small muted" style={{ textAlign: 'end' }}>{money(lang, fx, price)}</td>}</tr>
+          <tr><td><b>{T('Итого')}</b></td><td /><td className="num" style={{ textAlign: 'end' }}><b>{usd(lang, rows.reduce((a, r) => a + r.amount, 0))}</b></td>{fx && <td className="num small muted fxc" style={{ textAlign: 'end' }}>{money(lang, fx, price)}</td>}</tr>
         </tbody>
       </table>
     </div>

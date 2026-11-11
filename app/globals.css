@@ -487,3 +487,8 @@ details.pop > form { position: absolute; inset-inline-end: 0; top: calc(100% + 6
 .app--embed .top .crumbs, .app--embed .top .sub { display: none; }
 .app--embed .top h1 { font-size: 18px; }
 .app--embed .page { padding-top: 12px; padding-bottom: 16px; } /* и М5: без пустой полосы 70 px внизу */
+/* Остаток ревью 11.11: на ноутбуке 1280 px три колонки формы со списками давали по 158–165 px — пункты обрезались.
+   Сетка со списком — колонки не уже 260 px, лишние переносятся */
+.grid.g3:has(> .field > select.in), .grid.g4:has(> .field > select.in) { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+/* Остаток ревью 11.11: на телефоне колонка «≈ EUR» графика обрезалась краем карточки — прячем, пересчёт есть в итогах калькулятора */
+@media (max-width: 640px) { .sched .fxc { display: none; } }

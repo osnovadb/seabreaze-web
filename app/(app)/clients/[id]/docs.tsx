@@ -17,8 +17,8 @@ export function MakeDoc({ lang, clientId, clientLang, bookings, fixations, commi
     <form action={act} className="stack mt8" style={{ gap: 6 }}>
       <input type="hidden" name="client" value={clientId} />
       <div className="row" style={{ gap: 6 }}>
-        <select className="in" name="kind" value={kind} onChange={(e) => setKind(e.target.value)} style={{ flex: 2 }}>{kinds.map((k) => <option key={k} value={k}>{T(NAMES[k])}</option>)}</select>
-        <select key={`lang:${String(['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en')}`} className="in" name="lang" defaultValue={['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en'} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
+        <select className="in" name="kind" value={kind} onChange={(e) => setKind(e.target.value)} style={{ flex: '1 1 100%' }}>{kinds.map((k) => <option key={k} value={k}>{T(NAMES[k])}</option>)}</select>{/* остаток ревью 11.11: вид документа — во всю ширину, язык ниже */}
+        <select key={`lang:${String(['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en')}`} className="in" name="lang" defaultValue={['ru', 'en', 'de', 'he'].includes(clientLang) ? clientLang : 'en'} style={{ width: 'auto', minWidth: 90 }} aria-label="lang">{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
       </div>
       {byBooking
         ? <select className="in" name="booking" required>{bookings.length === 0 && <option value="">{T('У клиента нет броней')}</option>}{bookings.map((b) => <option key={b.id} value={b.id}>{T('Бронь {u}', { u: b.unit })}</option>)}</select>
