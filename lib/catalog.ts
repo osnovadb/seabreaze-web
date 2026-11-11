@@ -65,17 +65,21 @@ export async function listProjects(viewer?: User | null): Promise<Project[]> {
       (select min(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null
          and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
          and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''}) as min_usd, -- О36: «от» — по тем же квартирам, что «свободно»
-      (select count(*)::int from buildings b where b.project_id = p.id) as buildings,
+      (select count(*)::int from buildings b where b.project_id = p.id
+         and not (exists (select 1 from units u where u.building_id = b.id)
+           and not exists (select 1 from units u where u.building_id = b.id and not exists (select 1 from portal.unit_hidden h where h.unit_id = u.id)))) as buildings, -- без корпусов, где скрыто всё
       (select coalesce(array_agg(b.delivery order by b.sort, b.name) filter (where b.delivery is not null), '{}') from buildings b where b.project_id = p.id) as block_deliveries
     from projects p join developers d on d.id = p.developer_id ${f ? 'where ' + visibleSql('p') : ''} order by p.sort, p.name`, f ? [viewer!.id, viewer!.agency_id, viewer!.market] : [])
 }
 export const projectBySlug = async (slug: string, viewer?: User | null) => (await listProjects(viewer)).find((p) => p.slug === slug)
 export const projectVisible = async (projectId: string, viewer: User) => (await listProjects(viewer)).some((p) => p.id === projectId)
 
-export async function buildingsOf(projectId: string, viewer?: User | null): Promise<Building[]> {
+// Обход 11.11: корпус, где скрыты все квартиры (на стенде BRABUS — «ТЕСТ · QA»), партнёру и в режиме показа не выводим
+export async function buildingsOf(projectId: string, viewer?: User | null, opts: { show?: boolean } = {}): Promise<Building[]> {
   const f = ext(viewer)
-  return q<Building>(`
+  const rows = await q<Building & { hidden_n: number }>(`
     select b.id, b.name, b.external_id, b.floors_total, b.delivery, b.sort, count(u.*)::int as units,
+      count(*) filter (where exists (select 1 from portal.unit_hidden h where h.unit_id = u.id))::int as hidden_n,
       count(*) filter (where u.status = 'available' and u.price_list is not null
         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
         and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''})::int as free,
@@ -83,6 +87,7 @@ export async function buildingsOf(projectId: string, viewer?: User | null): Prom
         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
         and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''})::float as min_usd
     from buildings b left join units u on u.building_id = b.id where b.project_id = $1 group by b.id order by b.sort, b.name`, [projectId])
+  return (f || opts.show ? rows.filter((b) => !(b.units > 0 && b.hidden_n >= b.units)) : rows).map(({ hidden_n: _h, ...b }) => b)
 }
 
 export const unitsOfBuilding = (buildingId: string) => q<Unit>(`${UNIT_SELECT} where u.building_id = $1 order by u.floor desc, u.number`, [buildingId])

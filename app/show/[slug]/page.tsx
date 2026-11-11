@@ -18,7 +18,7 @@ export default async function ShowProject(
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const p = await projectBySlug(params.slug, c.user)
   if (!p || !['sales', 'stop'].includes(p.sales_status)) notFound()
-  const bs = await buildingsOf(p.id, c.user)
+  const bs = await buildingsOf(p.id, c.user, { show: true })
   const b = bs.find((x) => x.id === searchParams.b)
   const gp = await one<{ image: string; polygons: { block: string; points: [number, number][]; label: [number, number] }[] }>('select image, polygons from portal.genplans where project_id = $1', [p.id])
   const byExt = Object.fromEntries(bs.map((x) => [x.external_id || x.name, x]))
@@ -39,7 +39,7 @@ export default async function ShowProject(
         <div className="gp mt16">
           <img src={gp.image} alt="" />
           <svg viewBox="0 0 1 1" preserveAspectRatio="none">{gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}</svg>
-          {gp.polygons.map((g) => byExt[g.block] && <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}><b>{byExt[g.block].name}</b>{T('{n} доступно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</div>)}
+          {gp.polygons.map((g) => byExt[g.block] && <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}><b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} доступно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>{/* обход 11.11: на картинке только название, цифры — в чипах над ней (как О58 на странице проекта) */}</div>)}
         </div>
       )}
       {!b && files.length > 0 && (
