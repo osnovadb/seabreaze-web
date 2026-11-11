@@ -82,7 +82,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
         </span>}
         right={<>
           {cl.phone && <a className="btn" href={`https://wa.me/${cl.phone_norm}`} target="_blank">WhatsApp</a>}
-          <Link className="btn" href="/projects">{T('Подобрать квартиру')}</Link>
+          <a className="btn" href={`/clients/${cl.id}/pick`}>{T('Подобрать квартиру')}</a>
           <form action={startShow}><input type="hidden" name="client" value={cl.id} /><input type="hidden" name="lang" value={['de', 'en', 'ru', 'he'].includes(cl.language) ? cl.language : L} /><button className="btn btn--b">{T('Показ клиенту')}</button></form>
         </>} />
       <div className="page">

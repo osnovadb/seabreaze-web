@@ -6,3 +6,11 @@ export async function embedClient(): Promise<string | null> {
   const cl = (await headers()).get('x-cl') || ''
   return /^[0-9a-f-]{36}$/.test(cl) ? cl : null
 }
+
+// О27: клиент, для которого подбирают квартиру — вкладка Bitrix24 (x-cl) или «Подобрать квартиру» из карточки (cookie ge_pick)
+export async function pickClient(): Promise<string | null> {
+  const e = await embedClient()
+  if (e) return e
+  const p = (await cookies()).get('ge_pick')?.value || ''
+  return /^[0-9a-f-]{36}$/.test(p) ? p : null
+}

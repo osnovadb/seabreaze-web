@@ -11,7 +11,7 @@ import { isExternal, maxDiscount, discountCeiling, canBook } from './perm'
 export type VariantParams = { downPct: number; months: number; disc: number; start?: string; options?: string[]; planId?: string | null }
 export type Snapshot = { list: number; total: number; down: number; monthly: number; months: number; downPct: number; last: string | null; devPct: number; disc: number; approx: boolean; needsApproval: boolean }
 export type VariantRow = { id: string; unit_id: string; author_id: string; author: string; client_id: string | null; client: string | null; name: string; params: VariantParams; snapshot: Snapshot
-  needs_approval: boolean; approved_at: string | null; created_at: string }
+  needs_approval: boolean; approved_at: string | null; rejected_at?: string | null; created_at: string }
 
 export async function calcInputs(unitId: string, user: User) {
   const u = await unitById(unitId)
@@ -36,6 +36,6 @@ export const snapshotOf = (r: CalcOut, list: number): Snapshot => ({ list, total
 
 // Варианты квартиры: свои; руководителю рынка и владельцу — все (для согласования скидки)
 export const variantsOf = (unitId: string, user: User) => q<VariantRow>(
-  `select v.id, v.unit_id, v.author_id, a.name author, v.client_id, cl.name client, v.name, v.params, v.snapshot, v.needs_approval, v.approved_at, v.created_at
+  `select v.id, v.unit_id, v.author_id, a.name author, v.client_id, cl.name client, v.name, v.params, v.snapshot, v.needs_approval, v.approved_at, v.rejected_at, v.created_at
    from portal.calc_variants v join portal.users a on a.id = v.author_id left join portal.clients cl on cl.id = v.client_id
    where v.unit_id = $1 and (v.author_id = $2 or $3) order by v.created_at`, [unitId, user.id, ['owner', 'market_head'].includes(user.role)])

@@ -45,9 +45,12 @@ export async function decideRegistration(f: FormData) {
     const reason = ['developer_client', 'other_agency', 'other'].includes(s(f, 'reason')) ? s(f, 'reason') : 'other'
     await q(`update portal.registrations set status = 'rejected', decided_at = now(), reject_reason = $2, valid_until = null where id = $1`, [id, reason])
   } else return
-  const r = await one<{ client_id: string }>('select client_id from portal.registrations where id = $1', [id])
+  // О25 (обход 11.11): в истории — какой застройщик и причина отказа
+  const r = await one<{ client_id: string; dev: string; reason: string | null }>(`select r.client_id, coalesce(dv.name, p.name) dev, r.reject_reason reason from portal.registrations r
+      join projects p on p.id = r.project_id left join developers dv on dv.id = p.developer_id where r.id = $1`, [id])
+  const WHY: Record<string, string> = { developer_client: 'клиент застройщика', other_agency: 'за другим агентством', other: 'другое' }
   if (r) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system',$3,$4)`,
-    [r.client_id, c.user.id, verdict === 'confirmed' ? 'Регистрация у застройщика подтверждена' : 'Застройщик отказал в регистрации', {}])
+    [r.client_id, c.user.id, verdict === 'confirmed' ? 'Регистрация у застройщика {d} подтверждена' : 'Застройщик {d} отказал в регистрации: {r}', { d: r.dev, r: WHY[r.reason || 'other'] || 'другое' }])
   await audit(c.real.id, 'registration.' + verdict, 'registration', id)
   if (r) await pushDeal(r.client_id, verdict === 'confirmed' ? 'регистрация у застройщика подтверждена' : 'застройщик отказал в регистрации')
   revalidatePath('/registrations')

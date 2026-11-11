@@ -5,7 +5,7 @@
 // «Для себя» (доход партнёра / наш) — свёрнуто, чтобы не показывать клиенту с экрана.
 import { useActionState, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveVariant, deleteVariant, approveVariant } from '@/lib/variantActions'
+import { saveVariant, deleteVariant, approveVariant, rejectVariant } from '@/lib/variantActions'
 import { calcVariant, fromPlan, startPlan, MAX_FREE_MONTHS, type DownStep } from '@/lib/calc'
 import { planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import type { SplitCond } from '@/lib/money'
@@ -14,7 +14,7 @@ import { t, usd, pct, num, date, type Lang } from '@/lib/i18n'
 import { ScheduleTable, type FxView } from './Calculator'
 
 // Сохранённый вариант (этап 2): настройки + снимок сумм на момент сохранения; текущие суммы пересчитываем здесь же
-export type VariantView = { id: string; name: string; author: string; client: string | null; client_id?: string | null; mine: boolean; needs_approval: boolean; approved_at: string | null; created_at: string
+export type VariantView = { id: string; name: string; author: string; client: string | null; client_id?: string | null; mine: boolean; needs_approval: boolean; approved_at: string | null; rejected_at?: string | null; created_at: string
   params: { downPct: number; months: number; disc: number; start?: string; options?: string[]; planId?: string | null }; snapshot: { total: number; down: number; monthly: number; months: number } }
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(new Date())
@@ -58,6 +58,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
   const router = useRouter()
   useEffect(() => { if (saved?.ok) router.refresh() }, [saved]) // eslint-disable-line react-hooks/exhaustive-deps
   const approveAct = async (fd: FormData) => { await approveVariant(fd); router.refresh() }
+  const rejectAct = async (fd: FormData) => { await rejectVariant(fd); router.refresh() } // О28
   const deleteAct = async (fd: FormData) => { await deleteVariant(fd); router.refresh() }
   const [vname, setVname] = useState('')
   const [asking, setAsking] = useState(false) // партнёр: «Попросить больше» — скидка сверх его части пула, на согласование
@@ -130,7 +131,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         <button className="btn btn--p" disabled={saving}>{T('Сохранить вариант')}</button>
         {saved?.error && <span className="err tiny">{saved.error}</span>}{saved?.ok && <span className="okc tiny">{T('Вариант сохранён')}</span>}
       </form>}
-      {variants.length > 0 && <div className="stack" style={{ gap: 8 }}>
+      {variants.length > 0 && <div className="stack" style={{ gap: 8 }} id="variants">
         <div className="label">{T('Сохранённые варианты')} · {variants.length}</div>
         <div className="vcalc__cmp">{variants.map((v) => { const c = cur(v); const changed = Math.abs(c.total - v.snapshot.total) > 1
           return <div key={v.id} className="card card--tight stack" style={{ gap: 4 }}>
@@ -143,11 +144,11 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
             {c.disc > 0 && <div className="kv small"><span>{T('Скидка из пула')}</span><span>{pct(lang, c.disc)}</span></div>}
             {changed && <span className="pill pill--warn">{T('Цена изменилась: было {a}', { a: usd(lang, v.snapshot.total) })}</span>}
             {c.approx && <span className="tiny muted">{T('ориентировочно')}</span>}
-            {v.needs_approval && <span className={'pill ' + (v.approved_at ? 'pill--ok' : 'pill--warn')}>{T(v.approved_at ? 'скидка согласована' : 'нужно согласование')}</span>}
+            {v.needs_approval && <span className={'pill ' + (v.approved_at ? 'pill--ok' : v.rejected_at ? 'pill--bad' : 'pill--warn')} style={{ alignSelf: 'flex-start' }}>{T(v.approved_at ? 'скидка согласована' : v.rejected_at ? 'скидка не согласована' : 'нужно согласование')}</span>}
             <div className="row noprint" style={{ gap: 4, marginTop: 4 }}>
               <button type="button" className="btn btn--sm" onClick={() => load(v)}>{T('Открыть')}</button>
               {bookable && unitId && (!v.needs_approval || v.approved_at) && <a className="btn btn--sm btn--p" href={`/units/${unitId}/book?variant=${v.id}${v.client_id ? '&client=' + v.client_id : ''}`}>{T('Запросить бронь')}</a>}
-              {canApprove && v.needs_approval && !v.approved_at && <form action={approveAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--p">{T('Согласовать')}</button></form>}
+              {canApprove && v.needs_approval && !v.approved_at && !v.rejected_at && <><form action={approveAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--p">{T('Согласовать')}</button></form><form action={rejectAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm">{T('Не согласовать')}</button></form></>}
               {/* QA 10.11: удалить может автор или владелец — руководителю рынка «×» не показываем (было: молча не срабатывало) */}
               {(v.mine || ownerView) && <form action={deleteAct}><input type="hidden" name="id" value={v.id} /><button className="btn btn--sm btn--ghost" title={T('Удалить')}>×</button></form>}
             </div>

@@ -89,7 +89,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
               <div className="tiny muted">{T('Бронь уйдёт на согласование руководителю рынка; офис подтвердит её после решения.')}</div>
               <div><button type="button" className="btn btn--sm btn--ghost" onClick={() => { setAsk(false); setAskPct('') }}>{T('Отменить запрос')}</button></div>
             </div>)}
-        {!ext && disc > capP && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, capP) })}</div>}
+        {!ext && disc > capP && !(variant && disc <= variant.disc + 1e-9) /* О29: согласованный вариант на согласование не уходит */ && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, capP) })}</div>}
         <div className="grid g2 mt16">
           <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, shown.final)}</div><div className="tiny muted">{(list < priceList ? T('цена с учётом акции и плана {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, shown.discount) }) : T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, shown.discount) }))}</div>{asking && <div className="tiny warnc">{T('скидка {p} — на согласовании', { p: pct(lang, askN) })}</div>}</div>
           {ext

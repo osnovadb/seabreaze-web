@@ -671,6 +671,10 @@ export async function bookingAction(f: FormData) {
     if (made.length) await partnerProgress(b.agent_id) // §13 п.20: Active
   }
   await q('select portal.sync_client_stage($1)', [b.client_id]) // стадия клиента — по фактам: брони и сделки
+  // О25 (обход 11.11): подтверждение брони и договор — в истории клиента
+  const HIST: Record<string, string> = { confirm: 'Бронь {u} подтверждена у застройщика', contract: 'Договор по {u} подписан' }
+  if (HIST[act]) await q(`insert into portal.activities (client_id, user_id, kind, text, vars)
+      select $1, $2, 'system', $3, jsonb_build_object('u', portal.unit_no(bl.external_id, un.number)) from units un join buildings bl on bl.id = un.building_id where un.id = $4`, [b.client_id, c.user.id, HIST[act], b.unit_id])
   await audit(c.real.id, 'booking.' + act, 'booking', id, null, c.impersonating ? c.user.id : null)
   const NOTE: Record<string, string> = { spa_approval: 'договор на согласовании (SPA approval)', confirm: 'бронь подтверждена у застройщика', reject: 'бронь отклонена', release_confirm: 'бронь снята у застройщика', release_hold: 'холд снят', cancel: 'бронь снята', contract: 'договор подписан (SPA signed)', extend: 'бронь продлена', approve: 'скидка согласована', decline: 'скидка не согласована' }
   if (NOTE[act]) await pushDeal(b.client_id, NOTE[act])
@@ -1136,6 +1140,7 @@ export async function dealPaid(f: FormData) {
   const d = await one<{ client_id: string }>('update portal.deals set paid_pct = $2 where id = $1 returning client_id', [s(f, 'id'), v])
   if (d) await q('select portal.sync_client_stage($1)', [d.client_id]) // первый платёж — стадия «Платежи»
   if (d) await buildTranches(s(f, 'id')) // §8: условие транша выполнено — ждём поступление от застройщика
+  if (d) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Оплата клиента по сделке: {p}%',$3)`, [d.client_id, c.user.id, { p: v }]) // О25
   if (d) await pushDeal(d.client_id, `оплата клиента по сделке: ${v}%`) // §13 п.13: Won, Installments, Aftercare
   await audit(c.real.id, 'deal.paid', 'deal', s(f, 'id'), { paid_pct: v }, c.impersonating ? c.user.id : null)
   revalidatePath('/finance')

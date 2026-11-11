@@ -13,6 +13,7 @@ export type CU = {
   plot_area: number | null; ext_area: number | null; is_corner: boolean | null; building_id: string; project_id: string; hidden: boolean
 }
 type Mode = 'price' | 'm2' | 'rooms' | 'area'
+const ROOM_TYPES = /^(studio|\d+br)$/
 const STATUS: [string, string][] = [['F', 'Свободно'], ['M', 'Ваша бронь'], ['O', 'Наша бронь'], ['D', 'Наша сделка'], ['B', 'Бронь застройщика'], ['S', 'Продано'], ['N', 'Не в продаже'], ['SB', 'Передана агентству (Sea Breeze)'], ['X', 'Недоступно']]
 
 export function ChessBoard({ units, lang, team, selected, hrefFor, views, layouts, clients, bulk, projectId, canPick, initial }: {
@@ -85,7 +86,8 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
           <button type="button" className={'chip' + (more ? ' on' : '')} aria-expanded={more} onClick={() => setMore(!more)}>{T('Ещё фильтры')}{extraN ? ` · ${extraN}` : ''} <i className="chev" style={{ transform: more ? 'rotate(180deg)' : 'none' }} aria-hidden="true">▾</i></button>
         </div>
         {more && <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
-          {Array.from(new Set(units.map((u) => u.type))).length > 1 && <div className="chips">{Array.from(new Map(units.map((u) => [u.type, u.typeName])).entries()).map(([ty, n]) => <button key={ty} type="button" className={'chip' + (has('t', ty) ? ' on' : '')} onClick={() => toggle('t', ty)}>{T(n)}</button>)}</div>}
+          {/* О39 (обход 11.11): студии и спальни уже в фильтре комнат — здесь только другие виды (вилла, дуплекс, паркинг, кладовая) */}
+          {Array.from(new Set(units.map((u) => u.type))).some((ty) => !ROOM_TYPES.test(ty)) && <div className="chips">{Array.from(new Map(units.filter((u) => !ROOM_TYPES.test(u.type)).map((u) => [u.type, u.typeName])).entries()).map(([ty, n]) => <button key={ty} type="button" className={'chip' + (has('t', ty) ? ' on' : '')} onClick={() => toggle('t', ty)}>{T(n)}</button>)}</div>}
           <label className="field" style={{ width: 110 }}><span>{T('Этаж')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="numeric" placeholder={T('от')} value={f.fmin || ''} onChange={(e) => set('fmin', e.target.value)} /><input className="in" inputMode="numeric" placeholder={T('до')} value={f.fmax || ''} onChange={(e) => set('fmax', e.target.value)} /></div></label>
           {views.length > 0 && <label className="field" style={{ width: 150 }}><span>{T('Вид из окон')}</span><select className="in" value={f.v || ''} onChange={(e) => set('v', e.target.value)}><option value="">{T('любой')}</option>{views.map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select></label>}
           {layouts.length > 1 && <label className="field" style={{ width: 130 }}><span>{T('Планировка')}</span><select className="in" value={f.l || ''} onChange={(e) => set('l', e.target.value)}><option value="">{T('любая')}</option>{layouts.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>}
@@ -130,7 +132,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
           <div className="hovercard" style={{ left: Math.min(hover.x + 8, (typeof window !== 'undefined' ? window.innerWidth : 1400) - 270), top: Math.max(8, Math.min(hover.y - 20, (typeof window !== 'undefined' ? window.innerHeight : 900) - 330)) }}>
             {hover.u.plan ? <img src={hover.u.plan} alt="" /> : <div className="tiny muted">{T('планировка не загружена')}</div>}
             <div className="between mt8"><b>{hover.u.no}</b><span className="tiny">{T(STATUS.find(([c]) => c === hover.u.code)?.[1] || '')}</span></div>
-            <div className="small">{hover.u.rooms ? T('{r} комн.', { r: hover.u.rooms }) + ' · ' : T(hover.u.typeName) + ' · '}{num(lang, hover.u.area, 1)} м²{hover.u.out ? ` + ${num(lang, hover.u.out, 1)}` : ''} · {T('{f} этаж', { f: hover.u.floor })}</div>
+            <div className="small">{hover.u.rooms ? T('{r} комн.', { r: hover.u.rooms }) + ' · ' : T(hover.u.typeName) + ' · '}{num(lang, hover.u.area, 1)} {m2u(lang)}{hover.u.out ? ` + ${num(lang, hover.u.out, 1)}` : ''} · {T('{f} этаж', { f: hover.u.floor })}</div>
             {hover.u.orient && <div className="tiny muted">{hover.u.orient}</div>}
             {(team || hover.u.code === 'F') && hover.u.usd ? <div className="mt8"><b>{usd(lang, hover.u.net ?? hover.u.usd)}</b>{hover.u.promo ? <> <s className="tiny muted">{usd(lang, hover.u.usd)}</s> <span className="tiny bronze">{hover.u.promo}</span></> : null}<div className="tiny muted">{usd(lang, (hover.u.net ?? hover.u.usd) / (hover.u.area + hover.u.out))}/{m2u(lang)}{hover.u.layout ? ' · ' + hover.u.layout : ''}</div></div> : null}
             {team && hover.u.hidden && <div className="tiny warnc">{T('скрыта от партнёров')}</div>}

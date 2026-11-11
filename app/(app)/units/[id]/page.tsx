@@ -1,4 +1,4 @@
-import { embedClient } from '@/lib/embed'
+import { embedClient, pickClient } from '@/lib/embed'
 import { cookies } from 'next/headers'
 import { variantsOf } from '@/lib/variants'
 import { activeGrid } from '@/lib/calc'
@@ -61,7 +61,7 @@ export default async function UnitPage(
   if (fp) imgs.splice(1, 0, ['floor', T('На этаже')])
   const cur = imgs.some(([k]) => k === searchParams.img) ? searchParams.img! : 'plan'
   const cs = clientScope(c.user)
-  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') and cl.anonymized_at is null order by (cl.id::text = '${(await embedClient()) || ''}') desc, last_activity_at desc limit 100`, cs.params)
+  const clients = await q<{ id: string; name: string }>(`select id, name from portal.clients cl where ${cs.sql} and stage not in ('handed') and cl.anonymized_at is null order by (cl.id::text = '${(await pickClient()) || ''}') desc, last_activity_at desc limit 100`, cs.params)
   const simOffers = await offersFor(u.project_id) // «Похожие свободные» — тоже с ценой по акции, как сверху
   const similar = (await unitsOfBuilding(u.building_id)).filter((x) => x.id !== u.id && x.rooms === u.rooms && codeFor(x, c.user, mode) === 'F').slice(0, 4)
   const hist = ext ? [] : await unitHistory(u.id, 12)
@@ -101,7 +101,7 @@ export default async function UnitPage(
           {cur === 'floor' ? <div className="small muted mt8">{myCell ? T('Квартира на плане этажа — нажмите, чтобы открыть этаж целиком.') : T('План этажа — квартира на нём ещё не размечена.')}</div> : cur !== 'plan' && <div className="small muted mt8">{T('Визуализация. Квартиры сдаются без ремонта.')}</div>}
         </div>
           {/* калькулятор вариантов — под планировкой, на всю ширину левой колонки (место для сравнения вариантов) */}
-          {calcProps && <VariantCalc key={u.id} lang={L} {...calcProps} />}
+          {calcProps && !['D', 'S'].includes(code) /* О35: у проданной квартиры калькулятора нет */ && <VariantCalc key={u.id} lang={L} {...calcProps} />}
         </div>
         <div className="stack">
           <div className="card">
@@ -121,13 +121,14 @@ export default async function UnitPage(
             </div>
             {searchParams.err && <div className="err mt16">{searchParams.err}</div>}
             {searchParams.held && <div className="okbox mt16">{T('Квартира придержана на 24 часа — за это время запросите бронь')}</div>}
-            {code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Запросить бронь')}</Link>}
-            {/* Л3 (ревью 10.11): один выбор клиента на страницу — и для «Придержать 24 ч», и для «В подборку» */}
+            {/* О61 (обход 11.11): сначала клиент, потом действия для него — бронь, холд, подборка */}
+            {code === 'F' && clients.length === 0 && canBook(c.user.role) && u.sales_status === 'sales' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Запросить бронь')}</Link>}
             {code === 'F' && clients.length > 0 && (
-              <form action={addToSelection} className="row mt8" style={{ flexWrap: 'wrap' }}><input type="hidden" name="unit" value={u.id} />
-                <select className="in" name="client" style={{ flex: '1 1 180px' }}>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-                {canBook(c.user.role) && u.sales_status === 'sales' && <button className="btn" formAction={holdUnit}>{T('Придержать 24 ч')}</button>}
-                <button className="btn">{T('В подборку')}</button></form>
+              <form action={addToSelection} className="stack mt16" style={{ gap: 8 }}><input type="hidden" name="unit" value={u.id} />
+                <label className="field"><span>{T('Клиент')}</span><select className="in" name="client">{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                {canBook(c.user.role) && u.sales_status === 'sales' && <button className="btn btn--p btn--lg btn--block" formAction={`/units/${u.id}/book`} formMethod="get">{T('Запросить бронь')}</button>}
+                <div className="row" style={{ gap: 8 }}>{canBook(c.user.role) && u.sales_status === 'sales' && <button className="btn" formAction={holdUnit}>{T('Придержать 24 ч')}</button>}
+                  <button className="btn">{T('В подборку')}</button></div></form>
             )}
             {code === 'M' && u.booking_status === 'hold' && <Link className="btn btn--p btn--lg btn--block mt16" href={`/units/${u.id}/book`}>{T('Ваш холд до {d} · запросить бронь', { d: date(L, u.booking_ends) })}</Link>}
             {u.sales_status === 'stop' && <div className="note mt16">{T('Проект на стоп-продажах — новые брони не принимаются')}</div>}

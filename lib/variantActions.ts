@@ -59,8 +59,13 @@ export async function saveVariant(_: unknown, f: FormData) {
   }
   // скидка выше порога — руководителю рынка автора (нет — владельцу) уходит запрос на согласование
   // QA 10.11: всем руководителям рынка автора и владельцам (было limit 2 — второй руководитель рынка не получал)
+  // О28: в уведомлении — квартира и клиент
+  const meta = r.needsApproval ? await one<{ u: string; cl: string | null }>(`select portal.unit_no(bl.external_id, un.number) u,
+      (select cl.name from portal.calc_variants v left join portal.clients cl on cl.id = v.client_id where v.unit_id = un.id and v.author_id = $2 and v.name = $3 order by v.created_at desc limit 1) cl
+    from units un join buildings bl on bl.id = un.building_id where un.id = $1`, [unitId, c.user.id, name]) : null
+  const uNo = meta?.u || '', clName = meta?.cl || '—'
   if (r.needsApproval) for (const h of await q<{ id: string }>(`select id from portal.users where active and ((role = 'market_head' and market = $1) or role = 'owner')`, [c.user.market || '']))
-    await notify(h.id, 'booking', askNote ? 'Вариант расчёта со скидкой {d}% ждёт согласования: {n} — «{c}»' : 'Вариант расчёта со скидкой {d}% ждёт согласования: {n}', `/units/${unitId}`, { d: r.disc, n: name, c: askNote })
+    await notify(h.id, 'booking', askNote ? 'Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl} — «{c}»' : 'Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl}', `/units/${unitId}#variants`, { u: uNo, cl: clName, d: r.disc, n: name, c: askNote })
   await audit(c.real.id, id ? 'variant.update' : 'variant.create', 'unit', unitId, { name, downPct: r.downPct, months: r.months, disc: r.disc, approval: r.needsApproval })
   revalidatePath(`/units/${unitId}`)
   return { ok: true }
@@ -74,12 +79,22 @@ export async function deleteVariant(f: FormData) {
 }
 
 // Скидка выше порога автора: согласует владелец или руководитель рынка; до согласования вариант клиенту не уходит (этап 3)
+// О28 (обход 11.11): руководитель рынка может и не согласовать — автору уведомление, вариант в бронь не уходит
+export async function rejectVariant(f: FormData) {
+  const c = await requireCtx()
+  if (c.impersonating || !['owner', 'market_head'].includes(c.user.role)) return
+  const v = await one<{ unit_id: string; author_id: string; name: string }>(`update portal.calc_variants set rejected_by = $2, rejected_at = now() where id = $1 and needs_approval and approved_at is null and rejected_at is null returning unit_id, author_id, name`, [s(f, 'id'), c.user.id])
+  if (!v) return
+  await audit(c.real.id, 'variant.reject', 'unit', v.unit_id, { id: s(f, 'id') })
+  await notify(v.author_id, 'booking', 'Скидка в варианте «{n}» не согласована — сохраните вариант с меньшей скидкой', `/units/${v.unit_id}#variants`, { n: v.name })
+  revalidatePath(`/units/${v.unit_id}`)
+}
 export async function approveVariant(f: FormData) {
   const c = await requireCtx()
   if (c.impersonating || !['owner', 'market_head'].includes(c.user.role)) return
-  const v = await one<{ unit_id: string; author_id: string; name: string }>(`update portal.calc_variants set approved_by = $2, approved_at = now() where id = $1 and needs_approval and approved_at is null returning unit_id, author_id, name`, [s(f, 'id'), c.user.id])
+  const v = await one<{ unit_id: string; author_id: string; name: string }>(`update portal.calc_variants set approved_by = $2, approved_at = now() where id = $1 and needs_approval and approved_at is null and rejected_at is null returning unit_id, author_id, name`, [s(f, 'id'), c.user.id])
   if (!v) return
   await audit(c.real.id, 'variant.approve', 'unit', v.unit_id, { id: s(f, 'id') })
-  await notify(v.author_id, 'booking', 'Скидка в варианте «{n}» согласована', `/units/${v.unit_id}`, { n: v.name })
+  await notify(v.author_id, 'booking', 'Скидка в варианте «{n}» согласована', `/units/${v.unit_id}#variants`, { n: v.name })
   revalidatePath(`/units/${v.unit_id}`)
 }

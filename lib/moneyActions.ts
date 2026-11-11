@@ -46,6 +46,9 @@ export async function trancheReceived(f: FormData) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(s(f, 'date')) ? s(f, 'date') : new Date().toISOString().slice(0, 10)
   const actual = amount > 0 ? { amount, currency, date, usd: Math.round((await toUsd(amount, currency)) * 100) / 100 } : null
   const r = await receiveTranche(s(f, 'id'), c.user.id, actual)
+  // О25 (обход 11.11): транш — в истории клиента
+  if (r) await q(`insert into portal.activities (client_id, user_id, kind, text, vars, internal) select d.client_id, $2, 'system', 'Транш от застройщика получен: {a}', jsonb_build_object('a', $3::text), true from portal.deals d where d.id = $1`,
+    [r.deal_id, c.user.id, actual ? `${actual.currency} ${actual.amount}` : `USD ${Math.round(r.amount)}`])
   if (r) await audit(c.real.id, 'tranche.received', 'tranche', s(f, 'id'), { deal: r.deal_id, amount: r.amount, actual })
   done()
 }

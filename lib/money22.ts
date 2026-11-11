@@ -165,12 +165,9 @@ export async function clawbackDeal(dealId: string, by: string | null, reason = '
     await t.query(`update portal.deals set stage = 'cancelled', terminated_at = coalesce(terminated_at, now()), termination_date = coalesce($2::date, termination_date, current_date),
       termination_reason = coalesce($3, termination_reason), client_refunded = coalesce($4, client_refunded) where id = $1`, [dealId, o.date || null, reason, o.refunded ?? null])
     await t.query(`update portal.tranches set status = 'cancelled' where deal_id = $1 and status in ('scheduled','expected')`, [dealId])
-    // О5 (обход 11.11): бронь по сделке закрыта; клиент без других живых сделок и броней уходит из «Платежей» в отказ с причиной «расторжение»
+    // О5 (обход 11.11): бронь по сделке закрыта; стадия клиента — по фактам (portal.sync_client_stage: без брони и сделки — назад к «Показу»)
     await t.query(`update portal.bookings set status = 'cancelled' where id = (select booking_id from portal.deals where id = $1) and status = 'converted'`, [dealId])
-    await t.query(`update portal.clients c set stage = 'lost', lost_reason = 'расторжение', pause_until = null, last_activity_at = now() where c.id = $1
-        and c.stage in ('contract','payments','fee','support','handed','booking','kyc')
-        and not exists (select 1 from portal.deals x where x.client_id = c.id and x.id <> $2 and x.stage <> 'cancelled')
-        and not exists (select 1 from portal.bookings b where b.client_id = c.id and b.status in ('hold','queued','requested','confirmed','release_pending'))`, [d.client_id, dealId])
+    await t.query('select portal.sync_client_stage($1)', [d.client_id])
     await t.query(`update portal.accruals set status = 'void', note = coalesce(note, '') || ' ' || $2 where deal_id = $1 and status = 'open' and kind = 'share'`, [dealId, reason])
     if (!inWindow) return { claw: [] as { role: string; user_id: string; amount: number }[] }
     const got = (await t.query(`select role, user_id, sum(amount)::float s from portal.accruals where deal_id = $1 and status in ('in_register','paid') and role in ('partner','seller') and kind in ('share','adjustment') group by role, user_id`, [dealId])).rows

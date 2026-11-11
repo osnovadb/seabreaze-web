@@ -56,7 +56,7 @@ export default async function Units(
         from portal.bookings b join units u on u.id = b.unit_id join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id where b.client_id = $1 and b.status in ('hold','queued','requested','confirmed','release_pending','converted')`, [cl.id, c.user.id]))
   const regs = await one<{ ok: number; all: number }>(`select count(*) filter (where status in ('confirmed','confirmed_silence'))::int ok, count(*)::int "all" from portal.registrations where client_id = $1`, [cl.id])
   const tab = searchParams.tab || (units.length ? 'units' : 'pick')
-  const ps = tab === 'pick' ? await listProjects(c.user) : []
+  const ps = tab === 'pick' ? (await listProjects(c.user)).filter((x) => x.sales_status !== 'draft') /* О37: черновики в подбор не попадают */ : []
   const blds = tab === 'pick' ? await Promise.all(ps.map(async (p) => ({ p, bs: await buildingsOf(p.id, c.user) }))) : []
   const active = units.filter((u) => u.status)
   // этап 4 калькулятора: вкладка «Расчёт» — варианты по квартирам клиента, сохраняются сразу на этого клиента
@@ -89,7 +89,7 @@ export default async function Units(
               <td><Link href={`/units/${u.unit_id}`}><b>{u.no}</b></Link></td>
               <td className="small">{u.project}</td>
               <td>{u.liked ? <Pill kind="ok">♥ {T('нравится')}</Pill> : u.in_sel ? <span className="small muted">{T('в подборке')}</span> : ''}</td>
-              <td>{u.status ? <><Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && u.status !== 'converted' && <div className="tiny muted">{T('до {d}', { d: date(L, u.ends_at) })}</div>}</> : <span className="small muted">—</span>}</td>
+              <td>{u.status ? <><Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && !['converted', 'requested', 'queued'].includes(u.status!) /* О38: срок — после подтверждения, как в «Бронях» */ && <div className="tiny muted">{T('до {d}', { d: date(L, u.ends_at) })}</div>}</> : <span className="small muted">—</span>}</td>
               <td className="num">{usd(L, u.final ?? u.usd ?? 0)}</td>
               <td className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                 {(!u.status || (u.status === 'hold' && u.mine)) && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Условия покупки →')}</Link>}
@@ -113,7 +113,7 @@ export default async function Units(
             const office = canConfirmBooking(c.user.role)
             return <div key={u.unit_id} className="card stack" style={{ gap: 10 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span><b>{u.no}</b> · {u.project} · <Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && u.status !== 'converted' && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}
+                <span><b>{u.no}</b> · {u.project} · <Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && !['converted', 'requested', 'queued'].includes(u.status!) /* О38: срок — после подтверждения, как в «Бронях» */ && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}
                   {u.dev_no && <span className="small muted"> · {T('№ брони застройщика')} {u.dev_no}</span>}
                   {u.approval === 'pending' && <span className="small warnc"> · {T('скидка {p}% ждёт согласования', { p: u.disc || 0 })}</span>}</span>
                 <span className="row" style={{ gap: 8 }}><b>{usd(L, u.final ?? 0)}</b>{u.status === 'hold' && u.mine && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Запросить бронь')}</Link>}</span>

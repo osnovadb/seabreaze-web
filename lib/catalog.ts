@@ -62,7 +62,9 @@ export async function listProjects(viewer?: User | null): Promise<Project[]> {
       (select count(*)::int from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null
          and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
          and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''}) as free,
-      (select min(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null${f ? HIDDEN : ''}) as min_usd,
+      (select min(${toUsdSql})::float from units u where u.project_id = p.id and u.status = 'available' and u.price_list is not null
+         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
+         and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''}) as min_usd, -- О36: «от» — по тем же квартирам, что «свободно»
       (select count(*)::int from buildings b where b.project_id = p.id) as buildings,
       (select coalesce(array_agg(b.delivery order by b.sort, b.name) filter (where b.delivery is not null), '{}') from buildings b where b.project_id = p.id) as block_deliveries
     from projects p join developers d on d.id = p.developer_id ${f ? 'where ' + visibleSql('p') : ''} order by p.sort, p.name`, f ? [viewer!.id, viewer!.agency_id, viewer!.market] : [])
@@ -77,7 +79,9 @@ export async function buildingsOf(projectId: string, viewer?: User | null): Prom
       count(*) filter (where u.status = 'available' and u.price_list is not null
         and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
         and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''})::int as free,
-      min(${toUsdSql}) filter (where u.status = 'available' and u.price_list is not null)::float as min_usd
+      min(${toUsdSql}) filter (where u.status = 'available' and u.price_list is not null
+        and not exists (select 1 from portal.bookings x where x.unit_id = u.id and x.status in ('hold','queued','requested','confirmed','release_pending'))
+        and not exists (select 1 from portal.deals dd where dd.unit_id = u.id and dd.stage <> 'cancelled')${f ? HIDDEN : ''})::float as min_usd
     from buildings b left join units u on u.building_id = b.id where b.project_id = $1 group by b.id order by b.sort, b.name`, [projectId])
 }
 

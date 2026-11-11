@@ -53,6 +53,13 @@ export default async function Home() {
     if (days <= 3) attention.push({ kind: 'bad', title: T('Бронь {u} истекает через {d} дн.', { u: b.unit, d: days }), sub: b.client, href: '/bookings' })
     if (b.status === 'requested' && canConfirmBooking(u.role)) attention.push({ kind: 'warn', title: T('Бронь {u} ждёт подтверждения у застройщика', { u: b.unit }), sub: b.client, href: '/bookings' })
   }
+  // О28 (обход 11.11): варианты расчёта со скидкой сверх порога — в «Требует внимания» у руководителя рынка и владельца
+  if (['owner', 'market_head'].includes(u.role)) {
+    const pv = await q<{ unit_id: string; name: string; u: string; author: string }>(`select v.unit_id, v.name, portal.unit_no(bl.external_id, un.number) u, a.name author from portal.calc_variants v
+        join portal.users a on a.id = v.author_id join units un on un.id = v.unit_id join buildings bl on bl.id = un.building_id
+      where v.needs_approval and v.approved_at is null and v.rejected_at is null and ($1 = 'owner' or a.market = $2) order by v.created_at limit 20`, [u.role, u.market || ''])
+    for (const v of pv) attention.push({ kind: 'warn', title: T('Вариант со скидкой ждёт согласования: {u} · {n}', { u: v.u, n: v.name }), sub: v.author, href: `/units/${v.unit_id}#variants` })
+  }
   for (const cl of active) {
     const idle = Math.floor((now - new Date(cl.last_activity_at).getTime()) / 86400000)
     if (idle >= 30) attention.push({ kind: 'warn', title: T('Нет активности {d} дн.', { d: idle }), sub: cl.name, href: `/clients/${cl.id}` })

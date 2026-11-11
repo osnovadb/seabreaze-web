@@ -18,7 +18,7 @@ export async function calcViewProps(u: Unit, c: Ctx, o: { clients: { id: string;
   const self: 'agent' | 'ours' | 'seller' | null = ext ? (role === 'agency_head' || !c.user.agency_id ? 'agent' : null) : ['owner', 'market_head'].includes(role) ? 'ours' : role === 'seller' ? 'seller' : null
   // во вкладке клиента — только его варианты; на карточке квартиры и в шахматке — все свои (руководителю — все)
   const variants = vs.filter((v) => !o.clientId || v.client_id === o.clientId).map((v) => ({ id: v.id, name: v.name, author: v.author, client: v.client, client_id: v.client_id, mine: v.author_id === c.user.id,
-    needs_approval: v.needs_approval, approved_at: v.approved_at, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
+    needs_approval: v.needs_approval, approved_at: v.approved_at, rejected_at: v.rejected_at || null, created_at: v.created_at, params: v.params, snapshot: v.snapshot }))
   return {
     list: u.usd, plans, grid: activeGrid(gridAll, new Date().toISOString().slice(0, 10), u.building_id), fx, promo: pr.promo, mode: pr.mode, options: opts,
     cond: cond ? { fix_pct: cond.fix_pct, pool_pct: cond.pool_pct, agent_fix_pct: cond.agent_fix_pct, agent_pool_pct: cond.agent_pool_pct, agent_our_pool_share: cond.agent_our_pool_share, seller_share_pct: cond.seller_share_pct, fix_base: cond.fix_base || 'final' } : null,
