@@ -82,7 +82,7 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
           <div className="chips">{[1, 2, 3, 4].map((r) => <button key={r} type="button" className={'chip' + (has('r', String(r)) ? ' on' : '')} onClick={() => toggle('r', String(r))}>{r === 4 ? '4+' : r}{T('к')}</button>)}</div>
           <label className="field" style={{ width: 150 }}><span>{T('Цена, тыс. $')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="numeric" placeholder={T('от')} value={f.pmin || ''} onChange={(e) => set('pmin', e.target.value)} /><input className="in" inputMode="numeric" placeholder={T('до')} value={f.pmax || ''} onChange={(e) => set('pmax', e.target.value)} /></div></label>
           <label className="field" style={{ width: 130 }}><span>{T('Площадь, м²')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="decimal" placeholder={T('от')} value={f.amin || ''} onChange={(e) => set('amin', e.target.value)} /><input className="in" inputMode="decimal" placeholder={T('до')} value={f.amax || ''} onChange={(e) => set('amax', e.target.value)} /></div></label>
-          <button type="button" className={'chip' + (more ? ' on' : '')} aria-expanded={more} onClick={() => setMore(!more)}>{T('Ещё фильтры')}{extraN ? ` · ${extraN}` : ''} {more ? '▴' : '▾'}</button>
+          <button type="button" className={'chip' + (more ? ' on' : '')} aria-expanded={more} onClick={() => setMore(!more)}>{T('Ещё фильтры')}{extraN ? ` · ${extraN}` : ''} <i className="chev" style={{ transform: more ? 'rotate(180deg)' : 'none' }} aria-hidden="true">▾</i></button>
         </div>
         {more && <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
           {Array.from(new Set(units.map((u) => u.type))).length > 1 && <div className="chips">{Array.from(new Map(units.map((u) => [u.type, u.typeName])).entries()).map(([ty, n]) => <button key={ty} type="button" className={'chip' + (has('t', ty) ? ' on' : '')} onClick={() => toggle('t', ty)}>{T(n)}</button>)}</div>}
@@ -144,10 +144,10 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
           {picked.length > 0 && <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn btn--sm" onClick={() => setPicked(shown.map((u) => u.id))}>{T('Все свободные по фильтру')}</button>
             {clients.length > 0 && <form action={async (fd) => { await bulk!.toSelection(fd); setPicked([]); router.refresh() }} className="row" style={{ gap: 6 }}><Hidden />
-              <select className="in" name="client" required defaultValue="" style={{ width: 190 }}><option value="" disabled>{T('Клиент')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <select className="in" name="client" required defaultValue="" style={{ width: 'auto', minWidth: 190 }}><option value="" disabled>{T('Клиент')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
               <button className="btn btn--sm btn--p">{T('В подборку')}</button></form>}
             {bulk?.status && <form action={async (fd) => { await bulk.status!(fd); setPicked([]); router.refresh() }} className="row" style={{ gap: 6 }}><Hidden />
-              <select className="in" name="status" defaultValue="available" style={{ width: 160 }}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([s, l]) => <option key={s} value={s}>{T(l)}</option>)}</select>
+              <select className="in" name="status" defaultValue="available" style={{ width: 'auto', minWidth: 160 }}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([s, l]) => <option key={s} value={s}>{T(l)}</option>)}</select>
               <button className="btn btn--sm">{T('Сменить статус')}</button></form>}
             {bulk?.hide && <form action={async (fd) => { await bulk.hide!(fd); setPicked([]); router.refresh() }} className="row" style={{ gap: 6 }}><Hidden />
               <button className="btn btn--sm" name="hidden" value="1">{T('Скрыть от партнёров')}</button><button className="btn btn--sm" name="hidden" value="0">{T('Открыть партнёрам')}</button></form>}

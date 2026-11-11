@@ -27,7 +27,7 @@ export function ScheduleTable({ plan, price, lang, fx, start, expanded, onExpand
   const hidden = rows.length > SHOW + 2 && !expanded ? rows.length - SHOW - 1 : 0
   return (
     <div className="tbl-wrap mt8">
-      <table className="tbl sched">
+      <table className="tbl tbl--keep sched">
         <thead><tr><th>{T('Платёж')}</th><th>{T('Дата')}</th><th style={{ textAlign: 'end' }}>USD</th>{fx && <th style={{ textAlign: 'end' }}>≈ {fx.cur}</th>}</tr></thead>
         <tbody>
           {rows.map((r, i) => {

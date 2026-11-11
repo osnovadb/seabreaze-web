@@ -108,7 +108,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
                 {/* QA 09.11: отметка необратима и запускает начисления — второй шаг с суммой на глазах */}
                 <form action={trancheReceived} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="id" value={x.id} /><div className="tiny muted">{T('{a} от {d} пришли на счёт? Начисления по долям создадутся сразу, отменить нельзя.', { a: usd(L, x.amount), d: x.dev })}</div><div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{/* 285: фактические сумма, валюта и дата */}
                   <input className="in in--sm" name="amount" inputMode="decimal" defaultValue={Math.round(x.amount * 100) / 100} title={T('Сумма по факту')} style={{ width: 120 }} />
-                  <select className="in in--sm" name="currency" defaultValue="USD" style={{ width: 90 }}>{['USD', 'EUR', 'AZN', 'ILS'].map((cu) => <option key={cu}>{cu}</option>)}</select>
+                  <select className="in in--sm" name="currency" defaultValue="USD" style={{ width: 'auto', minWidth: 90 }}>{['USD', 'EUR', 'AZN', 'ILS'].map((cu) => <option key={cu}>{cu}</option>)}</select>
                   <input className="in in--sm" type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} title={T('Дата поступления')} /></div>
                   <button className="btn btn--sm">{T('Да, деньги на счёте')}</button></form></details>}</td></tr>))}</tbody></table></div>}
         {tab === 'register' && fin && <EntChips />}

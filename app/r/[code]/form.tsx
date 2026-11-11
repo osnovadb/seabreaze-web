@@ -17,7 +17,7 @@ export function LinkLeadForm({ lang, code, projects, project, brand }: { lang: L
     <form action={act} className="stack" style={{ gap: 10 }}>
       {st?.error && <div className="err">{T(st.error)}</div>}
       <input type="hidden" name="code" value={code} /><input type="hidden" name="lang" value={lang} />
-      <input name="website" tabIndex={-1} autoComplete="off" style={{ position: 'absolute', left: -9999 }} aria-hidden="true" />
+      <input name="website" tabIndex={-1} autoComplete="off" className="hp" aria-hidden="true" />
       <label className="field"><span>{T('Имя и фамилия')} *</span><input className="in" name="name" required autoComplete="name" /></label>
       <div className="grid g2">
         <label className="field"><span>{T('Телефон')}</span><input className="in" name="phone" type="tel" autoComplete="tel" /></label>

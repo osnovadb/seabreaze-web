@@ -22,7 +22,7 @@ import { needUuid } from '@/lib/ids'
 import { dealSchedules } from '@/lib/clientPayments'
 
 const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
-const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'отменена' }
+const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'расторгнута' } // О5: как в «Финансах»
 
 export default async function ClientCard(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -142,7 +142,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                 <input type="hidden" name="client" value={cl.id} />
                 <textarea className="in" name="text" placeholder={T('Звонок, сообщение или заметка…')} />
                 <div className="row">
-                  <select className="in" name="kind" style={{ width: 160 }}>{[['note', 'Заметка'], ['call', 'Звонок'], ['message', 'Сообщение'], ['meeting', 'Встреча'], ['email', 'Письмо']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+                  <select className="in" name="kind" style={{ width: 'auto', minWidth: 160 }}>{[['note', 'Заметка'], ['call', 'Звонок'], ['message', 'Сообщение'], ['meeting', 'Встреча'], ['email', 'Письмо']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
                   {!ext && <label className="check small"><input type="checkbox" name="internal" /> {T('Внутренний (агенту не видно)')}</label>}
                   <button className="btn btn--p" style={{ marginInlineStart: 'auto' }}>{T('Добавить')}</button>
                 </div>
@@ -169,7 +169,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               {books.map((b) => <Link key={b.id} href="/bookings" className="kv"><span style={{ color: 'var(--ink)' }}>{b.unit} · {usd(L, b.final_price)}{b.options_usd > 0 ? ' + ' + usd(L, b.options_usd) : ''}{b.group_id ? <span className="tiny bronze"> · {T('пакет {n}', { n: pkgNo(b.group_id, books) })}</span> : null}</span><span className="small">{T(b.status === 'confirmed' ? 'подтверждена' : b.status === 'requested' ? 'ждёт подтверждения' : b.status === 'converted' ? 'договор' : b.status === 'cancelled' ? 'снята' : 'истекла')}{['requested', 'confirmed'].includes(b.status) ? ' · ' + T('до {d}', { d: date(L, b.ends_at) }) : ''}</span></Link>)}
             </div>
             {deals.length > 0 && <div className="card">
-              <div className="h3">{T('Сделки')} · {deals.filter((d) => d.stage !== 'cancelled').length}</div>
+              <div className="h3">{T('Сделки')} · {deals.length}</div>
               {deals.map((d) => <Link key={d.id} href={`/units/${d.unit_id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{d.unit} · {usd(L, d.final_price)}{d.group_id ? <span className="tiny bronze"> · {T('пакет {n}', { n: pkgNo(d.group_id, deals) })}</span> : null}<div className="tiny muted">{date(L, d.created_at)}{d.amount ? ' · ' + (ext ? T('ваш доход') : T('наш доход')) + ' ' + usd(L, d.amount) : ''}</div></span>
                 <span className={'small' + (d.stage === 'cancelled' ? ' muted' : '')}>{T(DEAL_ST[d.stage] || d.stage)}{d.paid_pct && d.stage === 'contract' ? ' · ' + T('оплачено {p}%', { p: Math.round(d.paid_pct) }) : ''}</span></Link>)}
             </div>}

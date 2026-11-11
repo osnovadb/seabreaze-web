@@ -10,10 +10,10 @@ export function DeliveryPicker({ lang, value, label, compact, hint }: { lang: La
   const q = d?.done ? 'done' : d?.q ? String(d.q) : ''
   const sel = (
     <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-      <select key={`delivery_q:${String(q)}`} className="in" name="delivery_q" defaultValue={q} aria-label={T('Квартал')} style={{ minWidth: 0 }}>
+      <select key={`delivery_q:${String(q)}`} className="in" name="delivery_q" defaultValue={q} aria-label={T('Квартал')}>
         <option value="">{T('квартал')}</option>{['1', '2', '3', '4'].map((x) => <option key={x} value={x}>{['I', 'II', 'III', 'IV'][Number(x) - 1]} {T('кв.')}</option>)}<option value="done">{T('сдан')}</option>
       </select>
-      <select key={`delivery_y:${String(d?.year ? String(d.year) : '')}`} className="in" name="delivery_y" defaultValue={d?.year ? String(d.year) : ''} aria-label={T('Год')} style={{ minWidth: 0 }}>
+      <select key={`delivery_y:${String(d?.year ? String(d.year) : '')}`} className="in" name="delivery_y" defaultValue={d?.year ? String(d.year) : ''} aria-label={T('Год')}>
         <option value="">{T('год')}</option>{years.map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
       <input type="hidden" name="delivery_raw" value={value || ''} />

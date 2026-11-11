@@ -56,7 +56,7 @@ export function CondForm({ lang, projectId, cur, canEdit, example }: { lang: Lan
           <label className="field"><span>{T('Курс пересчёта')}</span><input className="in" name="fx_rule" defaultValue={cur.fx_rule || ''} placeholder={T('ЦБА на дату платежа')} disabled={!canEdit} /></label>
           <label className="field"><span>{T('Ждём поступление, р. дней')}</span><input className="in" name="payment_wait_days" defaultValue={cur.payment_wait_days ?? 10} disabled={!canEdit} /></label>
           <label className="field"><span>{T('Окно клаубэка, мес.')}</span><input className="in" name="clawback_months" defaultValue={cur.clawback_months ?? 3} disabled={!canEdit} /></label>
-          <label className="field"><span>{T('Зачёт клаубэка')}</span><select key={`clawback_offset:${String(cur.clawback_offset || 'any')}`} className="in" name="clawback_offset" defaultValue={cur.clawback_offset || 'any'} disabled={!canEdit}><option value="any">{T('против любых следующих выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
+          <label className="field"><span>{T('Зачёт клаубэка')}</span><select key={`clawback_offset:${String(cur.clawback_offset || 'any')}`} className="in" name="clawback_offset" defaultValue={cur.clawback_offset || 'any'} disabled={!canEdit}><option value="any">{T('из любых выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
         </div>
         <div className="stack mt8" style={{ gap: 6 }}>
           <label className="row small" style={{ gap: 8 }}><input type="checkbox" name="options_in_base" defaultChecked={!!cur.options_in_base} disabled={!canEdit} /> {T('Опции входят в базу комиссии')}</label>

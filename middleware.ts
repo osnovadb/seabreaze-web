@@ -11,8 +11,9 @@ export function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname
   if (PUBLIC.some((x) => p.startsWith(x))) {
     // QA 10.11 (WCAG, р. 273): у страницы подборки <html lang> — язык подборки; макету нужен путь
-    if (!p.startsWith('/s/')) return NextResponse.next()
-    const h = new Headers(req.headers); h.set('x-path', p)
+    // О4 (обход 11.11): язык и направление публичных страниц (/c/, /r/, /legal, /apply) — по самой странице, не по cookie
+    if (!['/s/', '/c/', '/r/', '/legal', '/apply'].some((x) => p.startsWith(x))) return NextResponse.next()
+    const h = new Headers(req.headers); h.set('x-path', p); h.set('x-lang', req.nextUrl.searchParams.get('lang') || '')
     return NextResponse.next({ request: { headers: h } })
   }
   // Bitrix24: обработчик приложения и установки принимают POST без нашей cookie — сотрудника проверяем через user.current

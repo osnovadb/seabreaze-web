@@ -55,7 +55,7 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
           <input type="hidden" name="id" value={u.id} />
           <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
             <input className="in" name="price" inputMode="decimal" defaultValue={u.price ?? ''} placeholder={T('Цена')} />
-            <select key={`currency:${String(u.currency)}`} className="in" name="currency" defaultValue={u.currency} style={{ width: 80 }}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select>
+            <select key={`currency:${String(u.currency)}`} className="in" name="currency" defaultValue={u.currency} style={{ width: 'auto', minWidth: 80 }}>{['USD', 'AZN', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select>
           </div>
           <select key={`status:${String(u.status)}`} className="in" name="status" defaultValue={u.status}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
           <div><button className="btn btn--sm">{T('Сохранить')}</button></div>

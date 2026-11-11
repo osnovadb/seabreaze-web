@@ -37,7 +37,7 @@ export default async function Agents() {
               <td>{a.market}</td><td className="small">{a.license || '—'}</td><td className="small">{a.volume}<div className="tiny muted">{a.channels}</div></td>
               <td className="small muted">{date(L, a.created_at)}</td><td><Pill kind={st[a.status][1]}>{T(st[a.status][0])}</Pill></td>
               <td><form action={reviewApplication} className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input type="hidden" name="id" value={a.id} />
-                <select key={`status:${String(a.status)}`} className="in" name="status" defaultValue={a.status} style={{ height: 30, width: 140 }}>{Object.entries(st).map(([k, [l]]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+                <select key={`status:${String(a.status)}`} className="in" name="status" defaultValue={a.status} style={{ height: 30, width: 'auto', minWidth: 140 }}>{Object.entries(st).map(([k, [l]]) => <option key={k} value={k}>{T(l)}</option>)}</select>
                 <input className="in" name="note" placeholder={T('комментарий')} defaultValue={a.note || ''} style={{ height: 30, width: 150 }} /><button className="btn btn--sm">OK</button></form>
                 {canAccess && !a.user_id && ['contract', 'approved'].includes(a.status) && <div className="mt8"><CreateAccess lang={L} id={a.id} curators={curators} /></div>}
                 {a.user_id && <div className="tiny okc mt8">{T('Доступ создан')} · <Link href={`/admin/users/${a.user_id}`}>{T('Открыть')}</Link></div>}</td>

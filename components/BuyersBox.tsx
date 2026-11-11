@@ -9,7 +9,7 @@ export function BuyersBox({ lang, clientId, buyers, docs, locked, kycToken }: { 
   const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '')
   const Upload = ({ buyer, kinds }: { buyer: string; kinds: string[] }) => (
     <form action={uploadBuyerDocPlain} className="row" style={{ gap: 4, flexWrap: 'wrap' }}><input type="hidden" name="client" value={clientId} /><input type="hidden" name="buyer" value={buyer} />
-      <select className="in" name="kind" style={{ height: 30, width: 150 }}>{kinds.map((k) => <option key={k} value={k}>{T(KYC_DOC_NAMES[k])}</option>)}</select>
+      <select className="in" name="kind" style={{ height: 30, width: 'auto', minWidth: 150 }}>{kinds.map((k) => <option key={k} value={k}>{T(KYC_DOC_NAMES[k])}</option>)}</select>
       <input className="in" type="file" name="file" style={{ height: 30, paddingTop: 3, width: 170 }} /><button className="btn btn--sm">{T('Загрузить')}</button></form>
   )
   return (

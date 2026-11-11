@@ -243,7 +243,7 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .show__top { display: flex; align-items: center; gap: 16px; padding: 14px 28px; background: var(--paper); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
 
 @media (max-width: 1100px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; align-content: start; } /* О2: шапка не растягивается на коротких страницах */
   /* Узкий экран: шапка вместо боковой панели; меню — одна строка с горизонтальной прокруткой, низ панели — в строку с переносом */
   .side { position: static; height: auto; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; }
   .side__role { margin: 0; }
@@ -295,7 +295,7 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .compass { position: absolute; right: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .9); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--deep); }
 /* v2 · М7: график платежей — середина длинной рассрочки свёрнута на экране, в печати видна целиком */
 .sched td { padding: 7px 12px; }
-.sched .sched-more { display: none; }
+.sched .sched-more { display: none !important; } /* О1: и в карточках на телефоне */
 @media print { .sched .sched-more { display: table-row !important; } }
 
 /* Окружение на планах: метки (море, бассейн, дорога) и стороны условной схемы этажа */
@@ -449,6 +449,9 @@ summary.btn::-webkit-details-marker { display: none; }
 /* В10 (ревью 10.11): поля в строке и в сетке сжимаются, а не наезжают друг на друга (контакты клиента, подключение источника, сопоставление статусов) */
 .row > .field, .row > .in, .grid > *, .field > .in { min-width: 0; }
 .row > .field > select.in { min-width: 0; width: 100%; }
+/* О50 (обход 11.11): поле со списком не уже 6,5rem — строка переносится, а не обрезает текст у стрелки («HE» → «.E») */
+.row > .field:has(> select.in) { min-width: 6.5rem; }
+select.in { padding-inline-end: 36px; }
 /* В8 (ревью 10.11): генплан на телефоне — на картинке только название корпуса (цифры — в списке корпусов ниже), подпись не шире 40 % картинки */
 @media (max-width: 640px) {
   .gp .tag { padding: 3px 7px; white-space: normal; max-width: 40%; text-align: center; line-height: 1.2; }
@@ -457,3 +460,7 @@ summary.btn::-webkit-details-marker { display: none; }
 }
 /* В8: на телефоне выпадающий список в строке с кнопкой — на всю ширину (имя клиента не обрезается), кнопка — под ним */
 @media (max-width: 640px) { .row > select.in { flex: 1 1 100% !important; } }
+
+/* О3: поле-ловушка для ботов — скрыто без смещения влево (left: -9999px давал прокрутку вбок на иврите) */
+.hp { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none; }
+.chev { display: inline-block; font-style: normal; transition: transform .15s; } /* О50: стрелка «Ещё фильтры» переворачивается */

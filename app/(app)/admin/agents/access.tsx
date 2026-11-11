@@ -22,7 +22,7 @@ export function CreateAccess({ lang, id, curators, stacked }: { lang: Lang; id: 
   return (
     <form action={act} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
       <input type="hidden" name="id" value={id} />
-      <select className="in" name="curator" required defaultValue="" style={{ height: 30, width: 150 }}><option value="" disabled>{T('Куратор')}</option>{curators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select className="in" name="curator" required defaultValue="" style={{ height: 30, width: 'auto', minWidth: 150 }}><option value="" disabled>{T('Куратор')}</option>{curators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
       <input className="in" type="date" name="contract" title={T('Договор подписан')} style={{ height: 30, width: 140 }} />
       <button className="btn btn--sm btn--p">{T('Создать доступ')}</button>
       {st && 'error' in st && st.error && <span className="err tiny">{T(st.error)}</span>}

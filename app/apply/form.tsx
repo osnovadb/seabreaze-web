@@ -31,7 +31,7 @@ export function ApplyForm({ lang, market, ft }: { lang: Lang; market: string; ft
       <input type="hidden" name="lang" value={lang} />
       {/* 358: защита от ботов — метка времени показа формы и поле-ловушка (людям не видно) */}
       <input type="hidden" name="ft" value={ft} />
-      <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hp" />
       <div className="grid g2">
         {F('name', 'Имя и фамилия', '', true)}{!ref && F('company', kind === 'agency' ? 'Название агентства' : 'Компания')}
         {F('email', 'E-mail', '', true)}{F('phone', 'Телефон')}

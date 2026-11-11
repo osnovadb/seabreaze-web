@@ -44,7 +44,7 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
         <div className="mt8">{C('options_in_base', 'Опции входят в базу комиссии (257)')}</div>
         <div className="label mt16">{T('Клаубэк и продажи')}</div>
         <div className="grid g3 mt8">{N('clawback_months', 'Окно клаубэка', 'мес.')}
-          <label className="field"><span>{T('Зачёт')}</span><select key={`clawback_offset:${String(cur.clawback_offset)}`} className="in" name="clawback_offset" defaultValue={cur.clawback_offset} disabled={!canEdit}><option value="any">{T('против любых следующих выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
+          <label className="field"><span>{T('Зачёт')}</span><select key={`clawback_offset:${String(cur.clawback_offset)}`} className="in" name="clawback_offset" defaultValue={cur.clawback_offset} disabled={!canEdit}><option value="any">{T('из любых выплат')}</option><option value="same_client">{T('только по тому же клиенту')}</option></select></label>
           <div className="stack" style={{ gap: 6, alignSelf: 'center' }}>{C('sells_to_az', 'Можно продавать клиентам из АЗ')}{C('active', 'Работаем с застройщиком')}</div>
         </div>
         <label className="field mt16"><span>{T('Заметка по договору')}</span><input className="in" name="note" defaultValue={cur.note || ''} disabled={!canEdit} /></label>

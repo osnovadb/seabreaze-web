@@ -2765,5 +2765,6 @@
 "Взнос {d} % · до {m} мес.": "Down payment {d}% · up to {m} months",
 "Взнос {d} %": "Down payment {d}%",
 "Ваши брони и холды.": "Your reservations and holds.",
-"Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Active reservations across all projects. The developer limit is shared across all of their projects; 24-hour holds do not count towards it."
+"Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Active reservations across all projects. The developer limit is shared across all of their projects; 24-hour holds do not count towards it.",
+"из любых выплат": "from any payments"
 }

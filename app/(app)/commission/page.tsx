@@ -48,7 +48,7 @@ export default async function Commission() {
   const trL = (x: { status: string; acc: string | null; reg_month: string | null; expected_at: string | null }): [string, 'ok' | 'warn' | 'ink' | 'off'] =>
     x.acc === 'paid' ? [T('выплачено'), 'ink'] : x.acc === 'in_register' ? [T('в реестре выплат за {m}', { m: (x.reg_month || '').slice(0, 7) }), 'ok'] : x.status === 'received' ? (gaps.missing.length ? [T('получено — ждём ваши данные для выплаты'), 'warn'] : [T('получено — войдёт в ближайший реестр'), 'ok'])
       : x.status === 'expected' ? [T('ожидаем от застройщика') + (x.expected_at ? ' · ' + date(L, x.expected_at) : ''), 'warn'] : [T('ждём оплату клиента'), 'off']
-  const stageL: Record<string, [string, 'ok' | 'warn' | 'ink' | 'off']> = { contract: ['договор подписан, ждём платёж', 'warn'], payments: ['клиент платит, ждём оплату застройщика', 'warn'], fee_received: ['застройщик оплатил — к выплате', 'ok'], paid_out: ['выплачено', 'ink'], cancelled: ['отменена', 'off'] }
+  const stageL: Record<string, [string, 'ok' | 'warn' | 'ink' | 'off']> = { contract: ['договор подписан, ждём платёж', 'warn'], payments: ['клиент платит, ждём оплату застройщика', 'warn'], fee_received: ['застройщик оплатил — к выплате', 'ok'], paid_out: ['выплачено', 'ink'], cancelled: ['расторгнута', 'off'] }
   return (
     <>
       <Top title={T('Комиссия')} sub={T('Выплата — после того, как застройщик оплатил вознаграждение GetsEstate, в той же пропорции')} />

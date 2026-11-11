@@ -164,7 +164,7 @@ export default async function Home() {
               <form action={startShow} className="stack mt16" style={{ gap: 8 }}>
                 <div className="label">{T('Встреча с клиентом')}</div>
                 <select className="in" name="client" defaultValue=""><option value="">{T('Без клиента')}</option>{clients.slice(0, 50).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-                <div className="row"><select key={`lang:${String(L)}`} className="in" name="lang" defaultValue={L} style={{ width: 90 }}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select><button className="btn btn--b" style={{ flex: 1 }}>{T('Режим показа клиенту')}</button></div>
+                <div className="row"><select key={`lang:${String(L)}`} className="in" name="lang" defaultValue={L} style={{ width: 'auto', minWidth: 90 }}>{['de', 'en', 'ru', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select><button className="btn btn--b" style={{ flex: 1 }}>{T('Режим показа клиенту')}</button></div>
               </form>
             )}
           </div>

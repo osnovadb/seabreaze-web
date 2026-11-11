@@ -46,7 +46,7 @@ export default async function Markets() {
             <input className="in" name="phone" defaultValue={o.phone || ''} placeholder={T('Телефон')} style={{ width: 150 }} disabled={!edit} /><input className="in" name="schedule" defaultValue={o.schedule || ''} placeholder={T('пн–пт 9–18')} style={{ width: 160 }} disabled={!edit} /><input className="in" name="tz" defaultValue={o.tz} style={{ width: 140 }} disabled={!edit} />
             {edit && <><button className="btn btn--sm">{T('Сохранить')}</button><button className="btn btn--sm btn--ghost" name="delete" value="1">×</button></>}</form>)}
           {edit && <form action={saveOffice} className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <select className="in" name="market" style={{ width: 90 }}>{['DE', 'IL', 'GLOBAL'].map((m) => <option key={m}>{m}</option>)}</select><input className="in" name="city" placeholder={T('Город')} style={{ width: 120 }} required />
+            <select className="in" name="market" style={{ width: 'auto', minWidth: 90 }}>{['DE', 'IL', 'GLOBAL'].map((m) => <option key={m}>{m}</option>)}</select><input className="in" name="city" placeholder={T('Город')} style={{ width: 120 }} required />
             <input className="in" name="address" placeholder={T('Адрес')} style={{ width: 240 }} /><input className="in" name="phone" placeholder={T('Телефон')} style={{ width: 150 }} /><input className="in" name="schedule" placeholder={T('пн–пт 9–18')} style={{ width: 160 }} />
             <input className="in" name="tz" placeholder="Europe/Berlin" style={{ width: 140 }} /><button className="btn btn--sm btn--p">{T('+ Офис')}</button></form>}
         </div>
@@ -56,7 +56,7 @@ export default async function Markets() {
             <div className="chips">{dict.filter((d) => d.kind === k).map((d) => <form key={d.code + d.market} action={saveDict} className="chip"><input type="hidden" name="kind" value={k} /><input type="hidden" name="code" value={d.code} /><input type="hidden" name="market" value={d.market} />
               {d.label}{d.market ? <span className="n">{d.market}</span> : null}{edit && <button name="delete" value="1" className="btn btn--sm btn--ghost" style={{ padding: '0 4px', height: 18 }}>×</button>}</form>)}</div>
             {edit && <form action={saveDict} className="row" style={{ gap: 6 }}><input type="hidden" name="kind" value={k} /><input className="in" name="label" placeholder={T('Значение')} style={{ flex: 1 }} required />
-              <select className="in" name="market" style={{ width: 100 }}><option value="">{T('все рынки')}</option>{['DE', 'IL', 'GLOBAL'].map((m) => <option key={m}>{m}</option>)}</select><button className="btn btn--sm">+</button></form>}
+              <select className="in" name="market" style={{ width: 'auto', minWidth: 100 }}><option value="">{T('все рынки')}</option>{['DE', 'IL', 'GLOBAL'].map((m) => <option key={m}>{m}</option>)}</select><button className="btn btn--sm">+</button></form>}
           </div>))}</div>
         <div className="tiny muted">{T('Причины Lost и сегменты в Bitrix24 — списки полей, их добавляет настройка Bitrix24 (scripts/b24setup). Здесь — для портала, прогрева и отчётов.')}</div>
       </div>
