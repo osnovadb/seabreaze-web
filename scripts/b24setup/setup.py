@@ -103,7 +103,7 @@ DEAL = [
     ('GE_LIST_PRICE', 'List price', N), ('GE_FINAL_PRICE', 'Final price', N), ('GE_DISCOUNT', 'Discount %', N), ('GE_PLAN', 'Payment plan', S),
     ('GE_CURRENCY', 'Currency', E('USD', 'EUR', 'ILS', 'AZN')),
     ('GE_RES_STATUS', 'Reservation status', E('Hold', 'Requested', 'Queued', 'Reserved', 'Declined', 'Released', 'Expired')),
-    ('GE_RES_UNTIL', 'Reserved until', D), ('GE_DEV_RES_NO', 'Developer reservation No.', S), ('GE_DEV_REGS', 'Developer registrations', S),
+    ('GE_RES_UNTIL', 'Reserved until', D), ('GE_DEV_RES_NO', 'Developer reservation No.', S), ('GE_CONTRACT_DATE', 'Contract date', D), ('GE_CONTRACT_NO', 'Contract No.', S), ('GE_DEV_REGS', 'Developer registrations', S),
     ('GE_DEAL_MARKET', 'Deal market', E(*MARKETS)), ('GE_AGENCY', 'Agency', S), ('GE_AGENT', 'Agent', S), ('GE_REFERRER', 'Referrer', S),
     ('GE_ESCORT', 'Escort in Baku', S), ('GE_TRIP', 'Trip date', D), ('GE_TRIP_STATUS', 'Trip status', E('Requested', 'Confirmed', 'Done', 'No-show')),
     ('GE_SIGNING', 'Signing', E('In person', 'Remote', 'Power of attorney')), ('GE_COBUYERS', 'Co-buyers', S), ('GE_BUYER_CO', 'Buyer company', S),

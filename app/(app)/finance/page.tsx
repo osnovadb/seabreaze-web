@@ -42,10 +42,10 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
      from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id join portal.clients cl on cl.id = d.client_id
      where true ${mk} order by d.created_at desc limit 200`) : []
   const pgD = pageOf(searchParams.page, deals.length, 50) // О55 (обход 11.11): продажи — по 50 на странице
-  const tranches = tab === 'tranches' ? await q<{ id: string; unit: string; project: string; dev: string; no: number; pct: number; amount: number; status: string; expected_at: string | null; received_at: string | null; trigger: string; paid_pct: number }>(
-    `select t.id, portal.unit_no(bl.external_id, un.number) unit, p.name project, dv.name dev, t.no, t.pct::float, t.amount::float, t.status, t.expected_at::text, t.received_at, t.trigger, d.paid_pct::float
+  const tranches = tab === 'tranches' ? await q<{ id: string; unit: string; project: string; dev: string; no: number; pct: number; amount: number; status: string; expected_at: string | null; received_at: string | null; trigger: string; paid_pct: number; deal_stage: string; refunded: boolean | null; offset: string | null; received_usd: number | null }>(
+    `select t.id, portal.unit_no(bl.external_id, un.number) unit, p.name project, dv.name dev, t.no, t.pct::float, t.amount::float, t.status, t.expected_at::text, t.received_at, t.trigger, d.paid_pct::float, d.stage deal_stage, d.client_refunded refunded, pd.clawback_offset "offset", coalesce(t.received_usd, t.amount)::float received_usd
      from portal.tranches t join portal.deals d on d.id = t.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id
-       join public.developers dv on dv.id = p.developer_id join portal.clients cl on cl.id = d.client_id
+       join public.developers dv on dv.id = p.developer_id left join portal.developers pd on pd.catalog_id = dv.id join portal.clients cl on cl.id = d.client_id
      where true ${mk} and (d.stage <> 'cancelled' or t.status = 'received') /* О13: транши расторгнутых сделок, кроме полученных, не ждём */ order by array_position(array['expected','scheduled','received','cancelled'], t.status), t.expected_at nulls last limit 300`) : []
   const reg = tab === 'register' ? (await q<{ id: string; month: string; status: string; confirmations: Record<string, { at: string }>; collected_at: string; approved_at: string | null; paid_at: string | null; no: number }>(`select id, month::text, status, confirmations, collected_at, approved_at, paid_at, no from portal.payout_registers where month = $1::date and ($2::int is null or no = $2) order by no desc limit 1`, [month + '-01', Number((searchParams as { r?: string }).r) || null]))[0] : null
   // 283: дополнительные реестры месяца — переключатель
@@ -101,11 +101,14 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
                     <button className="btn btn--sm">{T('Добавить в следующий акт')}</button></form></details></td></tr>}
           </Fragment>))}</tbody></table></div>}
         {tab === 'sales' && <Pager page={pgD.page} pages={pgD.pages} total={deals.length} qs={`tab=sales${searchParams.e ? '&e=' + searchParams.e : ''}`} label={T('Продаж: {n}', { n: deals.length })} />}
+        {tab === 'tranches' && (() => { const owe = tranches.filter((x) => x.status === 'received' && x.deal_stage === 'cancelled' && x.refunded); const sum = owe.reduce((a, x) => a + (x.received_usd || 0), 0)
+          return owe.length > 0 ? <div className="note" style={{ marginBottom: 12 }}>{T('К зачёту у застройщиков после расторжений: {a} ({n})', { a: usd(L, sum), n: owe.length })}</div> : null })()}
         {tab === 'tranches' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Продажа', 'Застройщик', 'Транш', 'Сумма', 'Статус', 'Ожидаем', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{tranches.length === 0 ? <tr><td colSpan={7} className="muted">{T('Траншей пока нет — они появляются с «Договор подписан»')}</td></tr> : tranches.map((x) => (
             <tr key={x.id}><td><b>{x.unit}</b><div className="tiny muted">{x.project}</div></td><td className="small">{x.dev}</td><td className="small">№{x.no} · {Math.round(x.pct * 100) / 100}%</td><td><b>{usd(L, x.amount)}</b></td>
-              <td><Pill kind={TR[x.status][1]}>{T(TR[x.status][0])}</Pill>{x.status === 'scheduled' && <div className="tiny muted">{T('оплачено клиентом {p}%', { p: x.paid_pct })}</div>}</td>
+              <td>{x.status === 'received' && x.deal_stage === 'cancelled' && x.refunded ? <><Pill kind="bad">{T('к зачёту у застройщика')}</Pill>{/* 379: после расторжения с возвратом денег клиенту — наш долг застройщику */}
+                <div className="tiny muted">{T(x.offset === 'same_client' ? 'зачёт — только по тому же клиенту' : 'зачёт — из любого следующего платежа')}</div></> : <Pill kind={TR[x.status][1]}>{T(TR[x.status][0])}</Pill>}{x.status === 'scheduled' && <div className="tiny muted">{T('оплачено клиентом {p}%', { p: x.paid_pct })}</div>}</td>
               <td className="small">{x.status === 'received' ? date(L, x.received_at) : x.expected_at ? date(L, x.expected_at) : '—'}</td>
               <td>{fin && x.status === 'expected' && <details className="pop"><summary className="btn btn--sm btn--p">{T('Транш получен')}{/* Л10: без смеси языков */}</summary>
                 {/* QA 09.11: отметка необратима и запускает начисления — второй шаг с суммой на глазах */}

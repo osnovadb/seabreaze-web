@@ -2820,5 +2820,9 @@
 "Номер договора": "Vertragsnummer",
 "Файл договора (по желанию)": "Vertragsdatei (optional)",
 "Отметить подписанным": "Als unterschrieben markieren",
-"— выберите страну —": "— Land wählen —"
+"— выберите страну —": "— Land wählen —",
+"к зачёту у застройщика": "zur Verrechnung beim Bauträger",
+"зачёт — только по тому же клиенту": "Verrechnung – nur beim selben Kunden",
+"зачёт — из любого следующего платежа": "Verrechnung – mit jeder nächsten Zahlung",
+"К зачёту у застройщиков после расторжений: {a} ({n})": "Zur Verrechnung bei Bauträgern nach Kündigungen: {a} ({n})"
 }

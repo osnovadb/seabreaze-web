@@ -2820,5 +2820,9 @@
 "Номер договора": "Müqavilənin nömrəsi",
 "Файл договора (по желанию)": "Müqavilə faylı (istəyə görə)",
 "Отметить подписанным": "İmzalanmış kimi qeyd et",
-"— выберите страну —": "— ölkəni seçin —"
+"— выберите страну —": "— ölkəni seçin —",
+"к зачёту у застройщика": "tikinti şirkətində əvəzləşdirilməli",
+"зачёт — только по тому же клиенту": "əvəzləşdirmə — yalnız həmin müştəri üzrə",
+"зачёт — из любого следующего платежа": "əvəzləşdirmə — istənilən növbəti ödənişdən",
+"К зачёту у застройщиков после расторжений: {a} ({n})": "Ləğvlərdən sonra tikinti şirkətlərində əvəzləşdirilməli: {a} ({n})"
 }
