@@ -9,7 +9,7 @@ import { DevForm } from './form'
 
 // 2.2 · Карточка условий застройщика (ТЗ §7): регистрация и молчание, защита, бронь и лимит, комиссия, клаубэк, НДС
 const blank: Developer = { id: '', name: '', catalog_id: null, reg_method: 'email', reg_email: null, reg_response_days: 3, silence_rule: 'remind', silence_extra_days: 0,
-  protect_months: 6, protect_months_sub: null, renew_remind_days: 7, booking_days: 14, booking_ext_days: 14, max_bookings_total: 10, booking_write_api: false,
+  protect_months: 6, protect_months_sub: null, renew_remind_days: 7, booking_days: 14, booking_ext_days: 14, max_bookings_total: 10, max_bookings_person: 3, booking_write_api: false,
   commission_pct: null, rates_by_market: {}, vat_mode: 'over', options_in_base: false, pay_timing: 'after_first_payment', fx_rule: null, clawback_months: 3,
   clawback_offset: 'any', payment_wait_days: 10, sells_to_az: false, tz: 'Asia/Baku', contacts: null, note: null, active: true }
 

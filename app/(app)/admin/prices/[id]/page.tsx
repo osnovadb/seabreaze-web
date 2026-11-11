@@ -17,7 +17,7 @@ export default async function PriceList(props: { params: Promise<{ id: string }>
   const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const l = await one<{ id: string; project_id: string; pname: string; title: string; status: string; rule: Record<string, unknown>; note: string | null; by: string; created_at: string; pub: string | null; published_at: string | null; rev: string | null; reverted_at: string | null }>(`
     select pl.id, pl.project_id, p.name pname, pl.title, pl.status, pl.rule, pl.note, a.name by, pl.created_at, b.name pub, pl.published_at, r.name rev, pl.reverted_at

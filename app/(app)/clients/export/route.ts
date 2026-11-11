@@ -8,7 +8,7 @@ import { makeXlsx } from '@/lib/xlsx'
 // Выгрузка клиентов в xlsx (М13): только те, кого пользователь видит в CRM
 export async function GET() {
   const c = await requireCtx()
-  if (!canSeeClients(c.user.role) || c.user.role === 'office') return new Response('forbidden', { status: 403 })
+  if (!canSeeClients(c.user.role) || (c.user.role === 'office' || c.user.role === 'finance')) return new Response('forbidden', { status: 403 })
   const T = (s: string) => t(c.lang, s)
   const cs = clientScope(c.user)
   const rows = await q<any>(`select cl.reg_no, cl.name, cl.phone, cl.email, cl.country, cl.language, cl.market, cl.source, cl.stage, u.name owner, cl.protected_until::text, cl.kyc_status, cl.goal, cl.budget, cl.created_at::date::text created

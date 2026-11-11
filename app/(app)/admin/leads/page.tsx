@@ -10,7 +10,7 @@ const RES: Record<string, [string, 'ok' | 'warn' | 'off' | 'bad' | 'ink']> = { n
 export default async function Leads(props: { searchParams: Promise<{ f?: string }> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
-  if (!['owner', 'market_head', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'market_head', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const mk = c.user.role === 'market_head' ? c.user.market : null
   const rows = await q<{ id: string; source: string; site: string | null; name: string | null; phone: string | null; email: string | null; market: string; lang: string; result: string; client_id: string | null; utm: Record<string, string> | null; created_at: string; bx: string | null; bx_err: string | null }>(`

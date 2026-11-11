@@ -13,7 +13,7 @@ import { revalidatePath } from 'next/cache'
 // Клиент команды из карточки Bitrix24: закрепление сразу (§10), регистрации у застройщиков (§7)
 export async function createFromB24(f: FormData) {
   const c = await requireCtx()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) throw new Error('forbidden')
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) throw new Error('forbidden')
   const kind = String(f.get('kind')) as Kind, id = Number(f.get('id'))
   if (!COL[kind] || !id) throw new Error('bad')
   const p = await b24Person(kind, id)

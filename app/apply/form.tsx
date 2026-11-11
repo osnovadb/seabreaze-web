@@ -9,7 +9,7 @@ function Submit({ lang }: { lang: Lang }) {
   const { pending } = useFormStatus()
   return <button className="btn btn--p btn--lg btn--block" disabled={pending}>{t(lang, 'Отправить заявку')}</button>
 }
-export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
+export function ApplyForm({ lang, market, ft }: { lang: Lang; market: string; ft: string }) {
   const [st, act] = useActionState(applyAgent, null)
   // QA 09.11: рекомендателю лицензия, компания и документы не нужны — прячем; подсказка — только для выбранного вида
   const [kind, setKind] = useState('agent')
@@ -29,6 +29,9 @@ export function ApplyForm({ lang, market }: { lang: Lang; market: string }) {
       </div>
       {ref && <div className="tiny muted">{T('Рекомендатель передаёт нам контакты знакомых и получает 2% от цены договора. Лицензия не нужна, доступ — сразу; ссылка для входа придёт на почту.')}</div>}
       <input type="hidden" name="lang" value={lang} />
+      {/* 358: защита от ботов — метка времени показа формы и поле-ловушка (людям не видно) */}
+      <input type="hidden" name="ft" value={ft} />
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
       <div className="grid g2">
         {F('name', 'Имя и фамилия', '', true)}{!ref && F('company', kind === 'agency' ? 'Название агентства' : 'Компания')}
         {F('email', 'E-mail', '', true)}{F('phone', 'Телефон')}

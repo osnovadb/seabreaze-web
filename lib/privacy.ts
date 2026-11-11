@@ -10,7 +10,7 @@ import { queueTask } from './b24sync'
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function staff() {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role) || c.impersonating) throw new Error('forbidden')
+  if (!['owner', 'office', 'finance'].includes(c.user.role) || c.impersonating) throw new Error('forbidden')
   return c
 }
 

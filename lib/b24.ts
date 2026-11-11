@@ -37,7 +37,7 @@ const TABS: [string, string][] = [['CRM_DEAL_DETAIL_TAB', 'Units'], ['CRM_CONTAC
 // 2.2 · Пункты GetsEstate в левом меню Bitrix24 (решение 242): набор по роли проверяет портал при открытии
 export const MENU: Record<string, [string, string, string[]]> = {
   catalog: ['Catalog', '/catalog', ['owner', 'market_head', 'seller', 'office', 'finance', 'content']],
-  backoffice: ['Back office', '/registrations', ['owner', 'office', 'market_head']],
+  backoffice: ['Back office', '/registrations', ['owner', 'office', 'finance', 'market_head']],
   partners: ['Partners', '/admin/agents', ['owner', 'market_head']],
   reports: ['Reports', '/reports', ['owner', 'market_head']],
   money: ['Money', '/finance', ['owner', 'finance', 'market_head']],

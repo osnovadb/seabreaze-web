@@ -34,7 +34,7 @@ export async function savePbSource(_: unknown, f: FormData) {
 }
 export async function runPbSource(_: unknown, f: FormData) {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role) || c.impersonating) return { error: t(c.lang, 'Нет прав') }
+  if (!['owner', 'office', 'finance'].includes(c.user.role) || c.impersonating) return { error: t(c.lang, 'Нет прав') }
   const src = await one<{ id: string; config: unknown }>(`select id, config from sources where id = $1 and kind = 'profitbase'`, [s(f, 'id')])
   if (!src) return { error: 'source' }
   // Один прогон за раз: если tick уже идёт (прогон «running» моложе 10 минут) — не запускаем второй
@@ -62,7 +62,7 @@ export async function retryPbOutbox(f: FormData) {
 // Меняется только locked_fields, цена и статус остаются: триггер замок заново не ставит, значение застройщика придёт следующим прогоном
 export async function unlockUnits(f: FormData) {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role) || c.impersonating) throw new Error('forbidden')
+  if (!['owner', 'office', 'finance'].includes(c.user.role) || c.impersonating) throw new Error('forbidden')
   const field = s(f, 'field'), unit = s(f, 'unit'), src = s(f, 'source')
   const expr = field === 'status' || field === 'price_list' ? `locked_fields - '${field}'` : `'[]'::jsonb`
   const where = unit ? 'id = $1' : 'source_id = $1'

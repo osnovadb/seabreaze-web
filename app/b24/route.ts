@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // пункт левого меню (?go=) — раздел по роли; нет права — сообщение, а не чужой экран
   const go = url.searchParams.get('go') || ''
   if (go && MENU[go] && !MENU[go][2].includes(u.role)) return page('Нет доступа', `Раздел «${MENU[go][0]}» не для вашей роли.`)
-  const landing = u.role === 'office' ? '/registrations' : u.role === 'finance' ? '/finance' : u.role === 'content' ? '/news' : '/catalog'
+  const landing = (u.role === 'office' || u.role === 'finance') ? '/registrations' : u.role === 'finance' ? '/finance' : u.role === 'content' ? '/news' : '/catalog'
   // список сделок: выбранные ID — в параметрах встройки (ids / IDS / ID)
   const listIds = [opts.ids, opts.IDS, (opts as Record<string, unknown>).ID].flat().filter(Boolean).join(',')
   const target = placement === 'CRM_DEAL_LIST_MENU' ? `/b24/deals?ids=${encodeURIComponent(listIds)}` : placement === 'CRM_DEAL_DETAIL_TAB' ? `/b24/deal/${id}` : placement === 'CRM_CONTACT_DETAIL_TAB' ? `/b24/contact/${id}` : placement === 'CRM_LEAD_DETAIL_TAB' ? `/b24/lead/${id}`

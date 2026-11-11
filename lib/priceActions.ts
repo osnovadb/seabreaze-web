@@ -15,7 +15,7 @@ const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 const all = (f: FormData, k: string) => f.getAll(k).map(String).map((x) => x.trim()).filter(Boolean)
 async function editor() {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role) || (c.impersonating && process.env.ALLOW_IMPERSONATE_WRITE !== '1')) throw new Error('forbidden')
+  if (!['owner', 'office', 'finance'].includes(c.user.role) || (c.impersonating && process.env.ALLOW_IMPERSONATE_WRITE !== '1')) throw new Error('forbidden')
   return c
 }
 const done = (pid: string, id?: string) => { revalidatePath('/admin/prices'); if (id) revalidatePath(`/admin/prices/${id}`); revalidatePath(`/admin/objects/${pid}`); revalidatePath('/projects', 'layout'); revalidatePath('/catalog') }

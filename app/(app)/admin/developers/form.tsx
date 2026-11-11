@@ -31,7 +31,7 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
           {N('renew_remind_days', 'Напомнить о продлении за', 'дней')}
         </div>
         <div className="label mt16">{T('Бронь')}</div>
-        <div className="grid g3 mt8">{N('booking_days', 'Срок брони', 'дней')}{N('booking_ext_days', 'Продление', 'дней')}{N('max_bookings_total', 'Одновременных броней на GetsEstate', 'шт.')}</div>
+        <div className="grid g3 mt8">{N('booking_days', 'Срок брони', 'дней')}{N('booking_ext_days', 'Продление', 'дней')}{N('max_bookings_total', 'Одновременных броней на GetsEstate — все проекты', 'шт.')}{N('max_bookings_person', 'Личный лимит партнёра и сейлза', 'шт.')}</div>
         <div className="mt8">{C('booking_write_api', 'Ставить брони в Profitbase застройщика (ключ даёт право записи)')}</div>
         <div className="label mt16">{T('Комиссия')}</div>
         <div className="grid g3 mt8">{N('commission_pct', 'Фикс от цены договора', '%')}

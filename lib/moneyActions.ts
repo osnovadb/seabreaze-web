@@ -1,7 +1,8 @@
 'use server'
 // 2.2 · §8 Деньги: действия финансов, руководителя рынка и админа; реквизиты партнёра для выплат
 import { revalidatePath } from 'next/cache'
-import { q, one, audit } from './db'
+import { q, one, audit, notify } from './db'
+import { t, LANGS, type Lang } from './i18n'
 import { requireCtx } from './auth'
 import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares, addAdjustment, writeOffDebt } from './money22'
 import { storeFile, isFile } from './files'
@@ -74,17 +75,27 @@ export async function savePayoutProfile(f: FormData) {
   const form = ['company', 'sole', 'individual'].includes(s(f, 'partner_form')) ? s(f, 'partner_form') : null
   // Реквизиты: смена IBAN/SWIFT (не первое заполнение) — выплата на новые не раньше чем через 3 дня
   const iban = s(f, 'bank_iban').replace(/\s+/g, '').toUpperCase().slice(0, 34), swift = s(f, 'bank_swift').replace(/\s+/g, '').toUpperCase().slice(0, 11)
+  const before = await one<{ iban: string | null; swift: string | null; email: string; name: string; locale: Lang }>('select bank_iban iban, bank_swift swift, email, name, locale from portal.users where id = $1', [id])
   await q(`update portal.users set partner_form = $2, vat_payer = $3, vat_no = nullif($4, ''), tax_country = nullif(upper($5), ''), tax_no = nullif($6, ''),
       tax_cert_until = case when $7 = '' then null else $7::date end,
       bank_changed_at = case when bank_iban is not null and (bank_iban is distinct from nullif($9, '') or bank_swift is distinct from nullif($10, '')) then now() else bank_changed_at end,
       bank_holder = nullif($8, ''), bank_iban = nullif($9, ''), bank_swift = nullif($10, ''), bank_name = nullif($11, '') where id = $1`,
     [id, form, f.get('vat_payer') === 'on', s(f, 'vat_no'), s(f, 'tax_country').slice(0, 2), s(f, 'tax_no'), s(f, 'tax_cert_until'), s(f, 'bank_holder').slice(0, 120), iban, swift, s(f, 'bank_name').slice(0, 120)])
   await audit(c.real.id, 'user.payout_profile', 'user', id)
+  // 284 (Денис 11.11): смена реквизитов (не первое заполнение) — письмо на адрес партнёра и уведомление финансам; выплата на новые — не раньше чем через 3 дня
+  if (before?.iban && (before.iban !== (iban || null) || (before.swift || null) !== (swift || null))) {
+    const L = (LANGS.includes(before.locale) ? before.locale : 'en') as Lang
+    const tail = (x: string | null) => (x ? '…' + x.slice(-4) : '—')
+    await q(`insert into portal.outbox_messages (channel, to_addr, user_id, subject, body, kind) values ('email',$1,$2,$3,$4,'bank_change')`, [before.email, id, 'GetsEstate · ' + t(L, 'Банковские реквизиты изменены'),
+      [t(L, 'Здравствуйте, {n}!', { n: before.name }), t(L, 'Реквизиты для выплат в вашем кабинете изменены: IBAN {a} → {b}. Выплаты на новые реквизиты начнутся не раньше чем через 3 дня.', { a: tail(before.iban), b: tail(iban || null) }),
+        t(L, 'Если это были не вы — срочно напишите вашему куратору или ответьте на это письмо.')].join('\n\n')])
+    for (const x of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(x.id, 'security', 'Партнёр {n} сменил банковские реквизиты — выплата на новые не раньше чем через 3 дня', '/finance?tab=register', { n: before.name })
+  }
   revalidatePath('/commission'); revalidatePath('/profile'); revalidatePath('/refer'); revalidatePath('/')
 }
 // Сопровождающий в Баку — назначает бэк-офис при Reserved (фикс за продажу — из условий проекта)
 export async function setEscort(f: FormData) {
-  const c = await role(['owner', 'office'])
+  const c = await role(['owner', 'office', 'finance'])
   const b = await one<{ client_id: string }>(`update portal.bookings set escort_id = nullif($2, '')::uuid where id = $1 returning client_id`, [s(f, 'id'), s(f, 'escort')])
   await q(`update portal.deals set escort_id = nullif($2, '')::uuid where booking_id = $1`, [s(f, 'id'), s(f, 'escort')])
   await audit(c.real.id, 'booking.escort', 'booking', s(f, 'id'), { escort: s(f, 'escort') || null })

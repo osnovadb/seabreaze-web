@@ -159,7 +159,7 @@ export default async function UnitPage(
                 <div className="kv"><span>{T('Статус в источнике')}</span><span>{u.external_status || u.status}</span></div>
                 <div className="kv"><span>{T('Подтверждено')}</span><span>{dateTime(L, u.synced_at)}</span></div>
                 <div className="kv"><span>{T('Ручные правки')}</span><span className="small">{u.locked.length ? '🔒 ' + u.locked.map((x) => T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x)).join(', ') + ' · ' + T('синхронизация не меняет') : T('нет · синхронизация может менять цену и статус')}</span></div>
-                {u.locked.length > 0 && ['owner', 'office'].includes(c.user.role) && !c.impersonating && <form action={unlockUnits} className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                {u.locked.length > 0 && ['owner', 'office', 'finance'].includes(c.user.role) && !c.impersonating && <form action={unlockUnits} className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                   <input type="hidden" name="unit" value={u.id} />
                   {u.locked.length > 1 && u.locked.map((x) => <button key={x} name="field" value={x} className="btn btn--sm">{T('Вернуть синхронизацию: {f}', { f: T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x) })}</button>)}
                   <button name="field" value="" className="btn btn--sm">{T(u.locked.length > 1 ? 'Вернуть синхронизацию: всё' : 'Вернуть синхронизацию')}</button>

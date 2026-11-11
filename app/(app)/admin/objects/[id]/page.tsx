@@ -26,7 +26,7 @@ export default async function ObjectCard(
   const params = await props.params;
   needUuid(params.id)
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const owner = c.user.role === 'owner'
   const p = await one<{ id: string; slug: string; name: string; developer_id: string; city: string | null; location: string | null; delivery: string | null; status: string; sort: number }>('select id, slug, name, developer_id, city, location, delivery, status, sort from projects where id = $1', [params.id])

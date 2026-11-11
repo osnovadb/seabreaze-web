@@ -36,7 +36,7 @@ export type StageCtx = { stage: string; paused: boolean; hasBooking: boolean; ha
 const AFTER_QUAL = ['selection', 'fixation', 'viewing', 'kyc', 'booking', 'contract', 'payments', 'fee', 'support', 'handed']
 const TEAM_ONLY = ['fixation', 'contract', 'payments', 'fee', 'support', 'handed']
 const NEED_DEAL = ['contract', 'payments', 'fee', 'support', 'handed']
-const CAN_MOVE: Role[] = ['owner', 'market_head', 'seller', 'office', 'agent', 'agency_head']
+const CAN_MOVE: Role[] = ['owner', 'market_head', 'seller', 'office', 'finance', 'agent', 'agency_head']
 
 // Можно ли перевести клиента в стадию: null — можно, иначе причина (ключ словаря). 'lost' и 'pause' — особые цели с причиной и датой.
 export function stageBlock(role: Role, c: StageCtx, target: string): string | null {

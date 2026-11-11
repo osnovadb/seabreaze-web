@@ -2660,5 +2660,22 @@
 "Нет согласия клиента — отправьте ссылку согласия": "No client consent — send the consent link",
 "нет согласия — отправьте ссылку согласия": "no consent — send the consent link",
 "Отправить ссылку": "Send link",
-"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Checked rows, or if none — the whole filtered list (rows without client consent are not included in the developer file):"
+"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Checked rows, or if none — the whole filtered list (rows without client consent are not included in the developer file):",
+"Личный лимит броней у этого застройщика — {n}; больше — с разрешения руководителя рынка": "Personal booking limit with this developer is {n}; more only with the market head's permission",
+"У застройщика сейчас нет свободного места — запрос {u} в очереди (до 7 дней); как только место освободится, он уйдёт бэк-офису": "The developer has no free slot right now — request {u} is queued (up to 7 days); as soon as a slot frees up it goes to the back office",
+"ближайшее место — ориентировочно {d}": "nearest slot — approximately {d}",
+"ваших — до {a} у застройщика": "yours — up to {a} with the developer",
+"клиент {c} · на человека {a} · у застройщика всего {t}": "client {c} · per person {a} · developer total {t}",
+"Одновременных броней на GetsEstate — все проекты": "Simultaneous bookings for GetsEstate — all projects",
+"Личный лимит партнёра и сейлза": "Personal limit of partner and seller",
+"Вход с нового устройства": "Sign-in from a new device",
+"В ваш кабинет GetsEstate вошли с нового устройства: {w}, {d}.": "Your GetsEstate account was signed in from a new device: {w}, {d}.",
+"Если это были не вы — смените пароль и напишите вашему куратору.": "If this wasn't you — change your password and write to your curator.",
+"Вход с нового устройства: {d}": "Sign-in from a new device: {d}",
+"Банковские реквизиты изменены": "Bank details changed",
+"Реквизиты для выплат в вашем кабинете изменены: IBAN {a} → {b}. Выплаты на новые реквизиты начнутся не раньше чем через 3 дня.": "The payout details in your account were changed: IBAN {a} → {b}. Payouts to the new details will start no earlier than in 3 days.",
+"Если это были не вы — срочно напишите вашему куратору или ответьте на это письмо.": "If this wasn't you — urgently write to your curator or reply to this e-mail.",
+"Партнёр {n} сменил банковские реквизиты — выплата на новые не раньше чем через 3 дня": "Partner {n} changed bank details — payout to the new ones no earlier than in 3 days",
+"Форма устарела или заполнена слишком быстро — обновите страницу и отправьте ещё раз": "The form is outdated or was filled in too quickly — reload the page and send again",
+"Слишком много заявок — попробуйте позже": "Too many applications — try later"
 }

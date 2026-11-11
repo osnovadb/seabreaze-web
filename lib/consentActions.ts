@@ -50,7 +50,7 @@ export async function sendConsentLink(f: FormData) {
   const id = s(f, 'client')
   const cl = await one<{ owner_id: string; agency_id: string | null }>('select owner_id, agency_id from portal.clients where id = $1', [id])
   if (!cl) return
-  const mine = cl.owner_id === c.user.id || (c.user.role === 'agency_head' && cl.agency_id === c.user.agency_id) || ['owner', 'market_head', 'seller', 'office'].includes(c.user.role)
+  const mine = cl.owner_id === c.user.id || (c.user.role === 'agency_head' && cl.agency_id === c.user.agency_id) || ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)
   if (!mine) throw new Error('forbidden')
   await q('update portal.clients set consent_reminders = 0, consent_requested_at = now() where id = $1 and consent_status <> $2', [id, 'given'])
   await requestConsent(id, c.user.id)

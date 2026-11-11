@@ -30,10 +30,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   items.push({ href: '/news', label: T('Новости'), cnt: newsUnread })
   items.push({ href: '/projects', label: T('Проекты') }, { href: '/catalog', label: T('Каталог') })
   if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/clients', label: ext ? T('Клиенты') : T('CRM · клиенты') })
-  if (u.role !== 'finance' && u.role !== 'content') items.push({ href: '/bookings', label: T('Брони'), cnt: u.role === 'office' || u.role === 'owner' ? cnt!.req : 0 })
+  if (u.role !== 'content') items.push({ href: '/bookings', label: T('Брони'), cnt: (u.role === 'office' || u.role === 'finance') || u.role === 'owner' ? cnt!.req : 0 }) // 364: финансы — с правами бэк-офиса
   if (u.role !== 'finance' && u.role !== 'content' && u.role !== 'office') items.push({ href: '/selections', label: T('Подборки') })
-  if (['office', 'owner', 'market_head'].includes(u.role)) items.push({ href: '/registrations', label: T('Регистрации'), cnt: u.role === 'market_head' ? 0 : cnt!.regs })
-  if (u.role === 'office' || u.role === 'owner') items.push({ href: '/kyc', label: 'KYC', cnt: cnt!.kyc })
+  if (['office', 'finance', 'owner', 'market_head'].includes(u.role)) items.push({ href: '/registrations', label: T('Регистрации'), cnt: u.role === 'market_head' ? 0 : cnt!.regs })
+  if ((u.role === 'office' || u.role === 'finance') || u.role === 'owner') items.push({ href: '/kyc', label: 'KYC', cnt: cnt!.kyc })
   if (u.role !== 'finance' && u.role !== 'content' && u.role !== 'office') items.push({ href: '/waitlist', label: T('Ожидание и поиски') })
   if (ext) items.push({ href: '/commission', label: T('Комиссия') })
   if (ext) items.push({ href: '/links', label: T('Мои ссылки') })
@@ -42,8 +42,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (u.role === 'finance') items.push({ href: '/reports/plan', label: T('План и факт') })
   if (canSeeFinance(u.role)) items.push({ href: '/finance', label: T('Финансы') })
   if (canReviewAgents(u.role)) items.push({ href: '/admin/agents', label: T('Агенты'), cnt: cnt!.apps })
-  if (u.role === 'owner' || u.role === 'office') items.push({ href: '/admin/objects', label: T('Объекты') })
-  if (['owner', 'market_head', 'office'].includes(u.role)) items.push({ href: '/admin/leads', label: T('Заявки с сайтов') })
+  if (u.role === 'owner' || (u.role === 'office' || u.role === 'finance')) items.push({ href: '/admin/objects', label: T('Объекты') })
+  if (['owner', 'market_head', 'office', 'finance'].includes(u.role)) items.push({ href: '/admin/leads', label: T('Заявки с сайтов') })
   if (canSeeSources(u.role)) items.push({ href: '/sources', label: T('Источники') })
   items.push({ href: '/materials', label: T('Материалы') })
   if (u.role === 'owner' || u.role === 'content') items.push({ href: '/admin/templates', label: T('Шаблоны') })
@@ -59,8 +59,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const cur = cid && /^[0-9a-f-]{36}$/.test(cid) ? await one<{ id: string; name: string }>('select id, name from portal.clients where id = $1', [cid]) : null
     // меню раздела внутри фрейма — по роли (пункты левого меню Bitrix24 ведут в те же разделы)
     const R = u.role
-    const em: [string, string, boolean][] = [['/projects', 'Проекты', true], ['/catalog', 'Каталог', true], ['/registrations', 'Регистрации', ['owner', 'office', 'market_head'].includes(R)], ['/bookings', 'Брони', R !== 'finance' && R !== 'content'],
-      ['/kyc', 'KYC', ['owner', 'office'].includes(R)], ['/admin/privacy', 'Согласия и данные', ['owner', 'office'].includes(R)], ['/admin/agents', 'Партнёры', ['owner', 'market_head'].includes(R)],
+    const em: [string, string, boolean][] = [['/projects', 'Проекты', true], ['/catalog', 'Каталог', true], ['/registrations', 'Регистрации', ['owner', 'office', 'finance', 'market_head'].includes(R)], ['/bookings', 'Брони', R !== 'finance' && R !== 'content'],
+      ['/kyc', 'KYC', ['owner', 'office', 'finance'].includes(R)], ['/admin/privacy', 'Согласия и данные', ['owner', 'office', 'finance'].includes(R)], ['/admin/agents', 'Партнёры', ['owner', 'market_head'].includes(R)],
       ['/finance', 'Финансы', ['owner', 'finance', 'market_head'].includes(R)], ['/reports', 'Отчёты', ['owner', 'market_head'].includes(R)], ['/news', 'Новости', true], ['/admin', 'Админка', ['owner', 'market_head', 'finance'].includes(R)]]
     return (
       <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>

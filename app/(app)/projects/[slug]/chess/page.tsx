@@ -43,9 +43,12 @@ export default async function ChessPage(
   // Партнёру сверху — его лимиты по проекту (прототип 5): брони из лимита, клиенты в работе, ставка
   const lim = isExternal(c.user.role) ? await (async () => {
     const cond = await conditionsFor(p.id, c.user)
-    const n = await one<{ b: number; cl: number }>(`select (select count(*)::int from portal.bookings where agent_id = $1 and project_id = $2 and status in ('requested','confirmed')) b,
-      (select count(*)::int from portal.clients where owner_id = $1 and stage not in ('lost','handed') and pause_until is null) cl`, [c.user.id, p.id])
-    return cond ? { ...n!, max: cond.max_bookings_agent, fix: cond.agent_fix_pct, pool: cond.agent_pool_pct, sales: p.sales_status } : null
+    // 366: личный лимит — у застройщика на все его проекты
+    const n = await one<{ b: number; cl: number; max: number | null }>(`select (select count(*)::int from portal.bookings bk join projects px on px.id = bk.project_id
+        where bk.agent_id = $1 and px.developer_id = (select developer_id from projects where id = $2) and bk.status in ('queued','requested','confirmed','release_pending')) b,
+      (select count(*)::int from portal.clients where owner_id = $1 and stage not in ('lost','handed') and pause_until is null) cl,
+      (select d.max_bookings_person from projects px join portal.developers d on d.catalog_id = px.developer_id where px.id = $2) max`, [c.user.id, p.id])
+    return cond ? { b: n!.b, cl: n!.cl, max: n!.max ?? cond.max_bookings_agent, fix: cond.agent_fix_pct, pool: cond.agent_pool_pct, sales: p.sales_status } : null
   })() : null
   const qs = (o: Record<string, string | undefined>) => '?' + new URLSearchParams(Object.entries({ b: b.id, u: sel?.id, ...o }).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString()
   // Данные для шахматки в браузере: статус по роли, цена с акцией, вид, планировка — фильтры и подсветка без перезагрузки
@@ -69,7 +72,7 @@ export default async function ChessPage(
   // этап 4 калькулятора: расчёт вариантов в боковой панели — те же данные и права, что на карточке квартиры
   const selCalc = sel && mode !== 'show' && sel.usd != null ? await calcViewProps(sel, c, { clients: clients.map((x) => ({ id: x.id, name: x.name })), clientId: curClient || null,
     bookable: codeFor(sel, c.user, mode, curClient) === 'F' && canBook(c.user.role) && sel.sales_status === 'sales' }) : null
-  const editor = ['owner', 'office'].includes(c.user.role)
+  const editor = ['owner', 'office', 'finance'].includes(c.user.role)
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [T('Шахматка')]]} title={`${p.name} · ${b.name}`}

@@ -30,7 +30,7 @@ export default async function Units(
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   // QA 09.11: только команда и только клиенты в её видимости (партнёр по прямой ссылке открывал Units чужого клиента)
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) notFound()
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) notFound()
   const cs = clientScope(c.user)
   const visible = await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
   if (!visible) notFound()
@@ -147,7 +147,7 @@ export default async function Units(
                 : <div className="small muted">{T('Оплачено клиентом')}: {u.paid ?? 0}%</div>)}
             </div>
           })}
-          {['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <input type="hidden" name="client" value={cl.id} />
             <label className="field"><span>{T('Отказ клиента — причина')}</span><select name="reason" className="in" defaultValue="Price">{B24_LOST.filter((x) => x !== 'Compliance').map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
             <button className="btn btn--sm">{T('Отказ')}</button>

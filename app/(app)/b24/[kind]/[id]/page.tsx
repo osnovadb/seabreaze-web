@@ -16,7 +16,7 @@ export default async function B24Tab(
   const c = await requireCtx()
   const kind = params.kind as Kind
   if (!['deal', 'contact', 'lead'].includes(kind) || !/^\d+$/.test(params.id)) notFound()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) notFound() // вкладка Bitrix24 — только команде (QA 09.11)
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) notFound() // вкладка Bitrix24 — только команде (QA 09.11)
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const r = await resolveClient(kind, Number(params.id))
   if (r.id) redirect(`/b24/ctx?client=${r.id}`) // запомнить клиента вкладки и открыть Units

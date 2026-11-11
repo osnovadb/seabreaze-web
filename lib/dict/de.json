@@ -2660,5 +2660,22 @@
 "Нет согласия клиента — отправьте ссылку согласия": "Keine Einwilligung des Kunden — Einwilligungslink senden",
 "нет согласия — отправьте ссылку согласия": "keine Einwilligung — Einwilligungslink senden",
 "Отправить ссылку": "Link senden",
-"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Markierte Zeilen oder, wenn keine, die ganze gefilterte Liste (Zeilen ohne Einwilligung kommen nicht in die Datei für den Bauträger):"
+"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Markierte Zeilen oder, wenn keine, die ganze gefilterte Liste (Zeilen ohne Einwilligung kommen nicht in die Datei für den Bauträger):",
+"Личный лимит броней у этого застройщика — {n}; больше — с разрешения руководителя рынка": "Persönliches Reservierungslimit bei diesem Bauträger — {n}; mehr nur mit Erlaubnis des Marktleiters",
+"У застройщика сейчас нет свободного места — запрос {u} в очереди (до 7 дней); как только место освободится, он уйдёт бэк-офису": "Beim Bauträger ist gerade kein Platz frei — Anfrage {u} steht in der Warteschlange (bis 7 Tage); sobald ein Platz frei wird, geht sie an das Backoffice",
+"ближайшее место — ориентировочно {d}": "nächster Platz — voraussichtlich {d}",
+"ваших — до {a} у застройщика": "Ihre — bis {a} beim Bauträger",
+"клиент {c} · на человека {a} · у застройщика всего {t}": "Kunde {c} · pro Person {a} · Bauträger gesamt {t}",
+"Одновременных броней на GetsEstate — все проекты": "Gleichzeitige Reservierungen für GetsEstate — alle Projekte",
+"Личный лимит партнёра и сейлза": "Persönliches Limit von Partner und Verkäufer",
+"Вход с нового устройства": "Anmeldung von einem neuen Gerät",
+"В ваш кабинет GetsEstate вошли с нового устройства: {w}, {d}.": "Bei Ihrem GetsEstate-Konto wurde sich von einem neuen Gerät angemeldet: {w}, {d}.",
+"Если это были не вы — смените пароль и напишите вашему куратору.": "Wenn Sie das nicht waren — ändern Sie Ihr Passwort und schreiben Sie Ihrem Betreuer.",
+"Вход с нового устройства: {d}": "Anmeldung von einem neuen Gerät: {d}",
+"Банковские реквизиты изменены": "Bankverbindung geändert",
+"Реквизиты для выплат в вашем кабинете изменены: IBAN {a} → {b}. Выплаты на новые реквизиты начнутся не раньше чем через 3 дня.": "Die Auszahlungsdaten in Ihrem Konto wurden geändert: IBAN {a} → {b}. Auszahlungen auf die neuen Daten beginnen frühestens in 3 Tagen.",
+"Если это были не вы — срочно напишите вашему куратору или ответьте на это письмо.": "Wenn Sie das nicht waren — schreiben Sie sofort Ihrem Betreuer oder antworten Sie auf diese E-Mail.",
+"Партнёр {n} сменил банковские реквизиты — выплата на новые не раньше чем через 3 дня": "Partner {n} hat die Bankverbindung geändert — Auszahlung auf die neue frühestens in 3 Tagen",
+"Форма устарела или заполнена слишком быстро — обновите страницу и отправьте ещё раз": "Das Formular ist veraltet oder wurde zu schnell ausgefüllt — Seite neu laden und erneut senden",
+"Слишком много заявок — попробуйте позже": "Zu viele Anfragen — später erneut versuchen"
 }

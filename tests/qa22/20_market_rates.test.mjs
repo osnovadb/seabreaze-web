@@ -22,7 +22,7 @@ test('бронь клиента из Израиля по BRABUS: фикс 2,5 % 
   assert.equal(Number(b.snapshot.fix_pct), 2.5, 'в брони не ставка рынка сделки: ' + b.snapshot.fix_pct)
   assert.equal(b.snapshot.rate_market, 'IL')
   assert.equal(Number(b.snapshot.agent_fix_pct), 1); assert.equal(Number(b.snapshot.referrer_pct), 0.5)
-  assert.equal(b.snapshot.fix_base, 'list'); assert.ok(Math.abs(b.snapshot.split.fix - u.price * 0.025) < 1, 'фикс Арада не от прайса')
+  assert.equal(b.snapshot.fix_base, 'list'); assert.ok(Math.abs(b.snapshot.split.fix - Number(b.price_list) * 0.025) < 1, `фикс Арада не от прайса: ${b.snapshot.split.fix} при прайсе ${b.price_list}`)
   await act(SIL, 'bookingAction', { id: b.id, act: 'cancel' })
 })
 test('ставка рынка, при которой доли больше нашего фикса, не сохраняется', async () => {

@@ -15,7 +15,7 @@ type Mo = { m: string; sold: number; bookings: number; deals: number; total: num
 export default async function Stock(props: { searchParams: Promise<{ p?: string; by?: string }> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ps = await q<{ id: string; slug: string; name: string }>('select id, slug, name from projects order by sort, name')
   const p = ps.find((x) => x.slug === searchParams.p) || null

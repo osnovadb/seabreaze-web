@@ -35,7 +35,7 @@ async function owner() {
 }
 async function unitsEditor() {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role) || (c.impersonating && process.env.ALLOW_IMPERSONATE_WRITE !== '1')) throw new Error('forbidden')
+  if (!['owner', 'office', 'finance'].includes(c.user.role) || (c.impersonating && process.env.ALLOW_IMPERSONATE_WRITE !== '1')) throw new Error('forbidden')
   return c
 }
 const log = (c: Ctx, action: string, entity: string, id: string, data?: unknown) => audit(c.real.id, action, entity, id, data, c.impersonating ? c.user.id : null)
@@ -202,7 +202,7 @@ export const saveUnit = safe(async (_: unknown, f: FormData) => {
   if (price != null && (Number.isNaN(price) || price < 0)) return { error: t(c.lang, 'Проверьте цену') }
   // Правка — от имени пользователя: журнал квартиры запишет автора (lib/unitEvents.ts)
   const err = await asActor(c.user.id, 'portal', async (db) => {
-  if (c.user.role === 'office') {
+  if ((c.user.role === 'office' || c.user.role === 'finance')) {
     await db.query(`update units set price_list = $2, price_currency = $3, status = $4 where id = $1 and project_id = $5`, [id, price, cur, status, pid])
   } else {
     const lay = s(f, 'layout') ? (await db.query<{ unit_type: string; bedrooms: number | null; total_area_m2: number | null; internal_area_m2: number | null; external_area_m2: number | null }>('select unit_type, bedrooms, total_area_m2, internal_area_m2, external_area_m2 from layouts where id = $1', [s(f, 'layout')])).rows[0] : null

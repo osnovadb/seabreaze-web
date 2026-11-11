@@ -13,7 +13,7 @@ import { trancheReceived, recomputeShares, registerCollect, registerConfirm, reg
 const TABS: [string, string][] = [['sales', 'Продажи и доли'], ['tranches', 'Транши от застройщиков'], ['register', 'Реестр выплат'], ['debts', 'Долги и клаубэк'], ['acts', 'Акты'], ['tax', 'Удержание налога']]
 const TR: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { scheduled: ['ждём оплату клиента', 'off'], expected: ['ожидаем от застройщика', 'warn'], received: ['получено', 'ok'], cancelled: ['отменён', 'off'] }
 
-export default async function Finance(props: { searchParams: Promise<{ tab?: string; m?: string }> }) {
+export default async function Finance(props: { searchParams: Promise<{ tab?: string; m?: string; e?: string }> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!canSeeFinance(c.user.role)) redirect('/')
@@ -22,6 +22,11 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
   const fin = ['owner', 'finance'].includes(c.user.role), owner = c.user.role === 'owner', head = c.user.role === 'market_head'
   const mk = head ? `and cl.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''
   const month = /^\d{4}-\d{2}$/.test(searchParams.m || '') ? searchParams.m! : new Date().toISOString().slice(0, 7)
+  // 365 (11.11): финансы видят выплаты всех трёх юрлиц, с фильтром. Плательщик — по рынку получателя: DE — GmbH, IL — IL Ltd, остальные — Caspian
+  const ENT: [string, string][] = [['GmbH', `l.market = 'DE'`], ['IL Ltd', `l.market = 'IL'`], ['Caspian', `coalesce(l.market, '') not in ('DE','IL')`]]
+  const ent = ENT.find(([k]) => k === searchParams.e)
+  const entSql = ent ? `and ${ent[1]}` : ''
+  const EntChips = () => <div className="chips mt8"><span className="small muted" style={{ alignSelf: 'center' }}>{T('Юрлицо')}:</span>{[['', T('все')], ...ENT.map(([k]) => [k, k])].map(([k, l]) => <a key={k} href={`?tab=${tab}&m=${month}${k ? '&e=' + encodeURIComponent(k) : ''}`} className={'chip' + ((searchParams.e || '') === k ? ' on' : '')}>{l}</a>)}</div>
   const Tabs = () => <div className="tabs">{TABS.filter(([k]) => fin || ['sales', 'tranches', 'register', 'debts'].includes(k)).map(([k, l]) => <a key={k} href={`?tab=${k}`} className={tab === k ? 'on' : ''}>{T(l)}</a>)}</div>
 
   const deals = tab === 'sales' ? await q<{ id: string; unit: string; project: string; client: string; stage: string; final_price: number; total: number; paid_pct: number; created_at: string; market: string | null; shares: { role: string; who: string | null; amount: number; got: number }[] | null }>(
@@ -40,7 +45,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
   const lines = reg ? await q<{ id: string; role: string; who: string | null; market: string | null; gross: number; withheld: number; net: number; doc_ok: boolean; carried: boolean; note: string | null; act_no: string | null; agreed: boolean; invoice: boolean; needs_inv: boolean }>(
     `select l.id, l.role, coalesce(u.name, l.recipient) who, l.market, l.gross::float, l.withheld::float, l.net::float, l.doc_ok, l.carried, l.note, l.act_no, l.agreed_at is not null agreed,
        l.invoice_file_id is not null invoice, coalesce(u.partner_form in ('company','sole'), false) needs_inv from portal.payout_lines l left join portal.users u on u.id = l.user_id
-     where l.register_id = $1 ${head ? `and l.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''} order by l.carried, l.role, who`, [reg.id]) : []
+     where l.register_id = $1 ${head ? `and l.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''} ${entSql} order by l.carried, l.role, who`, [reg.id]) : []
   const markets = Array.from(new Set(lines.filter((l) => !l.carried && l.market).map((l) => l.market!)))
   // QA 09.11: реестр месяца оплачен, а начисления продолжают приходить — говорим, куда они пойдут
   const after = tab === 'register' && reg && reg.status !== 'collected' ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
@@ -53,7 +58,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
   const acts = tab === 'acts' ? await q<{ id: string; act_no: string; act_date: string; who: string | null; role: string; market: string | null; net: number; currency: string | null; amount_cur: number | null; agreed: boolean; invoice: boolean; needs_inv: boolean; carried: boolean; reg_status: string; reg_month: string }>(
     `select l.id, l.act_no, l.act_date::text, coalesce(u.name, l.recipient) who, l.role, l.market, l.net::float, l.currency, l.amount_cur::float, l.agreed_at is not null agreed, l.invoice_file_id is not null invoice,
        coalesce(u.partner_form in ('company','sole'), false) needs_inv, l.carried, r.status reg_status, r.month::text reg_month
-     from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id left join portal.users u on u.id = l.user_id where l.act_no is not null order by l.act_date desc, l.act_no desc limit 300`) : []
+     from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id left join portal.users u on u.id = l.user_id where l.act_no is not null ${entSql} order by l.act_date desc, l.act_no desc limit 300`) : []
   const wh = tab === 'tax' ? await q<{ entity: string; country: string; rate: number }>('select entity, country, rate::float from portal.withholding order by entity, country') : []
   return (
     <>
@@ -85,6 +90,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
               <td>{fin && x.status === 'expected' && <details><summary className="btn btn--sm btn--p">{T('Получено (Received by AZ)')}</summary>
                 {/* QA 09.11: отметка необратима и запускает начисления — второй шаг с суммой на глазах */}
                 <form action={trancheReceived} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="id" value={x.id} /><div className="tiny muted">{T('{a} от {d} пришли на счёт? Начисления по долям создадутся сразу, отменить нельзя.', { a: usd(L, x.amount), d: x.dev })}</div><button className="btn btn--sm">{T('Да, деньги на счёте')}</button></form></details>}</td></tr>))}</tbody></table></div>}
+        {tab === 'register' && fin && <EntChips />}
         {tab === 'register' && <>
           <form className="row" style={{ gap: 8 }}><input type="hidden" name="tab" value="register" /><label className="field"><span>{T('Месяц среза')}</span><input className="in" type="month" name="m" defaultValue={month} /></label><button className="btn btn--sm">{T('Показать')}</button></form>
           {!reg && <div className="card stack" style={{ gap: 8 }}><div>{T('Реестр за {m} ещё не собран. Открытых начислений по поступлениям до конца месяца: {n} на {s}.', { m: month, n: pending?.n || 0, s: usd(L, pending?.s || 0) })}</div>
@@ -117,6 +123,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
             <tr key={i}><td>{d.who}</td><td className="small">{T(ROLE_LABEL[d.role] || d.role)}</td><td className="badc"><b>{usd(L, -d.bal)}</b></td><td className="small">{date(L, d.since)}{d.role === 'partner' && d.since && Date.now() - new Date(d.since).getTime() > 90 * 86400000 ? <div className="tiny badc">{T('3 месяца без зачёта — выставить счёт на возврат')}</div> : ''}
               {owner && d.user_id && <form action={writeOff} className="mt8"><input type="hidden" name="user" value={d.user_id} /><input type="hidden" name="role" value={d.role} /><button className="btn btn--sm btn--ghost">{T('Списать долг')}</button></form>}</td></tr>))}</tbody></table></div>
           <div className="small muted mt8">{T('Клаубэк партнёра зачитывается против следующих выплат; через 3 месяца без зачёта — счёт на возврат по соглашению; списать долг может только админ. Клаубэк сотрудника — только против будущих бонусов, из оклада не удерживаем.')}</div></div>}
+        {tab === 'acts' && fin && <EntChips />}
         {tab === 'acts' && fin && <div><div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Акт', 'Получатель', 'Реестр', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет — номера присваиваются при утверждении реестра')}</td></tr> : acts.map((a) => (

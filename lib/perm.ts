@@ -11,18 +11,18 @@ export const isTeam = (r: Role) => !isExternal(r)
 
 // Что видит пользователь в шахматке: полные статусы или только «свободно/недоступно»
 export const seesAllStatuses = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'finance', 'content'].includes(r)
-export const seesSource = (r: Role) => ['owner', 'market_head', 'seller', 'office'].includes(r)
+export const seesSource = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'finance'].includes(r)
 export const seesDeveloperTerms = (r: Role) => ['owner', 'market_head', 'finance'].includes(r)
 export const canRegisterClient = (r: Role) => ['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(r)
-export const canBook = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'agency_head', 'agent'].includes(r)
-export const canConfirmBooking = (r: Role) => ['owner', 'office'].includes(r)
+export const canBook = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'finance', 'agency_head', 'agent'].includes(r)
+export const canConfirmBooking = (r: Role) => ['owner', 'office', 'finance'].includes(r)
 export const canEditConditions = (r: Role) => r === 'owner'
 export const canManageUsers = (r: Role) => r === 'owner'
 export const canReviewAgents = (r: Role) => ['owner', 'market_head', 'seller'].includes(r)
 export const canSeeJournal = (r: Role) => ['owner', 'market_head', 'finance'].includes(r)
-export const canSeeClients = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'agency_head', 'agent'].includes(r)
+export const canSeeClients = (r: Role) => ['owner', 'market_head', 'seller', 'office', 'finance', 'agency_head', 'agent'].includes(r)
 export const canSeeFinance = (r: Role) => ['owner', 'market_head', 'finance'].includes(r)
-export const canSeeSources = (r: Role) => ['owner', 'office'].includes(r)
+export const canSeeSources = (r: Role) => ['owner', 'office', 'finance'].includes(r)
 export const maxDiscount = (r: Role, c: { seller_self_disc: number; seller_max_disc: number; agent_pool_pct: number }) =>
   r === 'owner' || r === 'market_head' ? Number(c.seller_max_disc) : r === 'seller' ? Number(c.seller_self_disc) : Number(c.agent_pool_pct)
 

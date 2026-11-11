@@ -11,7 +11,7 @@ import { PrivacyForm } from './form'
 // 2.2 · §15 Согласия и данные: журнал согласий, клиенты без согласия, запросы на удаление (исполнение за 30 дней, в портале и Bitrix24)
 export default async function Privacy() {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const reqs = await q<{ id: string; client_label: string; channel: string | null; requested_at: string; due_at: string; status: string; result: Record<string, unknown> | null; note: string | null }>(
     'select id, client_label, channel, requested_at, due_at::text, status, result, note from portal.privacy_requests order by status = \'open\' desc, requested_at desc limit 100')

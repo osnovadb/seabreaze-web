@@ -1,7 +1,7 @@
 'use server'
 import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { q, one, tx, audit, notify, withKeyLock, personKeys } from './db'
@@ -29,6 +29,7 @@ import { computeShares, buildTranches } from './money22'
 import { requestConsent } from './consent'
 import { priceNegotiation } from './dict'
 import { MAX_SEL_VARIANTS } from './selVariants'
+import { formTokenOk } from './formGuard'
 
 // Вход «от имени» по ТЗ — только чтение; на тестовом стенде запись разрешена флагом ALLOW_IMPERSONATE_WRITE=1
 async function writeCtx() {
@@ -57,9 +58,28 @@ export async function login(_: unknown, f: FormData) {
   }
   await noteLogin(email, ip, true)
   await signSession(u.id)
+  await deviceCheck(u.id, ip) // 358: уведомление о входе с нового устройства
   await q('update portal.users set prev_login_at = last_login_at, last_login_at = now() where id = $1', [u.id])
   await audit(u.id, 'login')
   redirect('/')
+}
+// 358 (11.11): вход с нового устройства — письмо на адрес пользователя и уведомление в портале; первое устройство — без письма
+async function deviceCheck(userId: string, ip: string) {
+  const jar = await cookies()
+  let dev = jar.get('ge_dev')?.value || ''
+  if (!/^[0-9a-f]{32}$/.test(dev)) { dev = crypto.randomBytes(16).toString('hex'); jar.set('ge_dev', dev, { path: '/', maxAge: 5 * 365 * 86400, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' }) }
+  const ua = ((await headers()).get('user-agent') || '').slice(0, 300)
+  const known = await one<{ n: number; me: boolean }>('select count(*)::int n, bool_or(device_id = $2) me from portal.user_devices where user_id = $1', [userId, dev])
+  await q(`insert into portal.user_devices (user_id, device_id, ua, ip) values ($1,$2,$3,$4) on conflict (user_id, device_id) do update set last_at = now(), ip = excluded.ip`, [userId, dev, ua, ip || null])
+  if (!known?.n || known.me) return
+  const u = await one<{ email: string; name: string; locale: Lang }>('select email, name, locale from portal.users where id = $1', [userId])
+  if (!u) return
+  const L = (LANGS.includes(u.locale) ? u.locale : 'en') as Lang
+  const when = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+  await q(`insert into portal.outbox_messages (channel, to_addr, user_id, subject, body, kind) values ('email',$1,$2,$3,$4,'new_device')`, [u.email, userId, 'GetsEstate · ' + t(L, 'Вход с нового устройства'),
+    [t(L, 'Здравствуйте, {n}!', { n: u.name }), t(L, 'В ваш кабинет GetsEstate вошли с нового устройства: {w}, {d}.', { w: when, d: ua.slice(0, 120) || '—' }), t(L, 'Если это были не вы — смените пароль и напишите вашему куратору.')].join('\n\n')])
+  await notify(userId, 'security', 'Вход с нового устройства: {d}', '/profile', { d: when })
+  await audit(userId, 'login.new_device', 'user', userId, { ip })
 }
 export async function logout() { await clearSession(); redirect('/login') }
 export async function setLang(lang: Lang) {
@@ -128,7 +148,7 @@ async function stageGuard(c: Ctx, clientId: string) {
   const cl = await one<{ id: string; owner_id: string; agency_id: string | null; name: string }>('select id, owner_id, agency_id, name from portal.clients where id = $1', [clientId])
   if (!cl) throw new Error('client')
   const u = c.user
-  const ok = u.role === 'owner' || u.role === 'market_head' || u.role === 'office' || cl.owner_id === u.id || (u.role === 'agency_head' && cl.agency_id === u.agency_id)
+  const ok = u.role === 'owner' || u.role === 'market_head' || (u.role === 'office' || u.role === 'finance') || cl.owner_id === u.id || (u.role === 'agency_head' && cl.agency_id === u.agency_id)
     || (u.role === 'seller' && (await one('select 1 from portal.users where id = $1 and curator_id = $2', [cl.owner_id, u.id])))
   if (!ok) throw new Error('forbidden')
   return cl
@@ -396,7 +416,7 @@ export async function fixation(f: FormData) {
     await stageGuard(c, id)
     await q(`insert into portal.fixations (client_id, project_id) values ($1,$2) on conflict do nothing`, [id, pid])
     await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system','Отправлено на фиксацию у застройщика')`, [id, c.user.id])
-  } else if (['owner', 'market_head', 'seller', 'office'].includes(c.user.role) && ['approved', 'rejected'].includes(act)) {
+  } else if (['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && ['approved', 'rejected'].includes(act)) {
     const cl = await one<{ owner_id: string; name: string }>('select owner_id, name from portal.clients where id = $1', [id])
     await q(`update portal.fixations set status = $3, decided_at = now(), protected_until = case when $3 = 'approved' then current_date + interval '12 months' end where client_id = $1 and project_id = $2`, [id, pid, act])
     await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system',$3)`, [id, c.user.id, act === 'approved' ? 'Застройщик одобрил фиксацию' : 'Застройщик отклонил фиксацию'])
@@ -498,10 +518,16 @@ export async function createBooking(_: unknown, f: FormData) {
       count(*) filter (where client_id = $1)::int cl, count(*) filter (where agent_id = $2)::int ag, count(*)::int tot
     from portal.bookings where project_id = $3 and status in ('requested','confirmed')`, [clientId, c.user.id, unit.project_id])
   if (active!.cl >= cond.max_bookings_client) return { error: t(c.lang, 'У клиента уже {n} активных брони — это максимум', { n: active!.cl }) }
-  if (isExternal(c.user.role) && active!.ag >= cond.max_bookings_agent) return { error: t(c.lang, 'Лимит броней агента: {n}', { n: cond.max_bookings_agent }) }
-  // §7 п.4: лимит одновременных броней — из условий проекта (решение 08.11: условия на проект); занят — запрос в очередь (Queued) на 7 дней
-  const limit = cond.max_bookings_total
-  const used = (await one<{ n: number }>(`select count(*)::int n from portal.bookings where project_id = $1 and status in ('requested','confirmed','release_pending')`, [unit.project_id]))!.n
+  // 366 (Денис 11.11): лимит застройщика — на все его проекты вместе; личный лимит партнёра и сейлза — у застройщика (Арад 1, Premium 3),
+  // руководитель рынка и владелец могут превысить. Занято — запрос в очередь (Queued) на 7 дней
+  const dl = await one<{ lim: number; person: number; used: number; mine: number }>(`select d.max_bookings_total lim, d.max_bookings_person person,
+      (select count(*)::int from portal.bookings b join public.projects p2 on p2.id = b.project_id where p2.developer_id = d.catalog_id and b.status in ('requested','confirmed','release_pending')) used,
+      (select count(*)::int from portal.bookings b join public.projects p2 on p2.id = b.project_id where p2.developer_id = d.catalog_id and b.agent_id = $2 and b.status in ('queued','requested','confirmed','release_pending')) mine
+    from public.projects p join portal.developers d on d.catalog_id = p.developer_id where p.id = $1`, [unit.project_id, c.user.id])
+  if (dl && !['owner', 'market_head'].includes(c.user.role) && dl.mine >= dl.person)
+    return { error: t(c.lang, 'Личный лимит броней у этого застройщика — {n}; больше — с разрешения руководителя рынка', { n: dl.person }) }
+  const limit = dl ? dl.lim : cond.max_bookings_total
+  const used = dl ? dl.used : (await one<{ n: number }>(`select count(*)::int n from portal.bookings where project_id = $1 and status in ('requested','confirmed','release_pending')`, [unit.project_id]))!.n
   const queued = used >= limit
   const days = cond.booking_days
   const tour = { from: s(f, 'tour_from') || null, to: s(f, 'tour_to') || null }
@@ -536,7 +562,7 @@ export async function createBooking(_: unknown, f: FormData) {
       queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
     .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e }) // одновременный второй запрос на ту же квартиру
   if (!b) return { error: 'Квартира уже недоступна — встаньте в лист ожидания' }
-  if (queued) await notify(c.user.id, 'booking', 'Лимит броней застройщика занят — запрос {u} в очереди (до 7 дней)', '/bookings', { u: unitNo(unit) })
+  if (queued) await notify(c.user.id, 'booking', 'У застройщика сейчас нет свободного места — запрос {u} в очереди (до 7 дней); как только место освободится, он уйдёт бэк-офису', '/bookings', { u: unitNo(unit) })
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
   await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Бронь {u} на {d} дней, цена {p}',$3)`, [clientId, c.user.id, { u: unitNo(unit), d: cond.booking_days, p: '$' + Math.round(sp.final).toLocaleString('en') }])
@@ -650,7 +676,7 @@ export async function bookingAction(f: FormData) {
 // гл. 6 (решение 341): «Отказ» во вкладке Units — Lost с причиной из списка (Price, Financing, …); стадию Lost в Bitrix24 ставит портал
 export async function refuseClient(f: FormData) {
   const c = await writeCtx()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role)) return
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) return
   const id = s(f, 'client'), reason = B24_LOST.includes(s(f, 'reason')) ? s(f, 'reason') : 'Other'
   const r = await moveStage(id, 'lost', { reason })
   if (r?.error) return
@@ -752,6 +778,12 @@ export async function openedSelection(token: string) {
 
 /* ── Заявка агента (публичная) и проверка ── */
 export async function applyAgent(_: unknown, f: FormData) {
+  // 358 (11.11): защита формы заявки от ботов — ловушка, метка времени показа формы, не больше 5 заявок с адреса в час и 3 с e-mail в сутки
+  const ip = clientIp()
+  if (s(f, 'website') || !formTokenOk(s(f, 'ft'))) return { error: 'Форма устарела или заполнена слишком быстро — обновите страницу и отправьте ещё раз' }
+  const flood = await one<{ i: number; e: number }>(`select count(*) filter (where ip = $1 and created_at > now() - interval '1 hour')::int i,
+      count(*) filter (where lower(email) = lower($2) and created_at > now() - interval '1 day')::int e from portal.agent_applications where (ip = $1 or lower(email) = lower($2))`, [ip || '-', s(f, 'email')])
+  if ((ip && (flood?.i || 0) >= 5) || (flood?.e || 0) >= 3) return { error: 'Слишком много заявок — попробуйте позже' }
   if (!s(f, 'name') || !s(f, 'email')) return { error: 'Нужны имя и e-mail' }
   if (!f.get('consent')) return { error: 'Нужно согласие с условиями и обработкой данных' }
   const market = ['DE', 'IL', 'GLOBAL'].includes(s(f, 'market')) ? s(f, 'market') : 'DE'
@@ -764,6 +796,7 @@ export async function applyAgent(_: unknown, f: FormData) {
   const token = crypto.randomBytes(12).toString('hex')
   const app = await one<{ id: string }>(`insert into portal.agent_applications (kind, name, company, email, phone, city, languages, license, volume, channels, market, status_token) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
     [['agency', 'referrer'].includes(s(f, 'kind')) ? s(f, 'kind') : 'agent', s(f, 'name'), s(f, 'company') || null, s(f, 'email'), s(f, 'phone'), s(f, 'city'), s(f, 'languages'), s(f, 'license'), s(f, 'volume'), s(f, 'channels'), market, token])
+  if (ip) await q('update portal.agent_applications set ip = $2 where id = $1', [app!.id, ip])
   for (const d of docs) await q('insert into portal.application_files (application_id, file_id) values ($1,$2)', [app!.id, await storeFile(d, null, DOC)])
   await queueApp(app!.id, `заявка подана в портале, документов: ${docs.length}`) // §13 п.18
   // §6 П9: рекомендатель — короткая оферта и соглашение о данных в форме, доступ сразу (Access granted), вход по ссылке из письма

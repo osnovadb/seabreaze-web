@@ -19,7 +19,7 @@ const KEYS = ['f', 'd', 'p', 'm', 'src', 's', 'from', 'to', 'by', 'flag', 'cons'
 export default async function Registrations(props: { searchParams: Promise<RegParams> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
-  if (!['owner', 'office', 'market_head'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const rows = await loadRegistrations({ ...searchParams, ids: undefined }, c.user)
   const devs = await q<{ id: string; name: string }>('select id, name from portal.developers where active order by name')
@@ -28,7 +28,7 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
   const groups: [string, string][] = [['today', 'К отправке'], ['wait', 'Ждём ответа'], ['silence', 'Молчание'], ['expiring', 'Истекают'], ['confirmed', 'Подтверждены'], ['rejected', 'Отказы'], ['all', 'Все']]
   const f = groups.some(([k]) => k === searchParams.f) ? searchParams.f! : 'today'
   const shown = rows.filter((r) => groupOf(r, today)[f])
-  const edit = ['owner', 'office'].includes(c.user.role)
+  const edit = ['owner', 'office', 'finance'].includes(c.user.role)
   // текущие фильтры — в ссылки вкладок и в выгрузку
   const qs = (over: Partial<Record<(typeof KEYS)[number], string>>) => {
     const u = new URLSearchParams()

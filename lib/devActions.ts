@@ -6,7 +6,7 @@ import { requireCtx } from './auth'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 
-const INT = ['reg_response_days', 'silence_extra_days', 'protect_months', 'renew_remind_days', 'booking_days', 'booking_ext_days', 'max_bookings_total', 'clawback_months', 'payment_wait_days'] as const
+const INT = ['reg_response_days', 'silence_extra_days', 'protect_months', 'renew_remind_days', 'booking_days', 'booking_ext_days', 'max_bookings_total', 'max_bookings_person', 'clawback_months', 'payment_wait_days'] as const
 
 export async function saveDeveloper(_: unknown, f: FormData) {
   const c = await requireCtx()

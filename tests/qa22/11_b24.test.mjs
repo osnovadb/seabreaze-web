@@ -3,7 +3,7 @@
 // Запуск только на отдельном экземпляре с вебхуком (QA_URL=:3044, B24_WEBHOOK задан). Всё созданное в Bitrix24 удаляется в конце.
 import { test, after, before } from 'node:test'
 import assert from 'node:assert/strict'
-import { user, agency, register, qualify, freeUnit, q, one, close, act, lastBooking, client } from './h.mjs'
+import { user, agency, register, qualify, freeUnit, q, one, close, act, lastBooking, client, formTok } from './h.mjs'
 
 const WH = (process.env.B24_WEBHOOK || '').replace(/\/+$/, '')
 const skip = !WH || !/3044/.test(process.env.QA_URL || '')
@@ -111,7 +111,7 @@ test('очередь обмена: ошибок нет', { skip }, async () => {
 })
 test('заявка партнёра → сделка в воронке Partners рынка, тип — полем (гл. 10, без Agencies / Sub-agents)', { skip }, async () => {
   const email = `qa-apply-${Date.now().toString(36)}@qa.test`
-  await act(null, 'applyAgent', { kind: 'agency', name: 'QA Apply TEST', company: 'QA Apply TEST GmbH', email, phone: '+49 151 ' + String(Date.now()).slice(-7), market: 'DE', consent: 'on', lang: 'de' })
+  await act(null, 'applyAgent', { ft: formTok(), kind: 'agency', name: 'QA Apply TEST', company: 'QA Apply TEST GmbH', email, phone: '+49 151 ' + String(Date.now()).slice(-7), market: 'DE', consent: 'on', lang: 'de' })
   const a = await one('select id, b24_deal_id, b24_contact_id from portal.agent_applications where email = $1', [email])
   assert.ok(a?.b24_deal_id, 'сделка заявки не создана')
   made.deal.add(Number(a.b24_deal_id)); if (a.b24_contact_id) made.contact.add(Number(a.b24_contact_id))

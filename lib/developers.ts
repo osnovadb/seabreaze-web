@@ -4,7 +4,7 @@ import { q, one } from './db'
 export type Developer = {
   id: string; name: string; catalog_id: string | null; reg_method: string; reg_email: string | null; reg_response_days: number
   silence_rule: 'confirm' | 'remind'; silence_extra_days: number; protect_months: number; protect_months_sub: number | null; renew_remind_days: number
-  booking_days: number; booking_ext_days: number; max_bookings_total: number; booking_write_api: boolean
+  booking_days: number; booking_ext_days: number; max_bookings_total: number; max_bookings_person: number; booking_write_api: boolean
   commission_pct: number | null; rates_by_market: Record<string, number>; vat_mode: 'over' | 'incl'; options_in_base: boolean
   pay_timing: string; fx_rule: string | null; clawback_months: number; clawback_offset: 'any' | 'same_client'; payment_wait_days: number
   sells_to_az: boolean; tz: string; contacts: string | null; note: string | null; active: boolean

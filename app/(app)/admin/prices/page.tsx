@@ -12,7 +12,7 @@ import { normRule } from '@/lib/priceRule'
 export default async function Prices(props: { searchParams: Promise<{ p?: string; units?: string }> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ps = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
   const p = ps.find((x) => x.id === searchParams.p) || ps[0]

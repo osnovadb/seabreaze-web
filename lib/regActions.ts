@@ -6,7 +6,7 @@ import { requireCtx } from './auth'
 import { pushDeal, queueSync } from './b24sync'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
-const BACKOFFICE = ['owner', 'office']
+const BACKOFFICE = ['owner', 'office', 'finance']
 
 async function office() {
   const c = await requireCtx()

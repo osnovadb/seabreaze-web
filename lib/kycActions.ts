@@ -15,7 +15,7 @@ async function canEdit(clientId: string) {
   if (c.impersonating) throw new Error('read-only')
   const cl = await one<{ owner_id: string; agency_id: string | null; kyc_status: string }>('select owner_id, agency_id, kyc_status from portal.clients where id = $1', [clientId])
   if (!cl) throw new Error('client')
-  const ok = ['owner', 'market_head', 'seller', 'office'].includes(c.user.role) || cl.owner_id === c.user.id || (c.user.role === 'agency_head' && cl.agency_id === c.user.agency_id)
+  const ok = ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) || cl.owner_id === c.user.id || (c.user.role === 'agency_head' && cl.agency_id === c.user.agency_id)
   if (!ok) throw new Error('forbidden')
   return { c, cl }
 }

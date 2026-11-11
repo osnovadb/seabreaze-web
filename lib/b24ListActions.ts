@@ -8,7 +8,7 @@ import { pushDeal } from './b24sync'
 
 export async function sendSelectionToDeals(_: unknown, f: FormData) {
   const c = await requireCtx()
-  if (!['owner', 'market_head', 'seller', 'office'].includes(c.user.role) || c.impersonating) return { error: 'Нет прав' }
+  if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) || c.impersonating) return { error: 'Нет прав' }
   const clients = f.getAll('client').map(String).filter(Boolean)
   const nos = String(f.get('units') || '').split(/[,;\s]+/).filter(Boolean)
   const units: string[] = []

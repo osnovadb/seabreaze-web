@@ -4,7 +4,7 @@
 export const KYC_DOCS = ['passport', 'address'] as const
 export const KYB_DOCS = ['registry', 'ubo', 'director'] as const
 export const KYC_DOC_NAMES: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', registry: 'выписка из реестра', ubo: 'бенефициары', director: 'паспорт директора' }
-export const canReviewKyc = (role: string) => role === 'office' || role === 'owner'
+export const canReviewKyc = (role: string) => (role === 'office' || role === 'finance') || role === 'owner'
 export type KycFields = { kyc_citizenship: string | null; kyc_tax_residence: string | null; kyc_pep: boolean | null }
 export type Buyer = { id: string; kind: 'person' | 'company'; name: string; citizenship: string | null; tax_residence: string | null; pep: boolean | null; reg_no: string | null; ubo: string | null }
 // Чего не хватает для отправки. docs — документы клиента с привязкой к покупателю (buyer_id null — главный покупатель)

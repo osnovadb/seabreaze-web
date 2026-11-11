@@ -20,7 +20,7 @@ const fmt = (s: string | null) => (s ? String(s).slice(0, 10).split('-').reverse
 
 export async function GET(req: Request) {
   const c = await requireCtx()
-  if (!['owner', 'office', 'market_head'].includes(c.user.role)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (!['owner', 'office', 'finance', 'market_head'].includes(c.user.role)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   const u = new URL(req.url).searchParams
   const sp = Object.fromEntries(['f', 'd', 'p', 'm', 'src', 's', 'from', 'to', 'by', 'flag', 'cons', 'ids'].map((k) => [k, u.get(k) || undefined])) as RegParams
   const today = day(new Date())

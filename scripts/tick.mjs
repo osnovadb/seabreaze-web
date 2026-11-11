@@ -39,14 +39,15 @@ const expired = await q(`update portal.bookings b set status = 'expired' from un
 // §7 п.4: очередь лимита застройщика — по времени запроса; освободилось место — следующий запрос сам переходит в Requested; в очереди живёт 7 дней
 const qOut = await q(`update portal.bookings set status = 'cancelled' where status = 'queued' and queue_until < now() returning id, agent_id`)
 for (const b of qOut) await notify(b.agent_id, 'booking', 'Запрос в очереди застройщика снят через 7 дней — запросите снова, если нужно', '/bookings', {}, 'qout:' + b.id)
-const devs = await q(`select p.id, coalesce(k.max_bookings_total, 10) lim,
-    (select count(*)::int from portal.bookings b where b.project_id = p.id and b.status in ('requested','confirmed','release_pending')) used
-  from public.projects p cross join lateral (select * from portal.cur_conditions(p.id)) k where k.id is not null`)
+// 366 (11.11): лимит — на застройщика (все его проекты вместе)
+const devs = await q(`select d.catalog_id dev, d.max_bookings_total lim,
+    (select count(*)::int from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = d.catalog_id and b.status in ('requested','confirmed','release_pending')) used
+  from portal.developers d where d.active`)
 for (const d of devs) {
   if (d.used >= d.lim) continue
   const moved = await q(`update portal.bookings set status = 'requested', ends_at = now() + ((snapshot->>'booking_days') || ' days')::interval
-    where id in (select b.id from portal.bookings b where b.project_id = $1 and b.status = 'queued' order by b.queued_at limit $2)
-    returning id, agent_id`, [d.id, d.lim - d.used])
+    where id in (select b.id from portal.bookings b join public.projects p on p.id = b.project_id where p.developer_id = $1 and b.status = 'queued' order by b.queued_at limit $2)
+    returning id, agent_id`, [d.dev, d.lim - d.used])
   for (const b of moved) {
     await notify(b.agent_id, 'booking', 'Место у застройщика освободилось — запрос брони передан бэк-офису', '/bookings', {}, 'qin:' + b.id)
     for (const o of await q(`select id from portal.users where active and role = 'office'`)) await notify(o.id, 'booking', 'Запрос из очереди ждёт подтверждения у застройщика', '/bookings', {}, `qin:${b.id}:${o.id}`)

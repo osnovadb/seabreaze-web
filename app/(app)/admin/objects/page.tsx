@@ -14,7 +14,7 @@ import { saveProject } from '@/lib/objects'
 // Объекты: проекты каталога, их статус и видимость. Новый проект создаётся черновиком — партнёры и сайты его не видят.
 export default async function Objects() {
   const c = await requireCtx()
-  if (!['owner', 'office'].includes(c.user.role)) redirect('/')
+  if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const ps = await listProjects(c.user)
   const access = await q<{ project_id: string; agent_markets: string[]; sites: string[] }>(`select ps.project_id, ps.agent_markets,
