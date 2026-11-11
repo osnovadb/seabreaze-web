@@ -449,3 +449,11 @@ summary.btn::-webkit-details-marker { display: none; }
 /* В10 (ревью 10.11): поля в строке и в сетке сжимаются, а не наезжают друг на друга (контакты клиента, подключение источника, сопоставление статусов) */
 .row > .field, .row > .in, .grid > *, .field > .in { min-width: 0; }
 .row > .field > select.in { min-width: 0; width: 100%; }
+/* В8 (ревью 10.11): генплан на телефоне — на картинке только название корпуса (цифры — в списке корпусов ниже), подпись не шире 40 % картинки */
+@media (max-width: 640px) {
+  .gp .tag { padding: 3px 7px; white-space: normal; max-width: 40%; text-align: center; line-height: 1.2; }
+  .gp .tag b { font-size: 11.5px; }
+  .gp .tag__s { display: none; }
+}
+/* В8: на телефоне выпадающий список в строке с кнопкой — на всю ширину (имя клиента не обрезается), кнопка — под ним */
+@media (max-width: 640px) { .row > select.in { flex: 1 1 100% !important; } }

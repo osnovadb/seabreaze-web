@@ -90,7 +90,7 @@ export default async function ProjectPage(
               </svg>
               {gp.polygons.map((g) => byExt[g.block] && (
                 <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}>
-                  <b>{byExt[g.block].name}</b>{T('{n} свободно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}
+                  <b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} свободно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>
                 </div>
               ))}
             </div>
