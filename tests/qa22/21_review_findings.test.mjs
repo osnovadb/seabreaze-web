@@ -87,7 +87,7 @@ test('383: без согласия клиента бронь не запраши
   const u = await freeUnit()
   const r = await act(S, 'createBooking', { unit: u.id, client: cl, discount: 0, __noConsent: '1' })
   assert.match(JSON.stringify(r.result || r), /согласи/, 'бронь без согласия клиента прошла')
-  assert.equal(await lastBooking(cl), null, 'бронь создана без согласия')
+  assert.ok(!(await lastBooking(cl)), 'бронь создана без согласия')
   await act(S, 'holdUnit', { unit: u.id, client: cl })
   const h = await lastBooking(cl)
   assert.equal(h?.status, 'hold', 'холд без согласия не поставился')
