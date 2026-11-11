@@ -17,7 +17,7 @@ import { pbEnqueue } from './pbQueue'
 import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mailOn } from './access'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
-import { LANGS, t, bakuYear, dateTime, tzOf, type Lang } from './i18n'
+import { LANGS, t, bakuYear, bakuToday, dateTime, tzOf, type Lang } from './i18n'
 import { marketOfCountry } from './country'
 import { stageBlock, LOST_REASONS, B24_LOST } from './stages'
 import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
@@ -198,6 +198,7 @@ async function registerClientLocked(f: FormData) {
   const name = s(f, 'name'), phone = s(f, 'phone'), email = s(f, 'email')
   if (!name || (!phone && !email)) return { error: 'Нужны имя и телефон или e-mail' }
   if (!f.get('consent')) return { error: 'Без согласия клиента регистрация невозможна' }
+  if (!s(f, 'country')) return { error: 'Укажите страну проживания — от неё зависят рынок и условия' } // О93: страна обязательна — от неё рынок клиента и ставка (378)
   const pn = norm.phone(phone), em = norm.email(email)
   const ext = isExternal(c.user.role)
   const dup = await one<{ id: string; owner_id: string; attach_status: string; owner_type: string; market: string | null }>(`select id, owner_id, attach_status, owner_type, market from portal.clients
@@ -501,7 +502,11 @@ export async function createBooking(_: unknown, f: FormData) {
   const cMarket = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [clientId]))?.m || 'GLOBAL'
   const cond = await conditionsFor(unit.project_id, isExternal(c.user.role) ? c.user : null, cMarket)
   if (!cond) return { error: 'Для проекта не заведены условия' }
-  const disc = Math.max(0, Number(s(f, 'discount') || 0))
+  // Акция застройщика и правило сложения проекта (М6): цена до раздела денег считается на сервере, не из формы
+  const { promo, mode } = await promoForUnit(unit)
+  const ch = priceChain(unit.usd!, null, promo, mode)
+  // 384: «акция входит в максимум» — скидка клиенту не меньше акции; сама акция согласования не требует
+  const disc = Math.max(ch.minDisc, Number(s(f, 'discount') || 0))
   // 270: на рынке клиента выключены переговоры о цене — скидку и бронь запрашивает руководитель Global (или админ)
   if (!(await priceNegotiation(cMarket)) && c.user.role !== 'owner' && !(c.user.role === 'market_head' && (c.user.market || 'GLOBAL') === 'GLOBAL'))
     return { error: 'На рынке клиента переговоры о цене выключены — бронь и скидку запрашивает руководитель Global' }
@@ -522,7 +527,7 @@ export async function createBooking(_: unknown, f: FormData) {
   const pMonths = vr ? Number(vr.params.months) || 0 : plan && !isFull(plan) ? Number(plan.months) || 0 : 0
   const pool = planPool({ grid: activeGrid(await downGridFor(unit.project_id), new Date().toISOString().slice(0, 10), unit.building_id), plans: allPlans, poolPct: cond.pool_pct, downPct: pDown, months: pMonths })
   const pc = planCond(cond, pool.pct)
-  const cap = extReq ? pc.agent_pool_pct : Math.min(maxDiscount(c.user.role, cond), pool.pct), ceiling = Math.min(discountCeiling(c.user.role, cond), pool.pct)
+  const cap = Math.max(ch.minDisc, extReq ? pc.agent_pool_pct : Math.min(maxDiscount(c.user.role, cond), pool.pct)), ceiling = Math.max(ch.minDisc, Math.min(discountCeiling(c.user.role, cond), pool.pct))
   const byVariant = !!vr && disc <= Number(vr.params.disc || 0) + 1e-9
   if (extReq && disc > cap && !f.get('ask') && !byVariant) return { error: t(c.lang, 'Скидка больше вашей части — нажмите «Попросить больше»') }
   // QA 10.11 (Ревью): партнёрский запрос — до нейтрального потолка, не равного пулу (иначе перебором находится размер пула); отказ — за руководителем рынка
@@ -551,9 +556,6 @@ export async function createBooking(_: unknown, f: FormData) {
   const maxUntil = new Date(Date.now() + (cond.booking_days + cond.booking_ext_days) * 86400000).toISOString().slice(0, 10)
   const wantUntil = /^\d{4}-\d{2}-\d{2}$/.test(s(f, 'want_until')) && s(f, 'want_until') > maxUntil ? s(f, 'want_until') : null
   const signing = ['in_person', 'remote', 'power_of_attorney'].includes(s(f, 'signing')) ? s(f, 'signing') : null
-  // Акция застройщика и правило сложения проекта (М6): цена до раздела денег считается на сервере, не из формы
-  const { promo, mode } = await promoForUnit(unit)
-  const ch = priceChain(unit.usd!, plan, promo, mode)
   if (!ch.poolAllowed && disc > 0) return { error: t(c.lang, 'По условиям акции скидка из пула не применяется — уберите скидку') }
   // Пакет: вторая квартира клиента (машиноместо, кладовка) к его активной брони — один договор на все
   const pkgId = s(f, 'package')
@@ -674,7 +676,11 @@ export async function bookingAction(f: FormData) {
     if (kc?.kyc_status !== 'passed' || kc?.consent_status !== 'given') return // 383: договор — только после согласия клиента
     // 380 (Денис 12.11): дата и номер договора обязательны, файл — по желанию; от даты договора считается окно возврата комиссии
     const cDate = s(f, 'contract_date'), cNo = s(f, 'contract_no').slice(0, 80)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(cDate) || cDate > new Date().toISOString().slice(0, 10) || !cNo) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cDate) || cDate > bakuToday() || !cNo) { // О95: «сегодня» — по Баку, не UTC; отказ — не молча
+      if (s(f, 'back') === 'bookings') redirect(`/bookings?cerr=${id}`)
+      if (s(f, 'back') === 'units') redirect(`/b24/units/${b.client_id}?tab=units&cerr=${id}`)
+      return
+    }
     const cFile = isFile(f.get('contract_file')) ? await storeFile(f.get('contract_file') as File, c.user.id, { exts: ['pdf', 'jpg', 'jpeg', 'png', 'heic'], max: 15 * 1024 * 1024 }).catch(() => null) : null
     // Пакет: подтверждённые брони того же клиента с тем же group_id оформляются одним договором — по сделке на квартиру
     const g = (await one<{ group_id: string | null }>('select group_id from portal.bookings where id = $1', [id]))?.group_id
@@ -713,6 +719,7 @@ export async function bookingAction(f: FormData) {
   revalidatePath(`/b24/units/${b.client_id}`)
   // QA 09.11: после «Договор подписан» строка пропадала из броней молча — возвращаемся с пояснением
   if (act === 'contract' && s(f, 'back') === 'bookings') redirect(`/bookings?contract=${id}`)
+  if (act === 'contract' && s(f, 'back') === 'units') redirect(`/b24/units/${b.client_id}?tab=units&signed=${id}`)
 }
 
 // гл. 6 (решение 341): «Отказ» во вкладке Units — Lost с причиной из списка (Price, Financing, …); стадию Lost в Bitrix24 ставит портал

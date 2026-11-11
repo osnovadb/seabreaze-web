@@ -44,12 +44,20 @@ test('378: клиент из Израиля у сейлза DE — рынок IL
   const SDE = await user('seller', { market: 'DE' })
   const cl = (await register(SDE, { country: 'IL' })).result.id
   assert.equal((await one('select market from portal.clients where id = $1', [cl])).market, 'IL', 'рынок взят у сотрудника, а не по стране клиента')
-  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: '+972500000378', email: '', country: 'AT', language: 'de' })
+  const ph = '+9725' + String(Date.now()).slice(-8) // уникальный: повторный прогон не упирается в дубль телефона
+  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: ph, email: '', country: 'AT', language: 'de' })
   assert.equal((await one('select market from portal.clients where id = $1', [cl])).market, 'DE', 'страну поправили — рынок не пересчитан')
-  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: '+972500000378', email: '', country: 'IL', language: 'de' })
+  await act(SDE, 'updateClientContacts', { id: cl, client: cl, name: 'QA 378', phone: ph, email: '', country: 'IL', language: 'de' })
   const u = await freeUnit('brabus-island-baku')
   await act(SDE, 'createBooking', { unit: u.id, client: cl, discount: '0' })
   const b = await lastBooking(cl)
   assert.equal(Number(b.snapshot.fix_pct), 2.5, 'фикс не по рынку Израиля: ' + b.snapshot.fix_pct)
   await act(SDE, 'bookingAction', { id: b.id, act: 'cancel' })
+})
+
+// О93 (обход 12.11): без страны проживания клиента не создаём — от неё рынок и ставка
+test('О93: регистрация клиента без страны — отказ с понятной ошибкой', async () => {
+  const SDE = await user('seller', { market: 'DE' })
+  const r = await register(SDE, { country: '' })
+  assert.match(String(r.result?.error || ''), /страну/, 'клиент без страны создан: ' + JSON.stringify(r.result))
 })

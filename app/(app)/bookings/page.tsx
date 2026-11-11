@@ -3,7 +3,7 @@ import { Fragment } from 'react'
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, usd, date, pct } from '@/lib/i18n'
+import { t, usd, date, pct, bakuToday } from '@/lib/i18n'
 import { canConfirmBooking, isExternal, canBook, canApproveDiscount } from '@/lib/perm'
 import { bookingScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
@@ -14,7 +14,7 @@ type B = { id: string; status: string; ends_at: string; starts_at: string; exten
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
 const PAGE = 200 // QA 10.11: «Все» у руководителя рынка — тысяча строк одним списком
 export default async function Bookings(
-  props: { searchParams: Promise<{ f?: string; created?: string; s?: string; contract?: string }> }
+  props: { searchParams: Promise<{ f?: string; created?: string; s?: string; contract?: string; cerr?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
@@ -54,6 +54,7 @@ export default async function Bookings(
           {[[T('Активных'), active.length], [T('Истекают ≤ 3 дней'), active.filter((r) => new Date(r.ends_at).getTime() - now < 3 * 86400000).length], [T('Ждут подтверждения застройщика'), active.filter((r) => r.status === 'requested').length], [T('Конфликты'), rows.filter(conflict).length]].map(([a, b]) => <div key={a} className="card card--tight kpi"><div className="small muted">{a}</div><div className="v">{b}</div></div>)}
         </div>
         {limits.length > 0 && <div className="row mt16" style={{ gap: 16 }}>{limits.map((x) => <span key={x.name} className={'small' + (x.used >= x.max ? ' badc' : '')}>{T('Лимит у застройщика')} · {x.name}: <b>{x.used} / {x.max}</b></span>)}</div>}
+        {searchParams.cerr && <div className="err" style={{ marginBottom: 16 }}>{T('Договор не отмечен: нужны номер договора и дата не позже сегодняшней (по Баку).')}</div>}
         {signed && <div className="okbox" style={{ marginBottom: 16 }}>{T('Договор по {u} подписан — бронь закрыта, сделка в «Финансы → Продажи и доли».', { u: signed.unit })}</div>}
         <div className="row mt16" style={{ gap: 12, justifyContent: 'space-between' }}><div className="chips">{[...(ext ? [] : [['wait', `${T('Ждут подтверждения')} · ${active.filter((r) => r.status === 'requested').length}`]]), ['active', 'Активные'], ['soon', 'Истекают'], ['conflict', 'Конфликты'], ...(!ext || rows.some(feeQ) ? [['fee', `${T('Взносы')} · ${rows.filter(feeQ).length}`]] : []), ['all', 'Все']].map(([k, l]) => <Link key={k} href={`?f=${k}`} className={'chip' + (f === k ? ' on' : '')}>{k === 'fee' || k === 'wait' ? l : T(l)}</Link>)}</div>
           <form className="row" style={{ gap: 6 }}><input type="hidden" name="f" value={f} /><input className="in in--sm" name="s" defaultValue={searchParams.s || ''} placeholder={T('Квартира, клиент, агент')} style={{ width: 220 }} /><button className="btn btn--sm">{T('Найти')}</button></form></div>
@@ -93,7 +94,7 @@ export default async function Bookings(
                       {r.status === 'confirmed' && !r.extended && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('extend', 'Продлить')}
                       {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && (r.consent_status !== 'given' ? <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после согласия клиента')}</Link> : r.kyc_status === 'passed' ? <details className="pop"><summary className="btn btn--sm">{T('Договор подписан')}</summary>{/* 380: дата и номер обязательны, файл — по желанию */}
                         <form action={bookingAction} className="stack" style={{ gap: 6 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="contract" /><input type="hidden" name="back" value="bookings" />
-                          <label className="field"><span>{T('Дата договора')}</span><input className="in in--sm" type="date" name="contract_date" required defaultValue={new Date().toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} /></label>
+                          <label className="field"><span>{T('Дата договора')}</span><input className="in in--sm" type="date" name="contract_date" required defaultValue={bakuToday()} max={bakuToday()} /></label>
                           <label className="field"><span>{T('Номер договора')}</span><input className="in in--sm" name="contract_no" required maxLength={80} /></label>
                           <label className="field"><span>{T('Файл договора (по желанию)')}</span><input className="in in--sm" type="file" name="contract_file" accept=".pdf,.jpg,.jpeg,.png,.heic" style={{ paddingTop: 4 }} /></label>
                           <ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: r.unit })}>{T('Отметить подписанным')}</ConfirmBtn></form></details> : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}

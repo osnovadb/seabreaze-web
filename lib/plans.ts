@@ -68,7 +68,8 @@ const daysIn = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(
 
 // Акция застройщика и правило сложения (М6). Скидка за 100% и акция уменьшают цену до раздела денег —
 // от получившейся базы считаются фикс и пул, как раньше от planBase. Фиксированная акция — в USD уже на квартире.
-export type PromoMode = 'chain' | 'sum' | 'best' | 'exclusive'
+// 384 (Денис 12.11): 'within' — «акция входит в максимум»: цена остаётся полной, акция — минимальная скидка из пула (в пределах максимума)
+export type PromoMode = 'chain' | 'sum' | 'best' | 'exclusive' | 'within'
 export type PromoView = { id: string; name: string; badge: string | null; kind: 'pct' | 'fixed'; pct: number; usd: number; ends_on: string | null }
 export function priceChain(list: number, plan: Plan | null | undefined, promo: PromoView | null | undefined, mode: PromoMode = 'chain') {
   // 361 (11.11): «скидка за 100 %» плана — это максимум скидки (пул плана), а не вычет из цены; клиенту автоматически ничего не отдаётся
@@ -80,6 +81,9 @@ export function priceChain(list: number, plan: Plan | null | undefined, promo: P
   if (mode === 'sum') promoAmt = Math.min(promoOf(list), list - planAmt0) // вместе со скидкой за 100% не больше прайса
   else if (mode === 'best') { const pa = promoOf(list); if (pa > planAmt0) { promoAmt = pa; planAmt = 0 } }
   else promoAmt = promoOf(list - planAmt0)
-  const base = Math.max(0, list - planAmt - promoAmt)
-  return { list, planPct, planAmt, promoAmt, base, promoApplied: promoAmt > 0, poolAllowed: !(mode === 'exclusive' && promoAmt > 0) }
+  const within = mode === 'within' && promoAmt > 0
+  const base = within ? list : Math.max(0, list - planAmt - promoAmt)
+  // minDisc — доля акции от прайса: в режиме 'within' скидка клиенту не меньше неё; promoPrice — цена с акцией для витрины
+  const minDisc = within && list > 0 ? Math.round(promoAmt / list * 10000) / 100 : 0
+  return { list, planPct, planAmt, promoAmt, base, promoApplied: promoAmt > 0, poolAllowed: !(mode === 'exclusive' && promoAmt > 0), within, minDisc, promoPrice: Math.max(0, list - promoAmt) }
 }

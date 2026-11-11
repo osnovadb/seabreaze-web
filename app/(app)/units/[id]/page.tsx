@@ -74,7 +74,7 @@ export default async function UnitPage(
   const { promo, mode: promoMode } = await promoForUnit(u)
   // калькулятор вариантов (этапы 1–4): данные и права — общие с шахматкой и вкладкой Bitrix24 (lib/calcView)
   const calcProps = await calcViewProps(u, c, { clients: clients.map((x) => ({ id: x.id, name: x.name })), bookable: code === 'F' && canBook(c.user.role) && u.sales_status === 'sales' })
-  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).base : null
+  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, promoMode).promoPrice : null
   const ori = orientOf(u, await riserInfo(u.building_id)), oriText = [orientText(L, ori), ori.note || ''].filter(Boolean).join(' · ')
   const [cn, ck] = ext && code === 'O' ? (['Забронирована', 'warn'] as const) : CODE_NAME[code]
   // Лист ожидания (М12): на занятую, но не проданную квартиру
@@ -178,7 +178,7 @@ export default async function UnitPage(
           {similar.length > 0 && (
             <div className="card">
               <div className="h3">{T('Похожие свободные')}</div>
-              {similar.map((x) => <Link key={x.id} href={`/units/${x.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{unitNo(x)} · {T('{f} эт.', { f: x.floor })} · {m2(L, x.area)}</span><span>{x.usd ? usd(L, (() => { const pr = promoOf(x, simOffers); return pr ? priceChain(x.usd!, null, pr, promoMode).base : x.usd! })()) : ''}</span></Link>)}
+              {similar.map((x) => <Link key={x.id} href={`/units/${x.id}`} className="kv"><span style={{ color: 'var(--ink)' }}>{unitNo(x)} · {T('{f} эт.', { f: x.floor })} · {m2(L, x.area)}</span><span>{x.usd ? usd(L, (() => { const pr = promoOf(x, simOffers); return pr ? priceChain(x.usd!, null, pr, promoMode).promoPrice : x.usd! })()) : ''}</span></Link>)}
             </div>
           )}
         </div>

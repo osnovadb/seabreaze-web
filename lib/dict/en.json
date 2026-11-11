@@ -2824,5 +2824,15 @@
 "к зачёту у застройщика": "to be offset by the developer",
 "зачёт — только по тому же клиенту": "offset — only against the same client",
 "зачёт — из любого следующего платежа": "offset — from any next payment",
-"К зачёту у застройщиков после расторжений: {a} ({n})": "To be offset by developers after terminations: {a} ({n})"
+"К зачёту у застройщиков после расторжений: {a} ({n})": "To be offset by developers after terminations: {a} ({n})",
+"Договор не отмечен: нужны номер договора и дата не позже сегодняшней (по Баку).": "Contract not marked: a contract number and a date no later than today (Baku time) are required.",
+"Укажите страну проживания — от неё зависят рынок и условия": "Specify the country of residence — the market and terms depend on it",
+"Страна проживания *": "Country of residence *",
+"Акция входит в максимум: цена полная, акция — часть скидки из пула": "Promotion within the maximum: full price, the promotion is part of the pool discount",
+"Акция «{n}» входит в максимум скидки: клиенту не меньше {p} от полной цены.": "Promotion “{n}” is within the maximum discount: the client gets at least {p} off the full price.",
+"в том числе акция «{n}»": "including promotion “{n}”",
+"Договор № {n}": "Contract No. {n}",
+"от {d}": "dated {d}",
+"возврат комиссии при расторжении — до {d}": "commission clawback on termination — until {d}",
+"договор {n} от {d}": "contract {n} dated {d}"
 }

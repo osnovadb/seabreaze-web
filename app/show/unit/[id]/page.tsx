@@ -32,7 +32,7 @@ export default async function ShowUnit(
   const cl = c.show?.clientId ? await one<{ market: string }>('select market from portal.clients where id = $1', [c.show.clientId]) : null
   const fx = await fxFor(cl?.market || c.user.market, L)
   const { promo, mode } = await promoForUnit(u)
-  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, mode).base : null
+  const promoPrice = promo && u.usd ? priceChain(u.usd, null, promo, mode).promoPrice : null
   return (
     <div className="page split">
       <div className="stack">

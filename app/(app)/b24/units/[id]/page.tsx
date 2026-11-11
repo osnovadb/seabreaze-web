@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, usd, date } from '@/lib/i18n'
+import { t, usd, date, bakuToday } from '@/lib/i18n'
 import { listProjects, buildingsOf } from '@/lib/catalog'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction, dealPaid, refuseClient } from '@/lib/actions'
@@ -20,14 +20,14 @@ import { calcViewProps } from '@/lib/calcView'
 import { VariantCalc } from '@/components/VariantCalc'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; deal_stage?: string | null; escort_id?: string | null }
+type U = { contract_no?: string | null; contract_date?: string | null; claw_until?: string | null; unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; deal_stage?: string | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 // М7 (ревью 10.11): метка квартиры после договора — по стадии сделки (один источник): расторгнута; «до …» у договора не показываем
 const DEAL_ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { cancelled: ['расторгнута', 'bad'] }
 const stOf = (u: { status: string | null; deal_stage?: string | null }) => (u.status === 'converted' && u.deal_stage && DEAL_ST[u.deal_stage]) || ST[u.status!]
 export default async function Units(
-  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string; u?: string }> }
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string; u?: string; signed?: string; cerr?: string }> }
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
@@ -48,7 +48,10 @@ export default async function Units(
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
       coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
-      d.id deal_id, d.paid_pct::float paid, (select dd.stage from portal.deals dd where dd.booking_id = b.id order by dd.created_at desc limit 1) deal_stage
+      d.id deal_id, d.paid_pct::float paid, d.contract_no, d.contract_date::text contract_date,
+      -- 380: окно возврата комиссии — от даты договора, как в clawbackDeal (месяцы × 31 день)
+      (coalesce(d.contract_date, d.created_at::date) + coalesce((b.snapshot->>'clawback_months')::int, (portal.cur_conditions(b.project_id)).clawback_months, 3) * 31)::text claw_until,
+      (select dd.stage from portal.deals dd where dd.booking_id = b.id order by dd.created_at desc limit 1) deal_stage
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
     where b.id is not null or s.unit_id is not null order by b.status is null, p.name, no`, [cl.id, c.user.id]).catch(async () =>
@@ -72,6 +75,8 @@ export default async function Units(
         right={<Link className="btn" href={`/clients/${cl.id}`}>{T('Карточка клиента')}</Link>} />
       <div className="page">
         {cl.consent_status !== 'given' && <div className="card card--tight" style={{ marginBottom: 12 }}><div className="small" style={{ marginBottom: 6 }}><b>{T('Согласие клиента')}</b> · {T('отправьте ссылку при первом контакте — без согласия клиент не попадает в рекламу')}</div><ConsentBox lang={L} cl={cl} /></div>}
+        {searchParams.signed && <div className="okbox" style={{ marginBottom: 12 }}>{T('Договор по {u} подписан — бронь закрыта, сделка в «Финансы → Продажи и доли».', { u: units.find((x) => x.booking_id === searchParams.signed)?.no || '' })}</div>}
+        {searchParams.cerr && <div className="err" style={{ marginBottom: 12 }}>{T('Договор не отмечен: нужны номер договора и дата не позже сегодняшней (по Баку).')}</div>}
         {searchParams.created && <div className="okbox" style={{ marginBottom: 12 }}>{T('Запрос брони отправлен бэк-офису — статус появится в сделке Bitrix24')}</div>}
         <div className="chips">{[['pick', 'Подбор'], ['units', `${T('Квартиры клиента')} · ${units.length}`], ['terms', `${T('Условия покупки')} · ${active.length}`], ['calc', T('Расчёт')]].map(([k, l]) => <a key={k} href={`?tab=${k}`} className={'chip' + (tab === k ? ' on' : '')}>{k === 'pick' ? T(l) : l}</a>)}</div>
         {tab === 'pick' && <div className="grid g3 mt16">{blds.map(({ p, bs }) => (
@@ -138,8 +143,8 @@ export default async function Units(
                 {cl.kyc_status === 'passed' && !u.spa_approval_at && <form action={bookingAction}>{h('spa_approval')}<button className="btn btn--sm">{T('Договор на согласовании')}</button></form>}
                 {cl.kyc_status === 'passed' && u.spa_approval_at && <span className="small okc">{T('Договор на согласовании с {d}', { d: date(L, u.spa_approval_at) })}</span>}
                 {cl.consent_status !== 'given' ? <span className="small warnc">{T('«Договор подписан» — после согласия клиента')}</span> : cl.kyc_status === 'passed'
-                  ? <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>{h('contract')}{/* 380: дата и номер договора обязательны, файл — по желанию */}
-                      <label className="field"><span>{T('Дата договора')}</span><input className="in" type="date" name="contract_date" required defaultValue={new Date().toISOString().slice(0, 10)} max={new Date().toISOString().slice(0, 10)} /></label>
+                  ? <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>{h('contract')}<input type="hidden" name="back" value="units" />{/* 380: дата и номер договора обязательны, файл — по желанию */}
+                      <label className="field"><span>{T('Дата договора')}</span><input className="in" type="date" name="contract_date" required defaultValue={bakuToday()} max={bakuToday()} /></label>
                       <label className="field"><span>{T('Номер договора')}</span><input className="in" name="contract_no" required maxLength={80} style={{ width: 150 }} /></label>
                       <label className="field"><span>{T('Файл договора (по желанию)')}</span><input className="in" type="file" name="contract_file" accept=".pdf,.jpg,.jpeg,.png,.heic" style={{ paddingTop: 6 }} /></label>
                       <ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: u.no })}>{T('Договор подписан')}</ConfirmBtn></form>
@@ -149,6 +154,7 @@ export default async function Units(
                 <label className="field"><span>{T('Сопровождающий в Баку')}</span><select key={`escort:${String(u.escort_id || '')}`} name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 <button className="btn btn--sm">{T('Сохранить')}</button></form>}
               {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
+              {u.status === 'converted' && u.deal_id && <div className="small muted">{[u.contract_no ? T('Договор № {n}', { n: u.contract_no }) : '', u.contract_date ? T('от {d}', { d: date(L, u.contract_date) }) : '', u.claw_until && u.deal_stage !== 'cancelled' ? T('возврат комиссии при расторжении — до {d}', { d: date(L, u.claw_until) }) : ''].filter(Boolean).join(' · ')}</div>}
               {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)
                 ? <form action={dealPaid} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.deal_id} />
                     <label className="field"><span>{T('Оплачено клиентом, %')}</span><input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>

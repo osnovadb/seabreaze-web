@@ -55,7 +55,7 @@ test('форма сайта с галочками — согласие сраз�
   const pr = await one(`select id from projects where slug = 'premium-residence'`)
   await act(L, 'saveLink', { project: [pr.id], lang: 'de', price_mode: 'from', title: 'QA' })
   const code = (await one('select code from portal.partner_links where user_id = $1', [L.id])).code
-  const r = await act(null, 'linkLead', { code, name: 'QA Link Lead', phone: '+49 151 ' + Math.floor(Math.random() * 1e8), consent: 'on', lang: 'de' })
+  const r = await act(null, 'linkLead', { code, name: 'QA Link Lead', phone: '+49 151 ' + Math.floor(Math.random() * 1e8), country: 'DE', consent: 'on', lang: 'de' })
   assert.ok(r.result?.ok)
   const c = await one(`select * from portal.clients where owner_id = $1 order by created_at desc limit 1`, [L.id])
   assert.equal(c.consent_status, 'given'); assert.equal(c.attach_status, 'candidate'); assert.equal(c.marketing_consent_at, null, 'реклама без второй галочки')

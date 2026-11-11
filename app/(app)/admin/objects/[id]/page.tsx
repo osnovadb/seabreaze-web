@@ -294,7 +294,7 @@ export default async function ObjectCard(
       `select o.id, o.name, o.badge, o.kind, o.value::float, o.currency, o.building_id, (select string_agg(u.number, ', ' order by u.number) from units u where u.id = any(o.unit_ids)) nums,
          o.starts_on::text, o.ends_on::text, o.active, o.source from portal.special_offers o where o.project_id = $1 order by o.active desc, o.ends_on nulls last, o.created_at`, [p!.id])
     const cur = (await one<{ c: string }>('select price_currency c from units where project_id = $1 group by 1 order by count(*) desc limit 1', [p!.id]))?.c || 'USD'
-    const MODES: [string, string][] = [['chain', 'По очереди: скидка за 100%, затем акция, затем пул'], ['sum', 'Проценты складываются'], ['best', 'Бо́льшая из акции и скидки за 100%'], ['exclusive', 'При акции скидки из пула нет']]
+    const MODES: [string, string][] = [['chain', 'По очереди: скидка за 100%, затем акция, затем пул'], ['sum', 'Проценты складываются'], ['best', 'Бо́льшая из акции и скидки за 100%'], ['exclusive', 'При акции скидки из пула нет'], ['within', 'Акция входит в максимум: цена полная, акция — часть скидки из пула']]
     const row = (o?: (typeof rows)[number]) => (
       <ActionForm key={o?.id || 'new'} action={savePromo} lang={L} reset={!o} className="card stack" style={{ gap: 8 }}>
         <input type="hidden" name="project" value={p!.id} />{o && <input type="hidden" name="id" value={o.id} />}

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { countryName } from '@/lib/country'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
@@ -103,7 +104,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               <div className="h3">{T('Клиент')}</div>
               <div className="kv"><span>{T('Телефон')}</span><span>{cl.phone || '—'}</span></div>
               <div className="kv"><span>E-mail</span><span className="small">{cl.email || '—'}</span></div>
-              <div className="kv"><span>{T('Страна, язык')}</span><span>{[cl.country, (cl.language || '').toUpperCase()].filter(Boolean).join(' · ')}</span></div>
+              <div className="kv"><span>{T('Страна, язык')}</span><span>{[countryName(cl.country, L), (cl.language || '').toUpperCase()].filter(Boolean).join(' · ')}</span></div>
               <div className="kv"><span>{T('Источник')}</span><span>{cl.source ? T(SRC_NAME[cl.source] || SOURCE_LABEL[cl.source] || (cl.source.startsWith('site') ? 'Сайт' : cl.source)) : '—'}</span></div>
               <div className="kv" style={{ alignItems: 'flex-start' }}><span>{T('Согласие')}</span><ConsentBox lang={L} cl={cl} /></div>
               <EditContacts lang={L} cl={{ id: cl.id, name: cl.name, phone: cl.phone, email: cl.email, country: cl.country, language: cl.language }} />

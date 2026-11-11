@@ -67,7 +67,7 @@ export default async function PublicSelection(
                     <div className="muted">{pr?.name} · {u.building} · {T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
                     {free && promoBy(u).promo && <div className="mt16"><span className="pill pill--ok">{promoBy(u).promo!.badge || T('Акция')}</span> <span className="small muted">{promoBy(u).promo!.name}</span></div>}
                     {/* 317: крупно — валюта по рынку клиента (DE — евро, IL — доллары), рядом вторая и курс */}
-                    <div className="mt16">{free && u.usd ? <>{promoBy(u).promo && <s className="muted small">{usd(L, u.usd)}</s>}<PriceDual amount={promoBy(u).promo ? priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base : u.usd} fx={fx} lang={L} /></> : <div className="big">{T(u.status === 'sold' || u.deal_id ? 'Уже продана' : 'Уже забронирована')}</div>}</div>
+                    <div className="mt16">{free && u.usd ? <>{promoBy(u).promo && <s className="muted small">{usd(L, u.usd)}</s>}<PriceDual amount={promoBy(u).promo ? priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).promoPrice : u.usd} fx={fx} lang={L} /></> : <div className="big">{T(u.status === 'sold' || u.deal_id ? 'Уже продана' : 'Уже забронирована')}</div>}</div>
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
                     {(u.finish === 'shell' || img) && <div className="small muted mt8">{[u.finish === 'shell' ? T('Сдаётся без ремонта') : '', img ? T('на фото — пример дизайна застройщика') : ''].filter(Boolean).join('; ')}.</div>}
                   </div>
@@ -95,7 +95,7 @@ export default async function PublicSelection(
                 {free && u.usd && planOf.get(u.id) && !(sv.get(u.id) || []).some((v) => calcs.has(v.variant_id)) && (() => { const p = planOf.get(u.id)!; return (
                   <div style={{ padding: '0 20px 20px' }}>
                     <div className="label">{T('График платежей')} · {planLabel(T, p.name, p)}</div>
-                    <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).base} lang={L} fx={fx} />
+                    <ScheduleTable plan={p} price={priceChain(u.usd, p, promoBy(u).promo, promoBy(u).mode).promoPrice} lang={L} fx={fx} />
                     <div className="tiny muted mt8">{T('Даты — ориентир от первого взноса; точный график — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
                   </div>) })()}
               </div>

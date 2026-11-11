@@ -21,7 +21,8 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const [cid, setCid] = useState(preset || '')
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   // Этап 3: бронь из варианта расчёта — его план и скидка (согласованная скидка варианта не уходит на повторное согласование)
-  const [disc, setDisc] = useState(variant?.disc || 0)
+  const ch0 = priceChain(priceList, null, promo, mode) // 384: в режиме «акция входит в максимум» скидка не меньше акции
+  const [disc, setDisc] = useState(Math.max(variant?.disc || 0, ch0.minDisc))
   const [planId, setPlanId] = useState((variant?.planId && plans.some((p) => p.id === variant.planId) ? variant.planId : '') || plans[0]?.id || '')
   const plan = plans.find((p) => p.id === planId)
   // 361: скидка за 100 % — максимум (пул плана), цену не снижает; акция застройщика — снижает
@@ -33,11 +34,11 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const pMonths = variant ? variant.months : plan && !isFull(plan) ? Number(plan.months) || 0 : 0
   const pool = planPool({ grid, plans, poolPct: Number(cond.pool_pct) || 0, downPct: pDown, months: pMonths }).pct
   const pc = planCond(cond, pool)
-  const capP = ext ? pc.agent_pool_pct : Math.min(cap, pool), ceilP = Math.min(ceiling, pool)
-  const maxDisc = ch.poolAllowed ? Math.max(ext ? capP : ceilP, variant?.disc || 0) : 0
+  const capP = Math.max(ch.minDisc, ext ? pc.agent_pool_pct : Math.min(cap, pool)), ceilP = Math.max(ch.minDisc, Math.min(ceiling, pool))
+  const maxDisc = ch.poolAllowed ? Math.max(ext ? capP : ceilP, variant?.disc || 0, ch.minDisc) : 0
   const [ask, setAsk] = useState(false)
   const [askPct, setAskPct] = useState('')
-  useEffect(() => { if (disc > maxDisc) setDisc(maxDisc) }, [maxDisc]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (disc > maxDisc) setDisc(maxDisc); else if (disc < ch.minDisc) setDisc(ch.minDisc) }, [maxDisc, ch.minDisc]) // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false)
   const [st, act, pending] = useActionState(createBooking, null)
   const askN = Number(askPct.replace(',', '.')) || 0
@@ -75,9 +76,10 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         </div>}
         <div className="h3">{ext ? T('Скидка клиенту из вашей части пула') : T('Скидка клиенту')}</div>
         <div className="small muted">{ext ? T('Вам выделено {p} от прайса по этому плану: сколько отдать клиенту, а сколько оставить себе — решаете вы', { p: pct(lang, capP) }) : T('Максимум по плану {m}; сами — до {p}, больше — с согласованием руководителя', { m: pct(lang, pool), p: pct(lang, capP) })}</div>
-        <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Number(e.target.value))} />
+        <input className="disc mt16" type="range" min={0} max={maxDisc} step={0.5} value={disc} onChange={(e) => setDisc(Math.max(ch.minDisc, Number(e.target.value)))} />
         <input type="hidden" name="discount" value={eff} />{ext && ask && askN > disc && <input type="hidden" name="ask" value="1" />}
         <div className="between small muted"><span>0%</span><b style={{ color: 'var(--ink)' }}>{pct(lang, disc)}</b><span>{pct(lang, maxDisc)}</span></div>
+        {ch.within && <div className="small muted mt8">{T('Акция «{n}» входит в максимум скидки: клиенту не меньше {p} от полной цены.', { n: promo?.name || '', p: pct(lang, ch.minDisc) })}</div>}
         {!ch.poolAllowed && <div className="note mt8">{T('По условиям акции «{n}» скидка из пула не применяется.', { n: promo?.name || '' })}</div>}
         {/* 373: «Попросить больше» — только когда своя часть отдана клиенту целиком */}
         {ext && ch.poolAllowed && (!ask
@@ -89,7 +91,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
               <div className="tiny muted">{T('Бронь уйдёт на согласование руководителю рынка; офис подтвердит её после решения.')}</div>
               <div><button type="button" className="btn btn--sm btn--ghost" onClick={() => { setAsk(false); setAskPct('') }}>{T('Отменить запрос')}</button></div>
             </div>)}
-        {!ext && disc > capP && !(variant && disc <= variant.disc + 1e-9) /* О29: согласованный вариант на согласование не уходит */ && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, capP) })}</div>}
+        {!ext && disc > Math.max(capP, ch.minDisc) && !(variant && disc <= variant.disc + 1e-9) /* О29: согласованный вариант на согласование не уходит */ && <div className="note mt8">{T('Скидка сверх {p} — бронь уйдёт на согласование владельцу или руководителю рынка; офис подтвердит её после решения.', { p: pct(lang, capP) })}</div>}
         <div className="grid g2 mt16">
           <div className="card card--sand card--tight"><div className="small muted">{T('Клиент платит застройщику')}</div><div className="big num">{usd(lang, shown.final)}</div><div className="tiny muted">{(list < priceList ? T('цена с учётом акции и плана {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, shown.discount) }) : T('прайс {a} − скидка {d}', { a: usd(lang, list), d: usd(lang, shown.discount) }))}</div>{asking && <div className="tiny warnc">{T('скидка {p} — на согласовании', { p: pct(lang, askN) })}</div>}</div>
           {ext
@@ -101,8 +103,9 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
         <div className="mt16">
           <div className="kv"><span>{T('Прайс застройщика')}</span><span>{usd(lang, priceList)}</span></div>
           {ch.planAmt > 0 && <div className="kv"><span>{T('Скидка за 100%')}</span><span>−{usd(lang, ch.planAmt)}</span></div>}
-          {promo && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
+          {promo && !ch.within && <div className="kv"><span>{T('Акция «{n}»', { n: promo.name })}</span><span className={ch.promoApplied ? 'okc' : 'muted small'}>{ch.promoApplied ? '−' + usd(lang, ch.promoAmt) : T('не суммируется со скидкой за 100%')}</span></div>}
           {(asking ? disc : eff) > 0 && <div className="kv"><span>{T('Скидка из пула')}</span><span>−{usd(lang, shown.discount)} ({pct(lang, asking ? disc : eff)})</span></div>}
+          {promo && ch.within && <div className="kv"><span className="small muted">{T('в том числе акция «{n}»', { n: promo.name })}</span><span className="small muted">{pct(lang, ch.minDisc)}</span></div>}
           {asking && <div className="kv"><span>{T('Запрошено')}</span><span className="warnc">{T('скидка {p} — на согласовании', { p: pct(lang, askN) })}</span></div>}
           <div className="kv"><span>{T('Итоговая цена')}</span><span>{usd(lang, shown.final)}</span></div>
           {optSum > 0 && <div className="kv"><span>{T('Опции')}</span><span>+{usd(lang, optSum)} · {T('всего {a}', { a: usd(lang, shown.final + optSum) })}</span></div>}

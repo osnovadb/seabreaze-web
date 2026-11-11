@@ -34,6 +34,7 @@ async function referClientLocked(f: FormData) {
   const name = s(f, 'name'), phone = s(f, 'phone'), email = s(f, 'email')
   if (!name || (!phone && !email)) return { error: 'Нужны имя и телефон или e-mail' }
   if (!f.get('consent')) return { error: 'Подтвердите, что человек согласен, чтобы мы с ним связались' }
+  if (!s(f, 'country')) return { error: 'Укажите страну проживания — от неё зависят рынок и условия' } // О93: страна обязательна — от неё рынок клиента и ставка (378)
   const pn = norm.phone(phone), em = norm.email(email)
   const dup = await one(`select 1 from portal.clients where ((length($1) >= 9 and length(phone_norm) >= 9 and right(phone_norm, 9) = right($1, 9)) or ($2 <> '' and email_norm = $2)) and attach_status <> 'junk' limit 1`, [pn, em])
   // уже есть в базе — без подробностей (чей клиент, не раскрываем)

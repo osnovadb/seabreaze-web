@@ -2824,5 +2824,15 @@
 "к зачёту у застройщика": "zur Verrechnung beim Bauträger",
 "зачёт — только по тому же клиенту": "Verrechnung – nur beim selben Kunden",
 "зачёт — из любого следующего платежа": "Verrechnung – mit jeder nächsten Zahlung",
-"К зачёту у застройщиков после расторжений: {a} ({n})": "Zur Verrechnung bei Bauträgern nach Kündigungen: {a} ({n})"
+"К зачёту у застройщиков после расторжений: {a} ({n})": "Zur Verrechnung bei Bauträgern nach Kündigungen: {a} ({n})",
+"Договор не отмечен: нужны номер договора и дата не позже сегодняшней (по Баку).": "Vertrag nicht markiert: Vertragsnummer und ein Datum spätestens heute (Baku-Zeit) sind erforderlich.",
+"Укажите страну проживания — от неё зависят рынок и условия": "Geben Sie das Wohnsitzland an — Markt und Konditionen hängen davon ab",
+"Страна проживания *": "Wohnsitzland *",
+"Акция входит в максимум: цена полная, акция — часть скидки из пула": "Aktion im Maximum enthalten: voller Preis, die Aktion ist Teil des Pool-Rabatts",
+"Акция «{n}» входит в максимум скидки: клиенту не меньше {p} от полной цены.": "Aktion „{n}“ ist im Höchstrabatt enthalten: der Kunde erhält mindestens {p} vom vollen Preis.",
+"в том числе акция «{n}»": "davon Aktion „{n}“",
+"Договор № {n}": "Vertrag Nr. {n}",
+"от {d}": "vom {d}",
+"возврат комиссии при расторжении — до {d}": "Provisionsrückforderung bei Kündigung — bis {d}",
+"договор {n} от {d}": "Vertrag {n} vom {d}"
 }

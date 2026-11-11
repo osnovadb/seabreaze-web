@@ -202,3 +202,19 @@ test('planLabel: название плана из базы переводитс�
   const R = (s, v = {}) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k]))
   assert.equal(planLabel(R, 'Своя схема Арада', { down_payment_pct: 35, months: 60 }), 'Своя схема Арада', 'по-русски название не меняем')
 })
+
+// 384 (Денис 12.11): «акция входит в максимум» — цена полная, акция — минимальная скидка из пула, согласования сама не требует
+import { priceChain } from '../../lib/plans.ts'
+test('384: режим within — база полная, акция становится минимальной скидкой в пределах максимума', () => {
+  const promo = { id: 'p', name: 'QA −5%', badge: null, kind: 'pct', pct: 5, usd: 0, ends_on: null }
+  const w = priceChain(200000, null, promo, 'within')
+  assert.equal(w.base, 200000); assert.equal(w.minDisc, 5); assert.equal(w.promoPrice, 190000); assert.ok(w.poolAllowed)
+  const c = priceChain(200000, null, promo, 'chain')
+  assert.equal(c.base, 190000); assert.equal(c.minDisc, 0)
+  const r0 = calcVariant({ list: 200000, plans: [], downPct: 100, months: 0, disc: 0, promo, mode: 'within', poolPct: 10, cap: 3, ceiling: 10, ext: false })
+  assert.equal(r0.disc, 5, 'скидка ниже акции'); assert.equal(r0.final, 190000); assert.equal(r0.needsApproval, false, 'акция сама ушла на согласование')
+  const r1 = calcVariant({ list: 200000, plans: [], downPct: 100, months: 0, disc: 8, promo, mode: 'within', poolPct: 10, cap: 3, ceiling: 10, ext: false })
+  assert.equal(r1.final, 184000); assert.equal(r1.needsApproval, true)
+  const r2 = calcVariant({ list: 200000, plans: [], downPct: 100, months: 0, disc: 15, promo, mode: 'within', poolPct: 10, cap: 3, ceiling: 10, ext: false })
+  assert.equal(r2.disc, 10, 'итог больше максимума')
+})

@@ -30,7 +30,7 @@ export type CalcOut = {
   plan: Plan | null; approx: boolean          // approx — планов нет, расчёт ориентировочный
   downPct: number; months: number; disc: number
   minDown: number; maxMonths: number | null; fixed: boolean   // рамки плана; fixed — свой график застройщика (этапы)
-  devPct: number; devAmt: number; promoAmt: number; promoApplied: boolean; poolAllowed: boolean  // devPct/devAmt — всегда 0 (вычета за взнос нет, 361)
+  devPct: number; devAmt: number; promoAmt: number; promoApplied: boolean; poolAllowed: boolean; within: boolean; minDisc: number  // devPct/devAmt — всегда 0 (вычета за взнос нет, 361)
   poolPct: number; poolSource: 'grid' | 'plan' | 'pool'   // максимум скидки по плану и откуда он взят
   capEff: number; ceilingEff: number                       // порог без согласования и предел скидки — в пределах пула плана
   base: number                                // цена после скидки застройщика и акции (от неё делится пул)
@@ -110,15 +110,18 @@ export function calcVariant(i: CalcIn): CalcOut {
   // акция застройщика (его собственная скидка из прайса) — как в priceChain
   const mode = i.mode || 'chain', promo = i.promo || null
   const promoAmt = !promo ? 0 : promo.kind === 'fixed' ? Math.min(promo.usd, i.list) : i.list * promo.pct / 100
-  const base = Math.max(0, i.list - promoAmt)
+  // 384: «акция входит в максимум» — цена полная, акция — минимальная скидка из пула
+  const within = mode === 'within' && promoAmt > 0
+  const minDisc = within && i.list > 0 ? Math.round(promoAmt / i.list * 10000) / 100 : 0
+  const base = within ? i.list : Math.max(0, i.list - promoAmt)
   const poolAllowed = !(mode === 'exclusive' && promoAmt > 0)
   // пороги ролей прежние, но не выше пула плана; у партнёра своя часть — его доля пула плана (349, 373)
   const agentPart = i.cond ? planCond(i.cond, pool.pct).agent_pool_pct : Math.min(i.cap ?? 0, pool.pct)
   const capEff = i.ext ? agentPart : Math.min(i.cap ?? Infinity, pool.pct)
   // партнёру предел — своя часть; запрос «Попросить больше» (askMax) — до нейтрального предела, отказ — за руководителем рынка
   const ceilingEff = i.ext ? (i.askMax ?? capEff) : Math.min(i.ceiling ?? 100, pool.pct)
-  let disc = clamp(Number(i.disc) || 0, 0, poolAllowed ? ceilingEff : 0)
-  if (disc !== (Number(i.disc) || 0)) clamped.push(poolAllowed ? 'Скидка не больше {c} — максимум по плану и вашему порогу' : 'По условиям акции скидка из пула не применяется')
+  let disc = clamp(Number(i.disc) || 0, minDisc, poolAllowed ? Math.max(ceilingEff, minDisc) : 0)
+  if (disc !== (Number(i.disc) || 0) && !(within && (Number(i.disc) || 0) < minDisc)) clamped.push(poolAllowed ? 'Скидка не больше {c} — максимум по плану и вашему порогу' : 'По условиям акции скидка из пула не применяется')
   const final = Math.max(0, base - i.list * disc / 100) // ревью 11.11: скидка в % — от прайса, как в договорах
   const total = final + (i.optionsUsd || 0)
   // график: свой план застройщика (этапы) или «взнос + равные платежи»
@@ -129,10 +132,10 @@ export function calcVariant(i: CalcIn): CalcOut {
   const last = rows.length ? rows[rows.length - 1].due : null
   return {
     plan, approx, downPct, months, disc, minDown, maxMonths, fixed,
-    devPct: 0, devAmt: 0, promoAmt: r2(promoAmt), promoApplied: promoAmt > 0, poolAllowed,
+    devPct: 0, devAmt: 0, promoAmt: r2(promoAmt), promoApplied: promoAmt > 0, poolAllowed, within, minDisc,
     poolPct: pool.pct, poolSource: pool.source, capEff, ceilingEff,
     base: r2(base), final: r2(final), total: r2(total), down, monthly, last, rows,
-    needsApproval: disc > capEff + 1e-9, clamped,
+    needsApproval: disc > Math.max(capEff, minDisc) + 1e-9, clamped,
     split: i.cond ? split(planCond(i.cond, pool.pct), base, disc, i.ext !== false, i.list) : null,
   }
 }

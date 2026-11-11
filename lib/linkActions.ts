@@ -48,6 +48,7 @@ async function linkLeadLocked(f: FormData) {
   const name = s(f, 'name'), phone = s(f, 'phone'), email = s(f, 'email')
   if (!name || (!phone && !email)) return { error: 'Нужны имя и телефон или e-mail' }
   if (!f.get('consent')) return { error: 'Без согласия на обработку данных мы не можем передать заявку' }
+  if (!s(f, 'country')) return { error: 'Укажите страну проживания — от неё зависят рынок и условия' } // О93: страна обязательна — от неё рынок клиента и ставка (378)
   const pn = norm.phone(phone), em = norm.email(email)
   const ip = ((await headers()).get('cf-connecting-ip') || (await headers()).get('x-forwarded-for') || '').split(',')[0].trim()
   // повтор той же заявки за 10 минут не дублируем; не больше 10 заявок с адреса за час

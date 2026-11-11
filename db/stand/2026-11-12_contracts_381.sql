@@ -6,3 +6,5 @@ update portal.developers set silence_rule = 'confirm', reg_response_days = 3, si
 -- те же значения — в действующих условиях проектов (регистрации читают их из portal.cur_conditions)
 update portal.conditions k set reg_response_days = 1, booking_days = 7, booking_ext_days = 7 from projects p where p.id = k.project_id and p.slug in ('brabus-island-baku','test-marina') and k.id = (portal.cur_conditions(p.id)).id;
 update portal.conditions k set silence_rule = 'confirm', reg_response_days = 3, silence_extra_days = 2, reg_protect_months = 12, clawback_offset = 'same_client' from projects p where p.id = k.project_id and p.slug = 'premium-residence' and k.id = (portal.cur_conditions(p.id)).id;
+-- О94 (обход 12.11): черновик v2 условий Premium (с 01.11) держал старые значения — при публикации откатил бы договорные; приводим к договору
+update portal.conditions k set silence_rule = 'confirm', reg_response_days = 3, silence_extra_days = 2, reg_protect_months = 12, clawback_offset = 'same_client' from projects p where p.id = k.project_id and p.slug = 'premium-residence' and k.status = 'draft';

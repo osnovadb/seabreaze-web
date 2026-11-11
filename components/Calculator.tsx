@@ -67,7 +67,7 @@ export function Calculator({ plans, price, lang, fx, discountPct = 0, initialPla
   if (!plans.length || !plan) return null
   // Опции — сверху цены квартиры, без скидок застройщика и пула
   const optSum = options.filter((o) => picked.includes(o.id)).reduce((a, o) => a + o.usd, 0)
-  const ch = priceChain(price, plan, promo, mode), base = ch.base, total = base * (1 - discountPct / 100) + optSum
+  const ch = priceChain(price, plan, promo, mode), base = ch.base, dEff = ch.within ? Math.max(discountPct, ch.minDisc) : discountPct, total = base * (1 - dEff / 100) + optSum // 384: в режиме «входит в максимум» акция — скидка от полной цены
   return (
     <div className="card">
       <div className="h3">{title ?? T('Калькулятор и график платежей')}</div>

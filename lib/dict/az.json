@@ -2824,5 +2824,15 @@
 "к зачёту у застройщика": "tikinti şirkətində əvəzləşdirilməli",
 "зачёт — только по тому же клиенту": "əvəzləşdirmə — yalnız həmin müştəri üzrə",
 "зачёт — из любого следующего платежа": "əvəzləşdirmə — istənilən növbəti ödənişdən",
-"К зачёту у застройщиков после расторжений: {a} ({n})": "Ləğvlərdən sonra tikinti şirkətlərində əvəzləşdirilməli: {a} ({n})"
+"К зачёту у застройщиков после расторжений: {a} ({n})": "Ləğvlərdən sonra tikinti şirkətlərində əvəzləşdirilməli: {a} ({n})",
+"Договор не отмечен: нужны номер договора и дата не позже сегодняшней (по Баку).": "Müqavilə qeyd olunmadı: müqavilə nömrəsi və bu gündən gec olmayan tarix (Bakı vaxtı) tələb olunur.",
+"Укажите страну проживания — от неё зависят рынок и условия": "Yaşayış ölkəsini göstərin — bazar və şərtlər ondan asılıdır",
+"Страна проживания *": "Yaşayış ölkəsi *",
+"Акция входит в максимум: цена полная, акция — часть скидки из пула": "Aksiya maksimuma daxildir: qiymət tamdır, aksiya puldan endirimin bir hissəsidir",
+"Акция «{n}» входит в максимум скидки: клиенту не меньше {p} от полной цены.": "«{n}» aksiyası maksimum endirimə daxildir: müştəriyə tam qiymətdən ən azı {p}.",
+"в том числе акция «{n}»": "o cümlədən «{n}» aksiyası",
+"Договор № {n}": "Müqavilə № {n}",
+"от {d}": "{d} tarixli",
+"возврат комиссии при расторжении — до {d}": "ləğv zamanı komissiyanın qaytarılması — {d} tarixinədək",
+"договор {n} от {d}": "{d} tarixli {n} müqavilə"
 }

@@ -24,7 +24,7 @@ export function LinkLeadForm({ lang, code, projects, project, brand }: { lang: L
         <label className="field"><span>{T('Телефон')}</span><input className="in" name="phone" type="tel" autoComplete="tel" /></label>
         <label className="field"><span>E-mail</span><input className="in" name="email" type="email" autoComplete="email" /></label>
       </div>
-      <label className="field"><span>{T('Страна проживания')}</span><CountrySelect lang={lang} /></label>
+      <label className="field"><span>{T('Страна проживания *')}</span><CountrySelect lang={lang} required /></label>
       {projects.length > 1 && <label className="field"><span>{T('Проект')}</span><select key={`project:${String(project || '')}`} className="in" name="project" defaultValue={project || ''}><option value="">{T('Помогите выбрать')}</option>{projects.map((p) => <option key={p}>{p}</option>)}</select></label>}
       {projects.length === 1 && <input type="hidden" name="project" value={projects[0]} />}
       <label className="field"><span>{T('Комментарий')}</span><textarea className="in" name="comment" rows={2} /></label>

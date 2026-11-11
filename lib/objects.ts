@@ -358,7 +358,7 @@ export const savePromo = safe(async (_: unknown, f: FormData) => {
 export const savePromoMode = safe(async (_: unknown, f: FormData) => {
   const c = await owner()
   const pid = s(f, 'project'), mode = s(f, 'mode')
-  if (!['chain', 'sum', 'best', 'exclusive'].includes(mode)) return { error: 'mode' }
+  if (!['chain', 'sum', 'best', 'exclusive', 'within'].includes(mode)) return { error: 'mode' } // 384: within — акция входит в максимум
   await q(`insert into portal.project_settings (project_id, promo_mode) values ($1, $2) on conflict (project_id) do update set promo_mode = excluded.promo_mode`, [pid, mode])
   await log(c, 'object.promo_mode', 'project', pid, { mode }); done(pid)
   return { ok: true }
