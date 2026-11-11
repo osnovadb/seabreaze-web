@@ -7,6 +7,7 @@ import { canConfirmBooking, isExternal, canBook, canApproveDiscount } from '@/li
 import { bookingScope } from '@/lib/scope'
 import { Top, Pill } from '@/components/ui'
 import { bookingAction } from '@/lib/actions'
+import { ConfirmBtn } from '@/components/ConfirmBtn'
 
 type B = { id: string; status: string; ends_at: string; starts_at: string; extended: boolean; final_price: number; price_list: number; discount_pct: number; unit: string; unit_id: string; unit_status: string; client: string; client_id: string; agent: string; agent_id: string; market: string | null; agent_amount: number | null; approval: string | null; plan_pool: number | null; kyc_status: string; options_usd: number; group_id: string | null; fee_status: string; fee_usd: number; fee_amount: number; fee_currency: string }
 const FEE_ST: Record<string, string> = { due: 'ждём оплату', paid: 'оплачен', credited: 'засчитан в цену', refunded: 'возвращён', kept: 'удержан' }
@@ -67,8 +68,8 @@ export default async function Bookings(
                 const decline = <form action={bookingAction} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="reject" />
                   <select className="in in--sm" name="reason" required defaultValue="">{/* Б11: причина не выбрана заранее */}<option value="" disabled>{T('Причина')}</option>{[['sold', 'Продана'], ['developer_refused', 'Застройщик отказал'], ['registration_failed', 'Нет регистрации'], ['other', 'Другое']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select><button className="btn btn--sm">{T('Отклонить')}</button></form>
                 const confirm = <form action={bookingAction} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="confirm" />
-                  <input className="in in--sm" name="dev_no" placeholder={T('№ брони застройщика')} style={{ width: 150 }} /><input className="in in--sm" type="date" name="until" title={T('до какого числа у застройщика')} /><button className="btn btn--sm btn--p">{T('Подтвердить')}</button></form>
-                const act = (a: string, l: string, p = false) => <form action={bookingAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value={a} /><input type="hidden" name="back" value="bookings" /><button className={'btn btn--sm' + (p ? ' btn--p' : '')}>{T(l)}</button></form>
+                  <input className="in in--sm" name="dev_no" placeholder={T('№ брони застройщика')} style={{ width: 150 }} /><input className="in in--sm" type="date" name="until" title={T('до какого числа у застройщика')} /><ConfirmBtn className="btn btn--sm btn--p" msg={T('Подтвердить бронь {u} у застройщика? Без даты срок посчитается по условиям проекта.', { u: r.unit })}>{T('Подтвердить')}</ConfirmBtn></form>
+                const act = (a: string, l: string, p = false, ask?: string) => <form action={bookingAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value={a} /><input type="hidden" name="back" value="bookings" />{ask ? <ConfirmBtn className={'btn btn--sm' + (p ? ' btn--p' : '')} msg={ask}>{T(l)}</ConfirmBtn> : <button className={'btn btn--sm' + (p ? ' btn--p' : '')}>{T(l)}</button>}</form>
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/units/${r.unit_id}`}><b>{r.unit}</b></Link>{r.group_id && <div className="tiny bronze">{T('пакет')}: {rows.filter((x) => x.group_id === r.group_id && x.id !== r.id).map((x) => x.unit).join(', ') || '—'}</div>}</td>
@@ -88,7 +89,7 @@ export default async function Bookings(
                       {r.status === 'hold' && (r.agent_id === c.user.id || c.user.role === 'market_head') && act('release_hold', 'Снять холд')}
                       {r.status === 'hold' && r.agent_id === c.user.id && <Link className="btn btn--sm btn--p" href={`/units/${r.unit_id}/book`}>{T('Запросить бронь')}</Link>}
                       {r.status === 'confirmed' && !r.extended && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('extend', 'Продлить')}
-                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && (r.kyc_status === 'passed' ? act('contract', 'Договор подписан') : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}
+                      {r.status === 'confirmed' && ['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && (r.kyc_status === 'passed' ? act('contract', 'Договор подписан', false, T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: r.unit })) : <Link className="tiny warnc" href={`/clients/${r.client_id}`}>{T('договор — после KYC')}</Link>)}
                       {(live || r.status === 'queued') && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('cancel', 'Снять')}
                     </div></td>
                   </tr>

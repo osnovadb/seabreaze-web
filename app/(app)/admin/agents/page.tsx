@@ -21,7 +21,7 @@ export default async function Agents() {
     `select u.id, u.name, u.email, u.role, u.market, a.name agency, cu.name curator, u.license_note, u.contract_signed_at,
       (select count(*)::int from portal.clients where owner_id = u.id) clients, (select count(*)::int from portal.bookings where agent_id = u.id and status in ('requested','confirmed')) bookings,
       (select count(*)::int from portal.deals where agent_id = u.id and stage <> 'cancelled') deals
-     from portal.users u left join portal.agencies a on a.id = u.agency_id left join portal.users cu on cu.id = u.curator_id where u.role in ('agent','agency_head') ${own ? '' : 'and u.market = $1'} order by u.name`, own ? [] : [c.user.market])
+     from portal.users u left join portal.agencies a on a.id = u.agency_id left join portal.users cu on cu.id = u.curator_id where u.role in ('agent','agency_head') and u.email not like 'qa-%@qa.test' /* О12: без пользователей автотестов */ ${own ? '' : 'and u.market = $1'} order by u.name`, own ? [] : [c.user.market])
   const st: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { new: ['новая', 'warn'], review: ['на проверке', 'warn'], contract: ['договор', 'ink'], approved: ['одобрена', 'ok'], rejected: ['отказ', 'bad'] }
   return (
     <>

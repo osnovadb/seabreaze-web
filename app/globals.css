@@ -464,3 +464,7 @@ select.in { padding-inline-end: 36px; }
 /* О3: поле-ловушка для ботов — скрыто без смещения влево (left: -9999px давал прокрутку вбок на иврите) */
 .hp { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none; }
 .chev { display: inline-block; font-style: normal; transition: transform .15s; } /* О50: стрелка «Ещё фильтры» переворачивается */
+/* О9: форма «Транш получен» — всплывающей панелью, ширина колонок таблицы не меняется */
+details.pop { position: relative; }
+details.pop > form { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 30; width: 300px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+@media (max-width: 640px) { details.pop > form { position: static; width: auto; box-shadow: none; } }

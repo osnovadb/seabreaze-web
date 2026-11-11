@@ -16,19 +16,20 @@ async function office() {
 }
 
 // Отметить отправленными: срок ответа — по договору застройщика (рабочие дни + запас «3 + 2»)
-export async function sendRegistrations(f: FormData) {
+export async function sendRegistrations(f: FormData): Promise<{ n: number; skipped: number }> {
   const c = await office()
   const ids = f.getAll('id').map(String).filter(Boolean)
-  if (!ids.length) return
+  if (!ids.length) return { n: 0, skipped: 0 }
   // срок ответа — по условиям проекта (рабочие дни + запас «3 + 2»)
-  await q(`update portal.registrations r set status = 'sent', sent_at = now(),
+  const done = await q<{ id: string }>(`update portal.registrations r set status = 'sent', sent_at = now(),
       answer_due = portal.add_workdays(current_date, coalesce(k.reg_response_days, 3) + coalesce(k.silence_extra_days, 0))
     from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k
     where x.id = r.id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')
-      and exists (select 1 from portal.clients cl where cl.id = r.client_id and cl.consent_status = 'given' and cl.anonymized_at is null)`, [ids]) // 313: только после согласия клиента
+      and exists (select 1 from portal.clients cl where cl.id = r.client_id and cl.consent_status = 'given' and cl.anonymized_at is null) returning r.id`, [ids]) // 313: только после согласия клиента
   await audit(c.real.id, 'registration.send', 'registration', ids[0], { n: ids.length })
   await queueSync((await q<{ client_id: string }>('select client_id from portal.registrations where id = any($1::uuid[])', [ids])).map((r) => r.client_id), 'регистрация отправлена застройщику') // §13 п.7
   revalidatePath('/registrations')
+  return { n: done.length, skipped: ids.length - done.length } // О10: сколько отмечено
 }
 
 // Ответ застройщика: Confirmed — защита на срок договора (у клиентов саб-агентов — свой срок, если задан); Rejected — с причиной

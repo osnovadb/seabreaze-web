@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useFormStatus } from 'react-dom'
-import { useActionState } from 'react'
+import { useActionState, startTransition } from 'react'
 import { registerClient, requestDispute } from '@/lib/actions'
 import { t, date, type Lang } from '@/lib/i18n'
 
@@ -16,7 +16,8 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
   const F = (name: string, label: string, type = 'text', ph = '') => <label className="field"><span>{T(label)}</span><input className="in" name={name} type={type} placeholder={ph ? T(ph) : ''} /></label>
   return (
     <div className="split">
-      <form action={act} className="card stack">
+      {/* О6 (обход 11.11): при ошибке поля не очищаются — отправляем без автосброса формы React 19 */}
+      <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); startTransition(() => act(fd)) }} className="card stack">
         {st?.error && <div className="err">{T(st.error)}</div>}
         <div className="grid g2">
           {F('name', 'Имя и фамилия *')}{F('country', 'Страна')}
@@ -27,7 +28,7 @@ export function RegisterForm({ lang, ext }: { lang: Lang; ext: boolean }) {
         </div>
         {F('interest', 'Интерес', 'text', 'Premium Residence, 2–3 комнаты')}
         {!ext && <label className="field"><span>{T('Источник')}</span><select className="in" name="source"><option value="office">{T('Офис / звонок')}</option><option value="site">{T('Сайт')}</option><option value="referral">{T('Рекомендация')}</option></select></label>}
-        <label className="check"><input type="checkbox" name="consent" /> <span>{T('Клиент знает, что я передаю его контакты GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.')} <Link className="bronze" href="/legal/consent" target="_blank">{T('Текст согласия')}</Link></span></label>
+        <label className="check"><input type="checkbox" name="consent" /> <span>{T(ext ? 'Клиент знает, что я передаю его контакты GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.' : 'Клиент знает, что мы вносим его контакты в базу GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.')} <Link className="bronze" href="/legal/consent" target="_blank">{T('Текст согласия')}</Link></span></label>
         <Submit lang={lang} />
         <div className="tiny muted">{T('Проверка по телефону и e-mail в нашей базе. Чужих клиентов и их агентов вы не увидите — только ответ «закреплён» или «уже зарегистрирован».')}</div>
       </form>

@@ -47,7 +47,7 @@ export async function planFact(u: User, kind: PeriodKind, key?: string) {
   const who: Record<Scope, { id: string; name: string; market: string | null }[]> = {
     market: (market ? [market] : ['DE', 'IL', 'GLOBAL']).map((m) => ({ id: m, name: m, market: m })),
     // менеджеры: действующие продавцы и руководители рынка + все, у кого есть сделки периода (чтобы разрезы сходились)
-    user: await q(`select id::text, name, market from portal.users u where ((active and role in ('seller','market_head')) or exists (select 1 from portal.deals d join portal.clients cl on cl.id = d.client_id
+    user: await q(`select id::text, name, market from portal.users u where u.email not like 'qa-%@qa.test' /* О12 */ and ((active and role in ('seller','market_head')) or exists (select 1 from portal.deals d join portal.clients cl on cl.id = d.client_id
         where d.seller_id = u.id and d.stage <> 'cancelled' and d.created_at >= $2 and d.created_at < $3 and ($1::text is null or cl.market = $1))) and ($1::text is null or market = $1 or role not in ('seller','market_head')) order by name`, [market, p.start, p.end]),
     agency: await q(`select id::text, name, market from portal.agencies where ($1::text is null or market = $1) order by name`, [market]),
   }

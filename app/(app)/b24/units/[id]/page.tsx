@@ -11,6 +11,7 @@ import { B24_LOST } from '@/lib/stages'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
 import { setEscort, terminateDeal } from '@/lib/moneyActions'
 import { ActionForm } from '@/components/ActionForm'
+import { ConfirmBtn } from '@/components/ConfirmBtn'
 import { ConsentBox } from '@/components/ConsentBox'
 import { clientScope } from '@/lib/scope'
 import { unitById, codeFor, viewMode } from '@/lib/catalog'
@@ -124,7 +125,7 @@ export default async function Units(
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('confirm')}
                   <label className="field"><span>{T('№ брони застройщика')}</span><input name="dev_no" className="in" style={{ width: 140 }} /></label>
                   <label className="field"><span>{T('до какого числа у застройщика')}</span><input name="until" type="date" className="in" /></label>
-                  <button className="btn btn--sm btn--p">{T('Подтвердить бронь')}</button></form>
+                  <ConfirmBtn className="btn btn--sm btn--p" msg={T('Подтвердить бронь {u} у застройщика? Без даты срок посчитается по условиям проекта.', { u: u.no })}>{T('Подтвердить бронь')}</ConfirmBtn></form>
                 <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}>{h('reject')}
                   <label className="field"><span>{T('Причина отказа')}</span><select name="reason" className="in" required defaultValue="">{/* Б11: причина не выбрана заранее */}<option value="" disabled>{T('Выберите')}</option>{[['sold', 'Sold'], ['developer_refused', 'Developer refused'], ['registration_failed', 'Registration failed'], ['other', 'Other']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <button className="btn btn--sm">{T('Отклонить')}</button></form></div>}
@@ -137,7 +138,7 @@ export default async function Units(
                 {cl.kyc_status === 'passed' && !u.spa_approval_at && <form action={bookingAction}>{h('spa_approval')}<button className="btn btn--sm">{T('Договор на согласовании')}</button></form>}
                 {cl.kyc_status === 'passed' && u.spa_approval_at && <span className="small okc">{T('Договор на согласовании с {d}', { d: date(L, u.spa_approval_at) })}</span>}
                 {cl.kyc_status === 'passed'
-                  ? <form action={bookingAction}>{h('contract')}<button className="btn btn--sm btn--p">{T('Договор подписан')}</button></form>
+                  ? <form action={bookingAction}>{h('contract')}<ConfirmBtn className="btn btn--sm btn--p" msg={T('Отметить договор по {u} подписанным? Бронь закроется, начнётся учёт платежей и долей — вернуть нельзя.', { u: u.no })}>{T('Договор подписан')}</ConfirmBtn></form>
                   : <span className="small muted">{T('«Договор на согласовании» и «Договор подписан» — после пройденного KYC')}</span>}
               </div>}
               {['confirmed', 'converted'].includes(u.status!) && office && staff.length > 0 && <form action={setEscort} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.booking_id!} />
@@ -156,12 +157,12 @@ export default async function Units(
                   <label className="field"><span>{T('Дата расторжения')}</span><input className="in" type="date" name="date" required /></label>
                   <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Причина')}</span><input className="in" name="reason" required maxLength={300} /></label>
                   <label className="field"><span>{T('Деньги клиенту вернули?')}</span><select className="in" name="refunded" required defaultValue=""><option value="" disabled>{T('Выберите')}</option><option value="yes">{T('да')}</option><option value="no">{T('нет')}</option></select></label>
-                  <button className="btn btn--sm">{T('Расторгнуть')}</button>
+                  <ConfirmBtn msg={T('Расторгнуть сделку по {u}? Бронь закроется, квартира вернётся в продажу, начисления по сделке будут сняты — вернуть нельзя.', { u: u.no })}>{T('Расторгнуть')}</ConfirmBtn>
                   <div className="tiny muted" style={{ flexBasis: '100%' }}>{T('Возврат комиссии — только при расторжении в первые 3 месяца и с возвратом денег клиенту; сумму утверждают финансы.')}</div>
                 </ActionForm></details>}
             </div>
           })}
-          {['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          {['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && !units.some((x) => x.status === 'converted' && x.deal_stage !== 'cancelled') /* О31: после договора — только расторжение */ && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <input type="hidden" name="client" value={cl.id} />
             <label className="field"><span>{T('Отказ клиента — причина')}</span><select name="reason" className="in" required defaultValue=""><option value="" disabled>{T('Выберите')}</option>{B24_LOST.filter((x) => x !== 'Compliance').map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
             <button className="btn btn--sm">{T('Отказ')}</button>

@@ -5,6 +5,8 @@ select current_database() = 'seabreeze_qa22' as ok \gset
 \if :ok
 update portal.deals d set stage = 'cancelled' from portal.bookings b join portal.users u on u.id = b.agent_id
   where d.booking_id = b.id and u.email like 'qa-%@qa.test' and d.stage <> 'cancelled';
+-- О13: у сделок автотестов, снятых уборкой, — и ожидаемые транши
+update portal.tranches t set status = 'cancelled' from portal.deals d where d.id = t.deal_id and d.stage = 'cancelled' and t.status in ('scheduled','expected');
 update portal.bookings b set status = 'cancelled' from portal.users u
   where u.id = b.agent_id and u.email like 'qa-%@qa.test' and b.status in ('hold','queued','requested','confirmed','release_pending','converted');
 -- лимит «10 заявок с адреса за час» на ссылке партнёра: прошлые прогоны шли с 127.0.0.1 — снимаем у них адрес, чтобы новый прогон не упёрся в лимит

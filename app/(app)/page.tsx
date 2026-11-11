@@ -17,7 +17,7 @@ export default async function Home() {
   const ext = isExternal(u.role)
   const cs = clientScope(u), bs = bookingScope(u)
   const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null }>(
-    `select id, name, stage, last_activity_at, protected_until, pause_until from portal.clients cl where ${cs.sql}`, cs.params)
+    `select id, name, stage, last_activity_at, protected_until, pause_until from portal.clients cl where ${cs.sql} and cl.anonymized_at is null`, cs.params) // О7: удалённые по запросу — не в «Требует внимания»
   const bookings = await q<{ id: string; status: string; ends_at: string; unit: string; client: string; client_id: string; price_list: number; discount_pct: number; snapshot: SplitCond; ext: boolean }>(
     `select b.id, b.status, b.ends_at, b.price_list::float, b.discount_pct::float, b.snapshot, portal.unit_no(bl.external_id, un.number) as unit, cl.name as client, cl.id as client_id, ag.role in ('agent','agency_head') ext from portal.bookings b
      join units un on un.id = b.unit_id join buildings bl on bl.id = un.building_id join portal.clients cl on cl.id = b.client_id join portal.users ag on ag.id = b.agent_id
@@ -45,7 +45,7 @@ export default async function Home() {
   const appr = ['owner', 'market_head'].includes(u.role) ? await one<{ n: number }>(`select count(*)::int n from portal.bookings b join portal.clients cl on cl.id = b.client_id where b.approval = 'pending' and b.status = 'requested' ${u.role === 'market_head' ? 'and cl.market = $1' : ''}`, u.role === 'market_head' ? [u.market] : []) : null
 
   const news = (await feed(u, { limit: 3 }))
-  const active = clients.filter((x) => !x.pause_until && !['handed'].includes(x.stage))
+  const active = clients.filter((x) => !x.pause_until && !['handed', 'lost'].includes(x.stage))
   const now = Date.now()
   const attention: { kind: 'bad' | 'warn' | 'ok'; title: string; sub: string; href: string }[] = []
   for (const b of bookings) {
@@ -57,7 +57,7 @@ export default async function Home() {
     const idle = Math.floor((now - new Date(cl.last_activity_at).getTime()) / 86400000)
     if (idle >= 30) attention.push({ kind: 'warn', title: T('Нет активности {d} дн.', { d: idle }), sub: cl.name, href: `/clients/${cl.id}` })
     const left = Math.ceil((new Date(cl.protected_until).getTime() - now) / 86400000)
-    if (ext && left <= 14) attention.push({ kind: 'bad', title: T('Защита клиента заканчивается через {d} дн.', { d: left }), sub: cl.name, href: `/clients/${cl.id}` })
+    if (ext && left >= 0 && left <= 14) attention.push({ kind: 'bad', title: T('Защита клиента заканчивается через {d} дн.', { d: left }), sub: cl.name, href: `/clients/${cl.id}` })
   }
   if (!ext && apps!.n && ['owner', 'market_head', 'seller'].includes(u.role)) attention.push({ kind: 'warn', title: T('Заявки агентов на проверке: {n}', { n: apps!.n }), sub: T('Проверить и ответить за 2 рабочих дня'), href: '/admin/agents' })
   if (disp?.n) attention.push({ kind: 'bad', title: T('Споры «чей клиент»: {n}', { n: disp.n }), sub: T('Решение по журналу'), href: '/admin/disputes' })

@@ -2766,5 +2766,6 @@
 "Взнос {d} %": "Anzahlung {d} %",
 "Ваши брони и холды.": "Ihre Reservierungen und Holds.",
 "Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Aktive Reservierungen in allen Projekten. Das Limit des Bauträgers gilt für alle seine Projekte zusammen; 24-Stunden-Holds zählen nicht dazu.",
-"из любых выплат": "aus beliebigen Zahlungen"
+"из любых выплат": "aus beliebigen Zahlungen",
+"Клиент знает, что мы вносим его контакты в базу GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.": "Der Kunde weiß, dass wir seine Kontaktdaten in die GetsEstate-Datenbank aufnehmen. Die Einwilligung bestätigt er selbst über den Link, den wir ihm senden."
 }

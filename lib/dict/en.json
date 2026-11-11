@@ -2766,5 +2766,6 @@
 "Взнос {d} %": "Down payment {d}%",
 "Ваши брони и холды.": "Your reservations and holds.",
 "Активные брони по всем проектам. Лимит у застройщика — общий на все его проекты; холды на 24 часа в лимит не входят.": "Active reservations across all projects. The developer limit is shared across all of their projects; 24-hour holds do not count towards it.",
-"из любых выплат": "from any payments"
+"из любых выплат": "from any payments",
+"Клиент знает, что мы вносим его контакты в базу GetsEstate. Согласие он подтвердит сам — по ссылке, которую мы ему отправим.": "The client knows we are adding their contact details to the GetsEstate database. They will confirm consent themselves via the link we send them."
 }

@@ -8,6 +8,7 @@ import { Top, Pill } from '@/components/ui'
 import { decideRegistration, renewRegistration, massEnqueue } from '@/lib/regActions'
 import { loadRegistrations, groupOf, type RegParams } from '@/lib/regFilter'
 import { RegBulk, CheckAll } from './bulk'
+import { ConfirmBtn } from '@/components/ConfirmBtn'
 import { sendConsentLink } from '@/lib/consentActions'
 
 // 2.2 · Регистрации у застройщиков (§7, экран Бэк-офис 01): пакет на сегодня, ждём ответа, молчание, истекают, все.
@@ -69,8 +70,11 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
             <tbody>
               {shown.length === 0 && <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr>}
               {shown.map((r) => {
-                const [lab, kind] = ST[r.status]
-                const term = r.status === 'to_send' ? (r.due_send ? T('передать до {d}', { d: date(L, r.due_send) }) : '') : r.status === 'sent' ? T('ответ до {d}', { d: date(L, r.answer_due!) }) + (r.answer_due! < today ? ' · ' + T(r.silence_rule === 'confirm' ? 'молчание = да' : 'напомнить') : '') : r.valid_until ? T('до {d}', { d: date(L, r.valid_until) }) : ''
+                // О23 (обход 11.11): до согласия клиента строка не «к отправке», а «ждёт согласия» — без срока
+                const noConsent = r.status === 'to_send' && r.consent_status !== 'given'
+                const [lab, kind] = noConsent ? ['ждёт согласия клиента', 'off'] as [string, 'off'] : ST[r.status]
+                const late = r.status === 'to_send' && !noConsent && !!r.due_send && r.due_send.slice(0, 10) < today // О26: просрочено
+                const term = noConsent ? '' : r.status === 'to_send' ? (r.due_send ? T('передать до {d}', { d: date(L, r.due_send) }) : '') : r.status === 'sent' ? T('ответ до {d}', { d: date(L, r.answer_due!) }) + (r.answer_due! < today ? ' · ' + T(r.silence_rule === 'confirm' ? 'молчание = да' : 'напомнить') : '') : r.valid_until ? T('до {d}', { d: date(L, r.valid_until) }) : ''
                 return (
                   <tr key={r.id}>
                     {/* 313 (Денис 11.11): застройщику — только после согласия клиента; без согласия строку не отметить; по умолчанию не отмечены */}
@@ -82,14 +86,14 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
                     <td>{r.developer} · {r.project}</td>
                     <td className="small muted">{r.owner_type === 'partner' ? r.owner + (r.agency ? ' · ' + r.agency : '') : r.owner_type === 'referrer' ? T('рекомендатель') + ' · ' + r.owner : T('команда')}{r.market ? ' · ' + r.market : ''}</td>
                     <td><Pill kind={kind}>{T(lab)}</Pill>{r.reject_reason && <div className="tiny muted">{T(WHY[r.reject_reason])}</div>}</td>
-                    <td className="small">{term}</td>
-                    <td className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                    <td className={'small' + (late ? ' bad' : '')}>{term}{late ? ' · ' + T('просрочено') : ''}</td>
+                    <td className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                       {edit && r.status === 'sent' && <>
                         <form action={decideRegistration}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="verdict" value="confirmed" /><button className="btn btn--sm btn--p">{T('Подтверждено')}</button></form>
                         <form action={decideRegistration} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="verdict" value="rejected" />
-                          <select className="in in--sm" name="reason" defaultValue="developer_client">{Object.entries(WHY).map(([k, v]) => <option key={k} value={k}>{T(v)}</option>)}</select><button className="btn btn--sm">{T('Отказ')}</button></form>
+                          <select className="in in--sm" name="reason" required defaultValue="" aria-label={T('Причина отказа')}><option value="" disabled>{T('Причина отказа')}</option>{Object.entries(WHY).map(([k, v]) => <option key={k} value={k}>{T(v)}</option>)}</select><ConfirmBtn msg={T('Записать отказ застройщика в регистрации {c}?', { c: r.client })}>{T('Отказ')}</ConfirmBtn></form>{/* О24: причина не выбрана заранее, с подтверждением */}
                       </>}
-                      {edit && ['confirmed', 'confirmed_silence', 'expired', 'rejected'].includes(r.status) && <form action={renewRegistration}><input type="hidden" name="id" value={r.id} /><button className="btn btn--sm">{T('Продлить')}</button></form>}
+                      {edit && ['confirmed', 'confirmed_silence', 'expired'].includes(r.status) && <form action={renewRegistration}>{/* О24: у отказа «Продлить» нет */}<input type="hidden" name="id" value={r.id} /><button className="btn btn--sm">{T('Продлить')}</button></form>}
                     </td>
                   </tr>
                 )
