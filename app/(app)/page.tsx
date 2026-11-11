@@ -77,7 +77,8 @@ export default async function Home() {
   if (ext && (u.role === 'agency_head' || !u.agency_id)) { const g = await payoutGaps(u.id); if (g.waiting > 0 && g.missing.length) attention.unshift({ kind: 'bad', title: T('{a} ждут выплаты — укажите данные для выплаты', { a: usd(L, g.waiting) }), sub: g.missing.map((m) => T(m)).join(', '), href: '/commission#payout' }) }
 
   // 382: одна шкала — партнёру короткая (8 шагов), сотрудникам стадии Bitrix24
-  const funnel = (ext ? PARTNER_STAGES.map(([k, l]) => [k, l]) : STAFF_STAGES).map(([k, l]) => [l, active.filter((x) => colOf(x, ext) === k).length] as [string, number])
+  // О96: сотрудникам — названия как в Bitrix24, без перевода (иначе часть стадий подменялась словарём старой шкалы); партнёру — перевод
+  const funnel = (ext ? PARTNER_STAGES.map(([k, l]) => [k, T(l)]) : STAFF_STAGES).map(([k, l]) => [l, active.filter((x) => colOf(x, ext) === k).length] as [string, number])
   const maxF = Math.max(1, ...funnel.map(([, n]) => n))
   // Ожидаемая комиссия агента: сделки в работе (до выплаты) + активные брони по снимку условий; агентская доля — только у броней партнёров.
   // Та же формула — на странице «Комиссия» (lib/money expectedAgent)
@@ -132,7 +133,7 @@ export default async function Home() {
             <div className="stack mt16" style={{ gap: 8 }}>
               {funnel.map(([l, n]) => (
                 <div key={l} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 24px', gap: 10, alignItems: 'center' }}>
-                  <span className="small">{T(l)}</span>
+                  <span className="small">{l}</span>
                   <span style={{ background: 'var(--sand)', borderRadius: 4, height: 20, display: 'block' }}><span style={{ display: 'block', height: 20, borderRadius: 4, background: '#A9C9BF', width: `${(n / maxF) * 100}%` }} /></span>
                   <span className="small num" style={{ fontWeight: 600 }}>{n}</span>
                 </div>
