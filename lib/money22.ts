@@ -124,11 +124,16 @@ export async function buildTranches(dealId: string) {
 }
 
 // Финансы отметили поступление транша в Caspian: начисления по каждой доле (кроме Caspian), месяц — срез поступления
-export async function receiveTranche(trancheId: string, by: string) {
+// 285 (Денис 11.11): фактическая сумма, дата и валюта транша; доли начисляются пропорционально фактически полученному (в USD)
+export async function receiveTranche(trancheId: string, by: string, actual: { amount: number; currency: string; usd: number; date: string } | null = null) {
   const made = await tx(async (t) => {
-    const tr = (await t.query(`update portal.tranches set status = 'received', received_at = now(), received_by = $2 where id = $1 and status = 'expected' returning id, deal_id, pct::float, amount::float`, [trancheId, by])).rows[0]
+    const tr = (await t.query(`update portal.tranches set status = 'received', received_at = now(), received_by = $2,
+        received_amount = $3, received_currency = $4, received_usd = $5, received_on = coalesce($6::date, current_date)
+      where id = $1 and status = 'expected' returning id, deal_id, pct::float, amount::float`, [trancheId, by, actual?.amount ?? null, actual?.currency ?? null, actual?.usd ?? null, actual?.date || null])).rows[0]
     if (!tr) return null
-    const month = (await t.query(`select date_trunc('month', now() at time zone 'Asia/Baku')::date::text m`)).rows[0].m
+    const factor = actual && actual.usd > 0 && tr.amount > 0 ? actual.usd / tr.amount : 1 // нет курса — по плану
+    tr.pct = tr.pct * factor
+    const month = (await t.query(`select date_trunc('month', coalesce($1::date, (now() at time zone 'Asia/Baku')::date))::date::text m`, [actual?.date || null])).rows[0].m
     const shares = (await t.query(`select role, user_id, recipient, amount::float from portal.deal_shares where deal_id = $1 and role <> 'caspian'`, [tr.deal_id])).rows
     for (const s of shares) {
       const a = r2((s.amount * tr.pct) / 100)
@@ -187,16 +192,20 @@ export async function decideClawback(reqId: string, approve: boolean, amount: nu
 
 // ── Реестр выплат за месяц (§8 «Выплаты») ──
 const ENTITY: Record<string, string> = { DE: 'GmbH', IL: 'IL Ltd' }
-export async function collectRegister(month: string, by: string) {
-  const reg = await one<{ id: string; status: string }>('select id, status from portal.payout_registers where month = $1', [month])
+// 283 (Денис 11.11): один реестр в месяц; дополнительный (extra) — по кнопке, когда основной уже утверждён или оплачен
+export async function collectRegister(month: string, by: string, extra = false) {
+  const last = await one<{ id: string; status: string; no: number }>('select id, status, no from portal.payout_registers where month = $1 order by no desc limit 1', [month])
+  if (extra && (!last || last.status === 'collected')) return { error: 'Дополнительный реестр — после утверждения основного' }
+  const reg = extra ? null : last
   if (reg && reg.status !== 'collected') return { error: 'Реестр уже утверждён — собрать заново нельзя' }
+  const no = extra ? (last!.no + 1) : 1
   return tx(async (t) => {
     let id = reg?.id
     if (id) {
       await t.query(`update portal.accruals set status = 'open', register_id = null where register_id = $1 and status = 'in_register'`, [id])
       await t.query('delete from portal.payout_lines where register_id = $1', [id])
       await t.query(`update portal.payout_registers set collected_at = now(), collected_by = $2, confirmations = '{}' where id = $1`, [id, by])
-    } else id = (await t.query(`insert into portal.payout_registers (month, collected_by) values ($1,$2) returning id`, [month, by])).rows[0].id
+    } else id = (await t.query(`insert into portal.payout_registers (month, collected_by, no) values ($1,$2,$3) returning id`, [month, by, no])).rows[0].id
     // всё открытое по поступлениям до конца месяца среза, включая перенесённое и минусы (клаубэк зачитывается против следующих выплат)
     const rows = (await t.query(`select a.role, a.user_id, a.recipient, sum(a.amount)::float s, array_agg(a.id) ids,
         u.market, u.partner_form, u.tax_no, u.vat_no, u.tax_country, u.tax_cert_until::text cert, u.bank_changed_at, u.bank_iban

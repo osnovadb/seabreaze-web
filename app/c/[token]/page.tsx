@@ -26,7 +26,7 @@ export default async function Consent(
       </div>
       <p className="mt16">{T('Здравствуйте, {n}!', { n: cl.name })}</p>
       <p>{cl.brand ? T('{b} работает с GetsEstate — агентством новостроек в Баку. Чтобы подобрать для вас квартиры и зарегистрировать вас у застройщиков, нам нужно ваше согласие.', { b: cl.brand }) : T('Чтобы подобрать для вас квартиры и зарегистрировать вас у застройщиков, нам нужно ваше согласие.')}</p>
-      <ConsentForm lang={L} token={params.token} status={cl.consent_status} marketing={cl.marketing} />
+      <ConsentForm lang={L} token={params.token} status={cl.consent_status} marketing={cl.marketing} ads={!cl.brand} />
       <p className="tiny muted mt24"><a href="/legal/privacy" target="_blank">{T('Политика конфиденциальности')}</a> · {T('Данные хранятся в ЕС. Отозвать согласие можно в любой момент по этой же ссылке или письмом.')}</p>
     </main>
   )

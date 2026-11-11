@@ -32,7 +32,9 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
   const attached = await selectionVariants(s.id)
   const head = ['owner', 'market_head'].includes(c.user.role)
   // QA 10.11: менять подборку может автор или владелец (selectionUpdate) — остальным кнопку не показываем
-  const canEdit = (s.user_id === c.user.id || c.user.role === 'owner') && !c.impersonating
+  const authorAg = (await one<{ agency_id: string | null }>('select agency_id from portal.users where id = $1', [s.user_id]))?.agency_id
+  const canEdit = (s.user_id === c.user.id || c.user.role === 'owner' || (c.user.role === 'agency_head' && !!authorAg && authorAg === c.user.agency_id)) && !c.impersonating // 375
+  const changed = await one<{ who: string; at: string }>('select u.name who, s.updated_at at from portal.selections s join portal.users u on u.id = s.updated_by where s.id = $1 and s.updated_by is not null and s.updated_by <> s.user_id', [s.id])
   const author = canEdit ? null : (await one<{ name: string }>('select name from portal.users where id = $1', [s.user_id]))?.name
   const avail = items.length ? await q<{ id: string; unit_id: string; name: string; snapshot: Snapshot; needs_approval: boolean; approved_at: string | null; author: string; mine: boolean }>(
     `select v.id, v.unit_id, v.name, v.snapshot, v.needs_approval, v.approved_at, a.name author, v.author_id = $2 mine from portal.calc_variants v join portal.users a on a.id = v.author_id
@@ -89,6 +91,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
               </div>
             )
           })}
+          {changed && <div className="tiny muted">{T('Изменено: {w}, {d}', { w: changed.who, d: dateTime(L, changed.at) })}</div>}
           {canEdit ? <button className="btn">{T('Сохранить заметки, графики и варианты')}</button>
             : <div className="note small">{T('Менять подборку может её автор ({a}) или владелец', { a: author || '—' })}</div>}
         </form>

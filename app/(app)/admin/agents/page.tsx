@@ -15,7 +15,7 @@ export default async function Agents() {
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
   const own = c.user.role === 'owner'
   const apps = await q<any>(`select a.*, (select count(*)::int from portal.application_files af where af.application_id = a.id) nfiles from portal.agent_applications a ${own ? '' : 'where market = $1'} order by case status when 'new' then 0 when 'review' then 1 when 'contract' then 2 else 3 end, created_at desc`, own ? [] : [c.user.market])
-  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','market_head','owner') ${own ? '' : 'and market = $1'} order by name`, own ? [] : [c.user.market])
+  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and leads_partners and role <> 'seller' ${own ? '' : 'and market = $1'} order by name`, own ? [] : [c.user.market])
   const canAccess = ['owner', 'market_head'].includes(c.user.role)
   const agents = await q<{ id: string; name: string; email: string; role: string; market: string; agency: string | null; curator: string | null; license_note: string | null; contract_signed_at: string | null; clients: number; bookings: number; deals: number }>(
     `select u.id, u.name, u.email, u.role, u.market, a.name agency, cu.name curator, u.license_note, u.contract_signed_at,

@@ -13,7 +13,7 @@ test('партнёр заводит клиента → кандидат 14 дн�
   const c = r.client
   assert.equal(c.attach_status, 'candidate'); assert.equal(c.owner_type, 'partner')
   const days = Math.round((new Date(c.candidate_until) - Date.now()) / 86400000)
-  assert.ok(days >= 13 && days <= 14, 'candidate_until ≈ +14 дней: ' + c.candidate_until)
+  assert.ok(days >= 29 && days <= 30, '362: приоритет кандидата ≈ +30 дней: ' + c.candidate_until)
   assert.equal(c.consent_status, 'pending'); assert.equal(c.consent_at, null, 'партнёр не может дать согласие за клиента')
   assert.ok(c.consent_token, 'ссылка на согласие создана')
   assert.ok(await one(`select 1 from portal.consents where client_id = $1 and kind = 'partner_confirm'`, [c.id]), 'подтверждение партнёра в журнале')

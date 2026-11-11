@@ -7,7 +7,6 @@ import { clientScope } from './scope'
 import { storeFile, isFile } from './files'
 import { t, LANGS, type Lang } from './i18n'
 import { DOC_KINDS, inspectTemplate, varAllowed, createDocument, canEditTemplates, type DocKind } from './docs'
-import { syncAct } from './acts'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 async function writeCtx() {
@@ -98,33 +97,4 @@ export async function docStatus(_: unknown, f: FormData) {
 }
 
 // Акт вознаграждения из «Финансов» (М4 + М8): документ по сделке акта, язык — интерфейса партнёра
-export async function actDocument(_: unknown, f: FormData) {
-  const c = await writeCtx()
-  if (!['owner', 'finance'].includes(c.user.role)) return { error: 'Нет прав' }
-  const a = await one<{ id: string; client_id: string; booking_id: string; locale: string }>(`select ca.id, d.client_id, d.booking_id, u.locale from portal.commission_acts ca join portal.deals d on d.id = ca.deal_id join portal.users u on u.id = ca.agent_id where ca.id = $1`, [s(f, 'id')])
-  if (!a?.booking_id) return { error: 'Нет прав' }
-  try {
-    const d = await createDocument('commission_act', (LANGS.includes(a.locale as Lang) ? a.locale : 'en') as Lang, { clientId: a.client_id, bookingId: a.booking_id }, c.user.id)
-    await q('update portal.commission_acts set document_id = $2 where id = $1', [a.id, d.id])
-    await log(c, 'document.create', 'document', d.id, { kind: 'commission_act', number: d.number })
-    revalidatePath('/finance')
-    return { ok: true }
-  } catch (e: any) {
-    return { error: String(e?.message) === 'template' ? t(c.lang, 'Нет шаблона для этого вида документа — загрузите его в «Шаблоны документов»') : t(c.lang, 'Документ не создан: {e}', { e: String(e?.message || '').slice(0, 80) }) }
-  }
-}
-export async function payActNow(f: FormData) {
-  const c = await writeCtx()
-  if (!['owner', 'finance'].includes(c.user.role)) return
-  const a = await one<{ deal_id: string }>(`select deal_id from portal.commission_acts where id = $1 and status = 'due'`, [s(f, 'id')])
-  if (!a) return
-  // выплата акта = стадия сделки «выплачено агенту»; вычет возвратов — в payAct
-  // процент оплаты клиента не трогаем — выплата агенту про наши деньги, не про платежи клиента
-  const d = await one<{ client_id: string }>(`update portal.deals set stage = 'paid_out', paid_out_at = current_date where id = $1 returning client_id`, [a.deal_id])
-  if (d) await q('select portal.sync_client_stage($1)', [d.client_id])
-  await syncAct(a.deal_id)
-  const ag = await one<{ agent_id: string }>('select agent_id from portal.commission_acts where id = $1', [s(f, 'id')])
-  if (ag) await notify(ag.agent_id, 'payout', 'Комиссия выплачена', '/commission')
-  await log(c, 'act.pay', 'commission_act', s(f, 'id'))
-  revalidatePath('/', 'layout') // селект стадии сделки в «Финансах» — сразу «выплачено»
-}
+// 281 (Денис 11.11): акты v2 по сделке удалены — акты 2.2 идут строками реестра выплат («Финансы → Акты»)

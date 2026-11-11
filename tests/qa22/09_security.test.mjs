@@ -34,7 +34,7 @@ test('вход по ссылке: неверный токен → «ссылка
 })
 test('акт чужого партнёра не открывается', async () => {
   const a = await user('agency_head'), b = await user('agency_head')
-  const reg = await one(`insert into portal.payout_registers (month) values ('2032-01-01') on conflict (month) do update set month = excluded.month returning id`)
+  const reg = await one(`insert into portal.payout_registers (month) values ('2032-01-01') on conflict (month, no) do update set month = excluded.month returning id`)
   const l = await one(`insert into portal.payout_lines (register_id, role, user_id, gross, net, act_no) values ($1,'partner',$2,100,100,'A-QA-'||floor(random()*1e6)) returning id`, [reg.id, a.id])
   assert.equal((await page(a, `/commission/act/${l.id}`)).status, 200)
   assert.notEqual((await page(b, `/commission/act/${l.id}`)).status, 200, 'чужой акт открылся')

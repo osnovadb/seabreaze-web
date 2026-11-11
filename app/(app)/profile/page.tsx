@@ -1,3 +1,4 @@
+import { isExternal } from '@/lib/perm'
 import { requireCtx } from '@/lib/auth'
 import { t, dateTime } from '@/lib/i18n'
 import { ROLE_NAMES } from '@/lib/perm'
@@ -33,7 +34,7 @@ export default async function Profile() {
             <div className="tiny muted">{T('Сменить e-mail, роль или агентство может администратор.')}</div>
           </div>
           <PasswordForm lang={L} />
-          <PinForm lang={L} />
+          {!isExternal(c.user.role) && <PinForm lang={L} />}{/* 279: партнёру PIN не нужен */}
         </div>
         {!c.impersonating && <div className="grid g2 mt16" style={{ alignItems: 'start' }}>
           <form action={saveNotifyPrefs} className="card stack" style={{ gap: 8 }}>

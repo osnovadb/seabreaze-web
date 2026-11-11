@@ -21,7 +21,6 @@ import { LANGS, t, bakuYear, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS, B24_LOST } from './stages'
 import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
 import { autoPost } from './posts'
-import { syncAct } from './acts'
 import { readXlsx } from './xlsx'
 import { pushDeal, queueSync, queueApp, queueTask } from './b24sync'
 import { grantAccess, invite, noPassword } from './partnerAccess'
@@ -112,7 +111,8 @@ export async function startShow(f: FormData) {
 export async function exitShow(_: unknown, f: FormData) {
   const c = await requireCtx()
   const r = await one<{ pin_hash: string }>('select pin_hash from portal.users where id = $1', [c.real.id])
-  if (!r?.pin_hash || !bcrypt.compareSync(s(f, 'pin'), r.pin_hash)) {
+  // 279 (Денис 11.11): партнёру PIN при выходе из показа не спрашиваем
+  if (!isExternal(c.real.role) && (!r?.pin_hash || !bcrypt.compareSync(s(f, 'pin'), r.pin_hash))) {
     // 5 неверных PIN за 15 минут — выходим из аккаунта целиком, чтобы PIN нельзя было подобрать
     await audit(c.real.id, 'show.pin_fail')
     const fails = await one<{ n: number }>(`select count(*)::int n from portal.audit where user_id = $1 and action = 'show.pin_fail' and created_at > now() - interval '15 minutes'`, [c.real.id])
@@ -150,7 +150,7 @@ async function stageGuard(c: Ctx, clientId: string) {
   if (cl.anon) throw new Error('anonymized') // Б12: после удаления данных по запросу карточка закрыта для правок
   const u = c.user
   const ok = u.role === 'owner' || u.role === 'market_head' || (u.role === 'office' || u.role === 'finance') || cl.owner_id === u.id || (u.role === 'agency_head' && cl.agency_id === u.agency_id)
-    || (u.role === 'seller' && (await one('select 1 from portal.users where id = $1 and curator_id = $2', [cl.owner_id, u.id])))
+
   if (!ok) throw new Error('forbidden')
   return cl
 }
@@ -206,14 +206,14 @@ async function registerClientLocked(f: FormData) {
   if (dup && !rival && !ext && dup.attach_status === 'candidate' && dup.owner_type === 'partner') {
     // Команда касается кандидата партнёра: уведомление менеджеру по партнёрам, партнёру — приоритет 14 дней
     for (const m of await q<{ id: string }>(`select id from portal.users where active and role = 'market_head' and (market = $1 or $1 is null)`, [dup.market]))
-      await notify(m.id, 'client', 'Команда заводит кандидата партнёра — у партнёра приоритет 14 дней', `/clients/${dup.id}`, {})
+      await notify(m.id, 'client', 'Команда заводит кандидата партнёра — у партнёра приоритет 30 дней от заведения', `/clients/${dup.id}`, {})
   }
   if (dup && !rival) {
     await audit(c.real.id, 'client.duplicate', 'client', dup.id, { tried_by: c.user.id }, c.impersonating ? c.user.id : null)
     // Возвращаем только то, что ввёл сам пользователь, — для кнопки «Запросить проверку»; владельца не раскрываем
     return { duplicate: true, tried: { name, phone, email } }
   }
-  // §10: клиент команды закрепляется сразу на 6 месяцев; клиент партнёра — кандидат на 14 дней без защиты, закрепление — после квалификации
+  // §10 / 362: клиент команды закрепляется сразу на 6 месяцев; клиент партнёра — кандидат (приоритет 30 дней) без защиты, закрепление — после квалификации
   const months = 6
   // номер — из последовательности (v2): count(*) давал одинаковые номера при одновременной регистрации
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
@@ -221,11 +221,11 @@ async function registerClientLocked(f: FormData) {
   const r = await one<{ id: string; protected_until: string | null; candidate_until: string | null }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, source, goal, budget, timeline, payment, interest, stage,
       owner_type, attach_status, protected_until, candidate_until, attached_at, other_claimant_of, segment)
     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, null, $12,$13,$14,$15,$16,$17,'lead',
-      $19, $20, case when $20 = 'protected' then current_date + ($18 || ' months')::interval end, case when $20 = 'candidate' then current_date + 14 end,
+      $19, $20, case when $20 = 'protected' then current_date + ($18 || ' months')::interval end, case when $20 = 'candidate' then current_date + 30 end, /* 362: приоритет партнёра — кандидаты не старше 30 дней */
       case when $20 = 'protected' then now() end, $21, $22) returning id, protected_until::text, candidate_until::text`,
     [reg, c.user.id, c.user.agency_id, name, phone, pn, email, em, s(f, 'country'), langCode(s(f, 'language')), c.user.market, ext ? 'agent' : s(f, 'source') || 'office', s(f, 'goal') || null, s(f, 'budget') || null, s(f, 'timeline') || null, s(f, 'payment') || null, s(f, 'interest') || null, months,
       ext ? 'partner' : 'team', ext ? 'candidate' : 'protected', rival, s(f, 'segment') || null])
-  if (ext) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Кандидат заведён ({r}): квалифицируйте до {d}, тогда клиент закрепится за вами',$3)`, [r!.id, c.user.id, { r: reg, d: r!.candidate_until! }])
+  if (ext) await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Кандидат заведён ({r}): квалифицируйте — тогда клиент закрепится за вами; приоритет за вами до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.candidate_until! }])
   else {
     await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Клиент зарегистрирован ({r}), закреплён до {d}',$3)`, [r!.id, c.user.id, { r: reg, d: r!.protected_until! }])
     await q('select portal.enqueue_registrations($1, null, false, $2)', [r!.id, c.user.id]) // §7: клиента команды — в очередь регистрации у всех застройщиков
@@ -532,6 +532,9 @@ export async function createBooking(_: unknown, f: FormData) {
   const queued = used >= limit
   const days = cond.booking_days
   const tour = { from: s(f, 'tour_from') || null, to: s(f, 'tour_to') || null }
+  // 355: запрос длинной брони — крайняя дата по условиям (срок + одно продление); дольше — задача бэк-офису согласовать с застройщиком
+  const maxUntil = new Date(Date.now() + (cond.booking_days + cond.booking_ext_days) * 86400000).toISOString().slice(0, 10)
+  const wantUntil = /^\d{4}-\d{2}-\d{2}$/.test(s(f, 'want_until')) && s(f, 'want_until') > maxUntil ? s(f, 'want_until') : null
   const signing = ['in_person', 'remote', 'power_of_attorney'].includes(s(f, 'signing')) ? s(f, 'signing') : null
   // Акция застройщика и правило сложения проекта (М6): цена до раздела денег считается на сервере, не из формы
   const { promo, mode } = await promoForUnit(unit)
@@ -563,6 +566,10 @@ export async function createBooking(_: unknown, f: FormData) {
       queued ? 'queued' : 'requested', null, tour.from, tour.to, signing, s(f, 'comment') || null])
     .catch((e) => { if ((e as { code?: string }).code === '23505') return null; throw e }) // одновременный второй запрос на ту же квартиру
   if (!b) return { error: 'Квартира уже недоступна — встаньте в лист ожидания' }
+  if (wantUntil) {
+    await q(`update portal.bookings set snapshot = snapshot || jsonb_build_object('want_until', $2::text) where id = $1`, [b.id, wantUntil])
+    await queueTask(clientId, `Long reservation · ${unitNo(unit)} · until ${wantUntil}`, `Запрошена бронь ${unitNo(unit)} до ${wantUntil} — дольше срока по условиям (до ${maxUntil}). Согласуйте с застройщиком и внесите срок в «Подтвердить бронь».`, 'office')
+  }
   if (queued) await notify(c.user.id, 'booking', 'У застройщика сейчас нет свободного места — запрос {u} в очереди (до 7 дней); как только место освободится, он уйдёт бэк-офису', '/bookings', { u: unitNo(unit) })
   // Вторая бронь клиента со сделкой не возвращает его из «Договора» назад в «Бронь»
   await q(`update portal.clients set stage = case when stage in ('contract','payments','fee','support','handed') then stage else 'booking' end, last_activity_at = now() where id = $1`, [clientId])
@@ -659,7 +666,7 @@ export async function bookingAction(f: FormData) {
       if (made.length) await t.query(`update portal.clients set stage = case when stage in ('payments','fee','support','handed') then stage else 'contract' end where id = $1`, [b.client_id])
     })
     if (made.length) await notify(b.agent_id, 'deal', made.length > 1 ? 'Договор подписан — сделок в работе: {n}' : 'Договор подписан — сделка в работе', '/commission', made.length > 1 ? { n: made.length } : undefined)
-    for (const d of made) await syncAct(d)
+    // 281 (Денис 11.11): акты v2 по сделке больше не создаются — акты идут строками реестра выплат (2.2)
     for (const d of made) await computeShares(d) // §8: доли по ролям и транши комиссии застройщика
     if (made.length) await partnerProgress(b.agent_id) // §13 п.20: Active
   }
@@ -734,8 +741,10 @@ export async function addManyToSelection(f: FormData) {
 export async function selectionUpdate(f: FormData) {
   const c = await writeCtx()
   const id = s(f, 'id')
-  const sel = await one<{ user_id: string }>('select user_id from portal.selections where id = $1', [id])
-  if (!sel || (sel.user_id !== c.user.id && c.user.role !== 'owner')) return
+  // 375 (Денис 11.11): менять подборку может автор, владелец и руководитель агентства автора; кто менял — записываем
+  const sel = await one<{ user_id: string; agency_id: string | null }>('select s.user_id, u.agency_id from portal.selections s join portal.users u on u.id = s.user_id where s.id = $1', [id])
+  if (!sel || (sel.user_id !== c.user.id && c.user.role !== 'owner' && !(c.user.role === 'agency_head' && sel.agency_id && sel.agency_id === c.user.agency_id))) return
+  await q('update portal.selections set updated_by = $2, updated_at = now() where id = $1', [id, c.user.id])
   if (s(f, 'remove')) await q('delete from portal.selection_items where selection_id = $1 and unit_id = $2', [id, s(f, 'remove')])
   if (s(f, 'lang')) await q('update portal.selections set lang = $2 where id = $1', [id, s(f, 'lang')])
   for (const [k, v] of f.entries()) if (k.startsWith('note:')) await q('update portal.selection_items set note = $3 where selection_id = $1 and unit_id = $2', [id, k.slice(5), String(v) || null])
@@ -965,6 +974,9 @@ export async function updateUser(_: unknown, f: FormData) {
   const market = owner ? s(f, 'market') || null : u.market
   const email = s(f, 'email').toLowerCase()
   if (!s(f, 'name') || !email) return { error: 'Нужны имя и e-mail' }
+  // 374/280: куратор — только тот, кто «ведёт партнёров» (не сейлз)
+  if (s(f, 'curator') && !(await one(`select 1 from portal.users where id = $1 and leads_partners and role <> 'seller'`, [s(f, 'curator')]))) return { error: 'Куратором может быть только пользователь с отметкой «Ведёт партнёров»' }
+  if (owner && f.has('leads_partners_form')) await q('update portal.users set leads_partners = $2 where id = $1', [u.id, f.get('leads_partners') === 'on' && role !== 'seller'])
   try {
     await q(`update portal.users set name = $2, email = $3, role = $4, market = $5, agency_id = $6, curator_id = $7, locale = $8, license_note = $9, contract_signed_at = $10 where id = $1`,
       [u.id, s(f, 'name'), email, role, market, s(f, 'agency') || null, s(f, 'curator') || null, LANGS.includes(s(f, 'locale') as Lang) ? s(f, 'locale') : 'ru', s(f, 'license') || null, s(f, 'contract') || null])
@@ -1202,7 +1214,6 @@ export async function dealStage(f: FormData) {
   const d = await one<{ agent_id: string | null; client_id: string }>('select agent_id, client_id from portal.deals where id = $1', [s(f, 'id')])
   if (d) await q('select portal.sync_client_stage($1)', [d.client_id])
   if (d?.agent_id && st === 'paid_out') await notify(d.agent_id, 'payout', 'Комиссия выплачена', '/commission')
-  await syncAct(s(f, 'id')) // М4: акт вознаграждения следует за стадией сделки
   await audit(c.real.id, 'deal.' + st, 'deal', s(f, 'id'))
   revalidatePath('/', 'layout') // стадия сделки в селекте, акты и стадия клиента — сразу
 }

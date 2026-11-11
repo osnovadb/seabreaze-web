@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { q, one, audit, notify } from './db'
 import { t, LANGS, type Lang } from './i18n'
+import { toUsd } from './fx'
 import { requireCtx } from './auth'
 import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares, addAdjustment, writeOffDebt, clawbackDeal, decideClawback } from './money22'
 import { storeFile, isFile } from './files'
@@ -40,8 +41,12 @@ export async function clawbackDecision(f: FormData) {
 
 export async function trancheReceived(f: FormData) {
   const c = await role(['owner', 'finance'])
-  const r = await receiveTranche(s(f, 'id'), c.user.id)
-  if (r) await audit(c.real.id, 'tranche.received', 'tranche', s(f, 'id'), { deal: r.deal_id, amount: r.amount })
+  // 285: фактические сумма, валюта и дата поступления (не плановые)
+  const amount = Number(s(f, 'amount').replace(/\s/g, '').replace(',', '.')), currency = ['USD', 'EUR', 'AZN', 'ILS'].includes(s(f, 'currency')) ? s(f, 'currency') : 'USD'
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(s(f, 'date')) ? s(f, 'date') : new Date().toISOString().slice(0, 10)
+  const actual = amount > 0 ? { amount, currency, date, usd: Math.round((await toUsd(amount, currency)) * 100) / 100 } : null
+  const r = await receiveTranche(s(f, 'id'), c.user.id, actual)
+  if (r) await audit(c.real.id, 'tranche.received', 'tranche', s(f, 'id'), { deal: r.deal_id, amount: r.amount, actual })
   done()
 }
 export async function recomputeShares(f: FormData) {
@@ -54,8 +59,9 @@ export async function registerCollect(f: FormData) {
   const c = await role(['owner', 'finance'])
   const m = /^\d{4}-\d{2}$/.test(s(f, 'month')) ? s(f, 'month') + '-01' : null
   if (!m) return
-  const r = await collectRegister(m, c.user.id)
-  await audit(c.real.id, 'register.collect', 'register', 'id' in r ? r.id : undefined, { month: m })
+  const extra = s(f, 'extra') === '1'
+  const r = await collectRegister(m, c.user.id, extra)
+  await audit(c.real.id, extra ? 'register.collect_extra' : 'register.collect', 'register', r && 'id' in r ? r.id : undefined, { month: m })
   done()
 }
 export async function registerConfirm(f: FormData) {

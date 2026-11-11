@@ -276,9 +276,9 @@ for (const r of renew) {
 // 11г. Регистрация истекла
 const regGone = await q(`update portal.registrations set status = 'expired' where status in ('confirmed','confirmed_silence') and valid_until < current_date returning client_id`)
 for (const id of new Set(regGone.map((r) => r.client_id))) await enqueueSync(q, id, 'регистрация у застройщика истекла')
-// 11д. Кандидат партнёра не квалифицирован за 14 дней — защиты не было, карточка остаётся у партнёра без приоритета; уведомление партнёру
+// 11д. 362: кандидат партнёра старше 30 дней — приоритет снят (защиты не было), карточка остаётся у партнёра без приоритета; уведомление партнёру
 const cands = await q(`select id, owner_id, name from portal.clients where attach_status = 'candidate' and candidate_until < current_date`)
-for (const c of cands) await notify(c.owner_id, 'client', 'Кандидат {c}: 14 дней на квалификацию прошли — приоритет снят', `/clients/${c.id}`, { c: c.name }, `cand-over:${c.id}`)
+for (const c of cands) await notify(c.owner_id, 'client', 'Кандидат {c}: 30 дней прошли — приоритет перед командой снят; квалифицируйте клиента, чтобы закрепить', `/clients/${c.id}`, { c: c.name }, `cand-over:${c.id}`)
 // 11е. Закрепление 6 месяцев: при брони или сделке — продлено; без них по истечении — клиента ведёт руководитель рынка, партнёр — Previous partner
 const ext1 = await q(`update portal.clients cl set attach_status = 'extended' where attach_status = 'protected' and protected_until < current_date
   and (exists (select 1 from portal.bookings b where b.client_id = cl.id and b.status in ('hold','queued','requested','confirmed','release_pending'))
@@ -352,6 +352,22 @@ try {
 try { await notifyOut(q, out) } catch (e) { out.notify_error = String(e.message || e).slice(0, 200) }
 
 // Наблюдаемость: ошибки шагов (…_error, ошибки прогонов Profitbase) — владельцу, не чаще раза в час
+// 367 (Денис 11.11): счёт партнёра (компания или ИП) — до 8-го; напоминания 1-го, 5-го и 8-го числа (по Баку). Без счёта выплата переносится
+{
+  const now = new Date(Date.now() + 4 * 3600000), day = now.getUTCDate(), ym = now.toISOString().slice(0, 7)
+  if ([1, 5, 8].includes(day)) {
+    const prev = (() => { const [y, m] = ym.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}` })()
+    const who = day === 1
+      ? await q(`select distinct u.id from portal.accruals a join portal.users u on u.id = a.user_id where a.status = 'open' and a.role = 'partner' and u.partner_form in ('company','sole') and u.active`)
+      : await q(`select distinct u.id from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id join portal.users u on u.id = l.user_id
+          where r.month = $1::date and r.status <> 'paid' and not l.carried and l.invoice_file_id is null and u.partner_form in ('company','sole') and u.active`, [prev + '-01'])
+    for (const u of who) await notify(u.id, 'payout', day === 8 ? 'Сегодня последний день загрузить счёт за {m} — без счёта выплата перенесётся на следующий месяц' : 'Загрузите счёт за {m} до 8-го — без счёта выплата переносится', '/commission', { m: prev }, `inv:${ym}:${day}:${u.id}`)
+    out.invoice_reminders = who.length
+  }
+  // 355: 1-го числа — бэк-офису напоминание выгрузить застройщикам даты контактов за прошлый месяц (Арад)
+  if (day === 1) for (const o of await q(`select id from portal.users where active and role in ('office','finance')`))
+    await notify(o.id, 'registration', 'Начало месяца: выгрузите застройщикам даты контактов с клиентами за прошлый месяц', '/registrations', {}, `contacts:${ym}:${o.id}`)
+}
 const errs = Object.entries(out).filter(([k, v]) => k.endsWith('_error') || (v && typeof v === 'object' && v.error)).map(([k, v]) => `${k}: ${String(typeof v === 'object' ? v.error : v).slice(0, 120)}`)
 if (errs.length) for (const o of await q(`select id from portal.users where active and role = 'owner'`))
   await notify(o.id, 'access', 'Фоновая обработка: ошибки — {e}', '/sources', { e: errs.join('; ').slice(0, 300) }, 'tick-err:' + new Date().toISOString().slice(0, 13) + ':' + o.id)

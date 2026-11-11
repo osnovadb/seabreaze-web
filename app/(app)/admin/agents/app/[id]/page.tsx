@@ -26,7 +26,7 @@ export default async function Application(props: { params: Promise<{ id: string 
   const a = await one<any>(`select a.*, r.name reviewer, u.name user_name from portal.agent_applications a left join portal.users r on r.id = a.reviewed_by left join portal.users u on u.id = a.user_id where a.id = $1`, [params.id])
   if (!a || (c.user.role !== 'owner' && a.market !== c.user.market)) notFound()
   const files = await q<{ file_id: string; filename: string; mime: string; size: number; created_at: string }>(`select af.file_id, f.filename, f.mime, f.size::int, af.created_at from portal.application_files af join portal.files f on f.id = af.file_id where af.application_id = $1 order by af.created_at`, [a.id])
-  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','market_head','owner') ${c.user.role === 'owner' ? '' : 'and market = $1'} order by name`, c.user.role === 'owner' ? [] : [c.user.market])
+  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and leads_partners and role <> 'seller' ${c.user.role === 'owner' ? '' : 'and market = $1'} order by name`, c.user.role === 'owner' ? [] : [c.user.market])
   const log = await q<{ action: string; created_at: string; who: string | null }>(`select x.action, x.created_at, w.name who from portal.audit x left join portal.users w on w.id = x.user_id where x.entity = 'application' and x.entity_id = $1 order by x.id desc limit 10`, [a.id])
   const canAccess = ['owner', 'market_head'].includes(c.user.role)
   const row = (l: string, v: string | null) => v ? <div className="kv"><span>{T(l)}</span><span style={{ textAlign: 'end' }}>{v}</span></div> : null

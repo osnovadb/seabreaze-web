@@ -1,5 +1,5 @@
 'use server'
-// 2.2 · §6 П8 Личная ссылка и белый фид партнёра; заявка со страницы ссылки — кандидат партнёра (14 дней, квалифицирует партнёр)
+// 2.2 · §6 П8 Личная ссылка и белый фид партнёра; заявка со страницы ссылки — кандидат партнёра (приоритет 30 дней — 362, квалифицирует партнёр)
 import crypto from 'node:crypto'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -53,7 +53,7 @@ async function linkLeadLocked(f: FormData) {
   const flood = await one<{ same: number; ip: number }>(`select count(*) filter (where ((phone_norm = $1 and $1 <> '') or (email_norm = $2 and $2 <> '')) and created_at > now() - interval '10 minutes')::int same,
       count(*) filter (where payload->>'ip' = $3)::int ip from portal.inbound_leads where source = 'partner_link' and created_at > now() - interval '1 hour'`, [pn, em, ip])
   if (flood && (flood.same > 0 || flood.ip >= 10)) return { ok: true }
-  const consent = { text: 'partner_link', version: '2.2', at: new Date().toISOString(), marketing: !!f.get('marketing') }
+  const consent = { text: 'partner_link', version: '2.2', at: new Date().toISOString(), marketing: false } // 363: клиент партнёра — не в рекламе
   const lead = await one<{ id: string }>(`insert into portal.inbound_leads (source, site, payload, name, phone, phone_norm, email, email_norm, lang, market, consent) values ('partner_link', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
     [code, JSON.stringify({ ip, comment: s(f, 'comment'), project: s(f, 'project') }), name, phone, pn, email, em, s(f, 'lang'), l.market, JSON.stringify(consent)])
   // уже есть в базе (у кого угодно) — кандидата не создаём; посетителю — то же «спасибо», партнёру — уведомление без владельца
@@ -66,15 +66,15 @@ async function linkLeadLocked(f: FormData) {
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)
   const reg = `R-${bakuYear()}-${String(n!.n).padStart(4, '0')}`
   const cl = await one<{ id: string }>(`insert into portal.clients (reg_no, owner_id, agency_id, name, phone, phone_norm, email, email_norm, country, language, market, consent_at, marketing_consent_at, source, interest, stage, owner_type, attach_status, candidate_until)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), case when $12 then now() end, 'partner_link', $13, 'lead', 'partner', 'candidate', current_date + 14) returning id`,
-    [reg, l.user_id, l.agency_id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'lang') || null, l.market, !!f.get('marketing'), [s(f, 'project'), s(f, 'comment')].filter(Boolean).join(' · ') || null])
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), case when $12 then now() end, 'partner_link', $13, 'lead', 'partner', 'candidate', current_date + 30) returning id`,
+    [reg, l.user_id, l.agency_id, name, phone, pn, email, em, s(f, 'country') || null, s(f, 'lang') || null, l.market, false, [s(f, 'project'), s(f, 'comment')].filter(Boolean).join(' · ') || null])
   await q(`update portal.inbound_leads set result = 'partner_client', client_id = $2 where id = $1`, [lead!.id, cl!.id])
   // галочки поставил сам клиент — журнал согласий
   await q(`update portal.clients set consent_status = 'given' where id = $1`, [cl!.id])
-  await q(`insert into portal.consents (client_id, kind, granted, source, lang, ip) values ($1,'data',true,'partner_link',$3,$4), ($1,'marketing',$2,'partner_link',$3,$4)`, [cl!.id, !!f.get('marketing'), s(f, 'lang') || null, ip])
+  await q(`insert into portal.consents (client_id, kind, granted, source, lang, ip) values ($1,'data',true,'partner_link',$3,$4), ($1,'marketing',$2,'partner_link',$3,$4)`, [cl!.id, false, s(f, 'lang') || null, ip])
   await q(`update portal.partner_links set leads = leads + 1 where id = $1`, [l.id])
-  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Заявка по личной ссылке партнёра ({r}): квалифицируйте до 14 дней', $2)`, [cl!.id, { r: reg }])
-  await notify(l.user_id, 'client', 'Новая заявка по вашей ссылке: {n} — квалифицируйте за 14 дней', `/clients/${cl!.id}`, { n: name })
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1, null, 'system', 'Заявка по личной ссылке партнёра ({r}): кандидат, приоритет партнёра — 30 дней', $2)`, [cl!.id, { r: reg }])
+  await notify(l.user_id, 'client', 'Новая заявка по вашей ссылке: {n} — квалифицируйте клиента; приоритет за вами 30 дней', `/clients/${cl!.id}`, { n: name })
   await pushDeal(cl!.id, `заявка по личной ссылке партнёра ${l.name} (${reg})`)
   return { ok: true }
 }

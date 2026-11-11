@@ -99,6 +99,9 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
         </div>
         {pages > 1 && <div className="row mt8" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><span className="small muted">{T('Строк: {n}', { n: all.length })} ·</span>
           {Array.from({ length: pages }, (_, i) => i + 1).map((n) => <Link key={n} href={`?${qs({})}${qs({}) ? '&' : ''}pg=${n}`} className={'chip' + (n === pg ? ' on' : '')}>{n}</Link>)}</div>}
+        {/* 355: раз в месяц — даты контактов по клиентам застройщика (Арад: защита от последнего записанного контакта) */}
+        <div className="card card--tight mt16 row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}><span className="small muted">{T('Даты контактов за прошлый месяц для застройщика (xlsx)')}:</span>
+          {devs.map((d) => <a key={d.id} className="btn btn--sm" href={`/api/registrations/contacts?dev=${d.id}`}>{d.name}</a>)}</div>
         {c.user.role === 'owner' && (
           <form action={massEnqueue} className="card mt24 row" style={{ gap: 12 }}>
             <div className="label">{T('Новый застройщик: вся база в регистрацию')}</div>

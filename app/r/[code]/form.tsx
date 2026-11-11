@@ -28,7 +28,8 @@ export function LinkLeadForm({ lang, code, projects, project, brand }: { lang: L
       {projects.length === 1 && <input type="hidden" name="project" value={projects[0]} />}
       <label className="field"><span>{T('Комментарий')}</span><textarea className="in" name="comment" rows={2} /></label>
       <label className="check small"><input type="checkbox" name="consent" required /> <span>{T('Согласен на обработку моих данных и их передачу застройщикам для подбора и регистрации, включая застройщиков, с которыми работа начнётся позже')} * <a className="bronze" href={`/legal/privacy?lang=${lang}`} target="_blank" rel="noopener">{T('Политика конфиденциальности')}</a></span></label>
-      <label className="check small"><input type="checkbox" name="marketing" /> <span>{T('Согласен получать рекламу и рассылки (необязательно)')}</span></label>
+      {/* 363: клиент партнёра — не в рекламе и сегментах, рекламное согласие не спрашиваем */}
+      <label className="check small" hidden><input type="checkbox" name="marketing" disabled /> <span>{T('Согласен получать рекламу и рассылки (необязательно)')}</span></label>
       <Submit lang={lang} />
     </form>
   )

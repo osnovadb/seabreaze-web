@@ -6,7 +6,7 @@ import { updateUser, resetPassword, resetPin } from '@/lib/actions'
 import { t, type Lang } from '@/lib/i18n'
 import { ROLE_NAMES, type Role } from '@/lib/perm'
 
-type U = { id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; languages?: string[]; b24_user_id?: string | null }
+type U = { id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; leads_partners?: boolean; languages?: string[]; b24_user_id?: string | null }
 function Btn({ label, primary }: { label: string; primary?: boolean }) {
   const { pending } = useFormStatus()
   return <button className={'btn' + (primary ? ' btn--p' : '')} disabled={pending}>{label}</button>
@@ -29,6 +29,8 @@ export function EditUser({ lang, u, owner, agencies, curators }: { lang: Lang; u
         <label className="field"><span>{T('Рынок')}</span><select key={`market:${String(u.market || '')}`} className="in" name="market" defaultValue={u.market || ''} disabled={!owner}><option value="DE">DE</option><option value="IL">IL</option><option value="GLOBAL">GLOBAL</option></select></label>
         <label className="field"><span>{T('Агентство (для агентов)')}</span><select key={`agency:${String(u.agency_id || '')}`} className="in" name="agency" defaultValue={u.agency_id || ''}><option value="">—</option>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label className="field"><span>{T('Куратор')}</span><select key={`curator:${String(u.curator_id || '')}`} className="in" name="curator" defaultValue={u.curator_id || ''}><option value="">—</option>{curators.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        {/* 374/280: куратор партнёров — только с этой отметкой; сейлзу не ставится */}
+        {owner && !['agent', 'agency_head', 'referrer', 'seller'].includes(u.role) && <label className="check" style={{ alignSelf: 'end' }}><input type="hidden" name="leads_partners_form" value="1" /><input type="checkbox" name="leads_partners" defaultChecked={!!u.leads_partners} /> {T('Ведёт партнёров (может быть куратором)')}</label>}
         <label className="field"><span>{T('Язык')}</span><select key={`locale:${String(u.locale)}`} className="in" name="locale" defaultValue={u.locale}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
         {ext && <label className="field"><span>{T('Договор подписан')}</span><input className="in" type="date" name="contract" defaultValue={u.contract_signed_at?.slice(0, 10) || ''} /></label>}
       </div>

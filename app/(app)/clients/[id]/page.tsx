@@ -73,7 +73,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
         sub={<span className="row" style={{ gap: 8, marginTop: 6 }}>
           <Pill kind="ink">{cl.pause_until ? T('Пауза до {d}', { d: date(L, cl.pause_until) }) : cl.stage === 'lost' ? T('Отказ') : ext ? T((PARTNER_STAGES[agentIdx] || ['', cl.stage])[1]) : stageName(L, cl.stage)}</Pill>
           {!ext && cl.b24_stage && <Pill kind="ink">Bitrix24: {cl.b24_stage}</Pill>}
-          {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат: квалифицируйте до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
+          {cl.attach_status === 'candidate' && <Pill kind="warn">{T('Кандидат · приоритет до {d}', { d: date(L, cl.candidate_until) })}</Pill>}
           {cl.attach_status !== 'candidate' && cl.protected_until && <Pill kind="ok">{T('Закреплён до {d}', { d: date(L, cl.protected_until) })}</Pill>}
           <Pill kind={cl.kyc_status === 'passed' ? 'ok' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'bad' : cl.kyc_status === 'pending' ? 'warn' : 'off'}>KYC: {T(cl.kyc_status === 'passed' ? 'пройден' : cl.kyc_status === 'pending' ? 'на проверке' : ['rejected', 'compliance'].includes(cl.kyc_status) ? 'отказ' : 'не начат')}</Pill>
           <span className="small muted">{cl.reg_no}{!ext ? ` · ${T('владелец')}: ${cl.owner_name}` : ''}</span>

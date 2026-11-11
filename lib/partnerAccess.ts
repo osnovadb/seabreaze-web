@@ -20,6 +20,8 @@ export async function grantAccess(appId: string, by: string | null, opts: { cura
   const a = await one<{ id: string; kind: string; name: string; company: string | null; email: string; market: string; license: string | null; user_id: string | null }>('select * from portal.agent_applications where id = $1', [appId])
   if (!a) return { error: 'Заявка не найдена' }
   if (a.user_id) return { error: 'Доступ уже создан' }
+  // 374/280: куратор — только с отметкой «ведёт партнёров», не сейлз
+  if (opts.curator && !(await one(`select 1 from portal.users where id = $1 and leads_partners and role <> 'seller'`, [opts.curator]))) return { error: 'Куратором может быть только пользователь с отметкой «Ведёт партнёров»' }
   let uid: string
   try {
     uid = await tx(async (t) => {

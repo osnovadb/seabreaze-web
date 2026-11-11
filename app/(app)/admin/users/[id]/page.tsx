@@ -16,13 +16,13 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
-  const u = await one<{ id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; active: boolean; last_login_at: string | null; created_at: string; languages: string[]; b24_user_id: string | null }>(
-    'select id, name, email, role, market, agency_id, curator_id, locale, license_note, contract_signed_at::text, active, last_login_at, created_at, languages, b24_user_id::text from portal.users where id = $1', [params.id])
+  const u = await one<{ id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; active: boolean; last_login_at: string | null; created_at: string; languages: string[]; b24_user_id: string | null; leads_partners: boolean }>(
+    'select id, name, email, role, market, agency_id, curator_id, locale, license_note, contract_signed_at::text, active, last_login_at, created_at, languages, b24_user_id::text, leads_partners from portal.users where id = $1', [params.id])
   if (!u) notFound()
   const owner = c.user.role === 'owner'
   if (!owner && !(['agent', 'agency_head'].includes(u.role) && u.market === c.user.market)) redirect('/admin/agents')
   const agencies = await q<{ id: string; name: string }>(`select id, name from portal.agencies ${owner ? '' : 'where market = $1'} order by name`, owner ? [] : [c.user.market])
-  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','market_head','owner') ${owner ? '' : 'and market = $1'} order by name`, owner ? [] : [c.user.market])
+  const curators = await q<{ id: string; name: string }>(`select id, name from portal.users where active and leads_partners and role <> 'seller' ${owner ? '' : 'and market = $1'} order by name`, owner ? [] : [c.user.market])
   const work = await one<{ clients: number; bookings: number }>(`select (select count(*)::int from portal.clients where owner_id = $1 and stage not in ('lost','handed')) clients,
     (select count(*)::int from portal.bookings where agent_id = $1 and status in ('requested','confirmed')) bookings`, [u.id])
   // Заявка, из которой создан доступ, и её документы (разрешение маклера, выписка)
