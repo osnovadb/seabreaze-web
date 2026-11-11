@@ -41,6 +41,7 @@ test('кандидат партнёра → лид Candidate с полями п�
   assert.ok(c.b24_lead_id, 'лид не создан')
   const l = await b24('crm.lead.get', { id: c.b24_lead_id })
   assert.equal(l.STATUS_ID, 'GE_CANDIDATE'); assert.equal(l.SOURCE_ID, 'GE_PARTNER'); assert.ok(l.UF_CRM_GE_AGENCY, 'нет агентства в лиде')
+  assert.equal(l.OPENED, 'N', '348: лид портала «доступен всем»')
 })
 let sale
 test('квалификация → контакт, сделка Partner clients DE, лид Qualified', { skip }, async () => {
@@ -49,6 +50,8 @@ test('квалификация → контакт, сделка Partner clients 
   const c = await keep(r.result.id)
   assert.ok(c.b24_deal_id && c.b24_contact_id, 'сделка или контакт не созданы')
   const d = await b24('crm.deal.get', { id: c.b24_deal_id })
+  assert.equal(d.OPENED, 'N', '348: сделка портала «доступна всем»')
+  assert.equal((await b24('crm.contact.get', { id: c.b24_contact_id })).OPENED, 'N', '348: контакт портала «доступен всем»')
   const cats = (await b24('crm.category.list', { entityTypeId: 2 })).categories
   assert.equal(cats.find((x) => Number(x.id) === Number(d.CATEGORY_ID))?.name, 'Partner clients DE')
   assert.equal((await b24('crm.lead.get', { id: c.b24_lead_id })).STATUS_ID, 'CONVERTED')

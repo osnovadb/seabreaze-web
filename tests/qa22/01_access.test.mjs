@@ -17,14 +17,14 @@ test('setup: пользователи всех ролей', async () => {
 const MATRIX = [
   ['/', ['owner', 'market_head', 'seller', 'office', 'finance', 'content', 'agency_head', 'agent']],
   ['/catalog', ['owner', 'market_head', 'seller', 'office', 'finance', 'content', 'agency_head', 'agent']],
-  ['/clients', ['owner', 'market_head', 'seller', 'office', 'agency_head', 'agent']],
-  ['/registrations', ['owner', 'office', 'market_head']],
+  ['/clients', ['owner', 'market_head', 'seller', 'office', 'finance', 'agency_head', 'agent']], // 364: финансы — с правами бэк-офиса
+  ['/registrations', ['owner', 'office', 'finance', 'market_head']],
   ['/finance', ['owner', 'market_head', 'finance']],
   ['/commission', ['agency_head', 'agent']],
   ['/links', ['agency_head', 'agent']],
   ['/refer', ['referrer']],
   ['/admin/markets', ['owner', 'market_head']],
-  ['/admin/privacy', ['owner', 'office']],
+  ['/admin/privacy', ['owner', 'office', 'finance']],
   ['/admin/b24', ['owner']],
   ['/admin/developers', ['owner', 'market_head', 'office', 'finance']],
 ]

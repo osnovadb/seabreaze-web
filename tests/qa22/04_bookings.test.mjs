@@ -83,7 +83,7 @@ test('лимит застройщика (на все его проекты, 366)
   await tick()
   assert.equal((await booking(second.id)).status, 'requested', 'очередь не продвинулась')
   await act(S1, 'bookingAction', { id: second.id, act: 'cancel' })
-  await q(`update portal.developers set max_bookings_total = 100000 where id = $1`, [dev.id])
+  await q(`update portal.developers set max_bookings_total = 1000 where id = $1`, [dev.id])
 })
 test('личный лимит у застройщика (366): сейлзу — не больше лимита, руководитель рынка может превысить', async () => {
   const pr = await project('brabus-island-baku')
@@ -100,7 +100,7 @@ test('личный лимит у застройщика (366): сейлзу — 
   const r2 = await act(MH, 'createBooking', { unit: c2.id, client: clm, discount: 0 })
   assert.ok(!/Личный лимит/.test(JSON.stringify(r2.result || r2)), 'руководитель рынка упёрся в личный лимит')
   for (const x of await q(`select id, agent_id from portal.bookings where client_id = any($1::uuid[]) and status in ('requested','queued')`, [[cl, clm]])) await act(x.agent_id === S9.id ? S9 : MH, 'bookingAction', { id: x.id, act: 'cancel' })
-  await q(`update portal.developers set max_bookings_person = 100000 where id = $1`, [dev.id])
+  await q(`update portal.developers set max_bookings_person = 1000 where id = $1`, [dev.id])
 })
 test('конец подтверждённой брони → Release pending (квартира ещё «бронь») → бэк-офис подтверждает снятие → свободна', async () => {
   const cl = (await register(S1)).result.id

@@ -47,7 +47,7 @@ test('stageBlock: партнёр двигает только Selection, пауз
   assert.equal(stageBlock('agent', ctx, 'selection'), null)
   assert.equal(stageBlock('agent', ctx, 'pause'), null); assert.equal(stageBlock('agent', ctx, 'lost'), null)
   assert.ok(stageBlock('agent', ctx, 'booking'), 'бронь — только на квартиру')
-  assert.ok(stageBlock('finance', ctx, 'selection'), 'финансы не двигают стадии')
+  assert.ok(stageBlock('content', ctx, 'selection'), 'контент не двигает стадии') // 364: финансы — с правами бэк-офиса
 })
 test('stageBlock: без квалификации дальше Selection нельзя', () => {
   assert.ok(stageBlock('agent', { stage: 'lead', paused: false, hasBooking: false, hasDeal: false, qualified: false }, 'selection'))
