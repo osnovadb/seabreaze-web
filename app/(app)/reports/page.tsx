@@ -61,7 +61,7 @@ export default async function Reports() {
           ) })}
         </div>
         <Table title={T('По владельцу клиента')} rows={byOwner} />
-        <div className="grid g2">
+        <div className="stack">{/* О56 (обход 11.11): семь колонок не помещались в половину ширины — таблицы одна под другой */}
           <Table title={T('По источнику')} rows={bySource} />
           <Table title={T('По рынку')} rows={byMarket} />
         </div>

@@ -7,5 +7,7 @@ export function ViewTabs({ lang, base, b, active, facade }: { lang: Lang; base: 
   const items: [string, string, string][] = [['chess', 'Шахматка', `${base}/chess?b=${b}`], ['floor', 'Этаж', `${base}/floor?b=${b}`], ['sides', 'Стороны дома', `${base}/chess?b=${b}&side=sea`]]
   if (facade) items.push(['facade', 'Фасад', `${base}/facade?b=${b}`])
   items.push(['layouts', 'Планировки', `${base}/layouts`])
+  // О60 (обход 11.11): один набор вкладок вида на всех экранах проекта — «Список» тоже здесь
+  items.push(['list', 'Список', `/catalog?p=${base.split('/').pop()}`])
   return <div className="chips">{items.map(([k, l, h]) => <Link key={k} href={h} className={'chip' + (k === active ? ' on' : '')}>{T(l)}</Link>)}</div>
 }

@@ -2,9 +2,10 @@ import { Fragment } from 'react'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, usd, pct, date } from '@/lib/i18n'
+import { t, usd, pct, date, monthName } from '@/lib/i18n'
 import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
+import { Pager, pageOf } from '@/components/Pager'
 import { dealPaid } from '@/lib/actions'
 import { ROLE_LABEL } from '@/lib/money22'
 import { scheduleOf } from '@/lib/paySchedule'
@@ -15,7 +16,7 @@ import { trancheReceived, recomputeShares, registerCollect, registerConfirm, reg
 const TABS: [string, string][] = [['sales', 'Продажи и доли'], ['tranches', 'Транши от застройщиков'], ['register', 'Реестр выплат'], ['debts', 'Долги и клаубэк'], ['acts', 'Акты'], ['tax', 'Удержание налога']]
 const TR: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { scheduled: ['ждём оплату клиента', 'off'], expected: ['ожидаем от застройщика', 'warn'], received: ['получено', 'ok'], cancelled: ['отменён', 'off'] }
 
-export default async function Finance(props: { searchParams: Promise<{ tab?: string; m?: string; e?: string }> }) {
+export default async function Finance(props: { searchParams: Promise<{ tab?: string; m?: string; e?: string; page?: string }> }) {
   const searchParams = await props.searchParams;
   const c = await requireCtx()
   if (!canSeeFinance(c.user.role)) redirect('/')
@@ -40,6 +41,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
         from portal.deal_shares s left join portal.users u on u.id = s.user_id where s.deal_id = d.id) shares
      from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id join portal.clients cl on cl.id = d.client_id
      where true ${mk} order by d.created_at desc limit 200`) : []
+  const pgD = pageOf(searchParams.page, deals.length, 50) // О55 (обход 11.11): продажи — по 50 на странице
   const tranches = tab === 'tranches' ? await q<{ id: string; unit: string; project: string; dev: string; no: number; pct: number; amount: number; status: string; expected_at: string | null; received_at: string | null; trigger: string; paid_pct: number }>(
     `select t.id, portal.unit_no(bl.external_id, un.number) unit, p.name project, dv.name dev, t.no, t.pct::float, t.amount::float, t.status, t.expected_at::text, t.received_at, t.trigger, d.paid_pct::float
      from portal.tranches t join portal.deals d on d.id = t.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id join projects p on p.id = d.project_id
@@ -78,26 +80,27 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
       <div className="page stack">
         <Tabs />
         {tab === 'sales' && <div className="tbl-wrap"><table className="tbl">
-          <thead><tr>{['Продажа', 'Клиент', 'Цена договора', 'Комиссия застройщика', 'Доли', 'Оплачено клиентом', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
-          <tbody>{deals.length === 0 ? <tr><td colSpan={7} className="muted">{T('Сделок пока нет')}</td></tr> : deals.map((d) => (<Fragment key={d.id}>
+          <thead><tr>{['Продажа', 'Клиент', 'Цена договора', 'Комиссия застройщика', 'Доли', 'Оплачено клиентом'].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
+          <tbody>{deals.length === 0 ? <tr><td colSpan={6} className="muted">{T('Сделок пока нет')}</td></tr> : deals.slice(pgD.from, pgD.to).map((d) => (<Fragment key={d.id}>
             <tr>
               <td><b>{d.unit}</b><div className="tiny muted">{d.project} · {date(L, d.created_at)}{d.stage === 'cancelled' ? ' · ' + T('расторгнута') : ''}</div></td>
               <td className="small">{d.client}</td><td>{usd(L, d.final_price)}</td><td><b>{usd(L, d.total)}</b>{d.fix != null && d.total > 0 && <div className="tiny muted">{T('фикс {f} · пул {p}', { f: usd(L, d.fix), p: usd(L, Math.max(0, d.total - d.fix)) })}</div>}{/* М11: комиссия и пул скидки — раздельно */}</td>
               <td className="tiny" style={{ minWidth: 260 }}>{d.shares && <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, auto) auto', gap: '2px 12px' }}>{/* В3: доли — две колонки «кто | сумма» */}
                 {d.shares.filter((s) => !(head && s.role === 'caspian')).map((s) => <Fragment key={s.role}><span>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' && s.who !== ROLE_LABEL[s.role] ? ` · ${T(s.who)}` : ''}</span>
                   <span className="nowrap"><b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</span></Fragment>)}</div>}
-                {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}</td>
+                {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}
+                <div className="mt8">{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻ {T('Пересчитать доли')}</button></form>}</div>{/* О56 (обход 11.11): «Пересчитать» — под долями, без отдельной колонки */}</td>
               <td>{fin && d.stage !== 'cancelled' /* О11 */ ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><span className="small">%</span><button className="btn btn--sm">{T('Сохранить')}</button></form> : pct(L, d.paid_pct)}
                 {(() => { const sc = d.stage !== 'cancelled' ? scheduleOf(d) : null; return sc && sc.overdue.length > 0 ? <div className="tiny bad">{T('просрочка {a}', { a: usd(L, sc.overdueAmount) })}</div> : sc?.next ? <div className="tiny muted">{T('следующий платёж {a} до {d}', { a: usd(L, sc.next.amount), d: date(L, sc.next.due) })}</div> : null })()}{/* 292 */}</td>
-              <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost nowrap" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻ {T('Пересчитать доли')}</button></form>}</td>
             </tr>
-            {fin && d.shares && <tr className="subrow"><td colSpan={7} style={{ paddingTop: 0 }}><details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка долей по {u}', { u: d.unit })}</summary>{/* В3: форма во всю ширину строкой под сделкой */}
+            {fin && d.shares && <tr className="subrow"><td colSpan={6} style={{ paddingTop: 0 }}><details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка долей по {u}', { u: d.unit })}</summary>{/* В3: форма во всю ширину строкой под сделкой */}
                   <form action={adjustment} className="row mt8" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}><input type="hidden" name="deal" value={d.id} />
                     <label className="field"><span>{T('Кому')}</span><select className="in" name="role">{d.shares.filter((x) => x.role !== 'caspian').map((x) => <option key={x.role} value={x.role}>{T(ROLE_LABEL[x.role])}</option>)}</select></label>
                     <label className="field"><span>{T('Сумма, USD (минус — удержание)')}</span><input className="in" name="amount" inputMode="decimal" style={{ width: 160 }} /></label>
                     <label className="field" style={{ flex: 1, minWidth: 220 }}><span>{T('Причина')}</span><input className="in" name="note" /></label>
                     <button className="btn btn--sm">{T('Добавить в следующий акт')}</button></form></details></td></tr>}
           </Fragment>))}</tbody></table></div>}
+        {tab === 'sales' && <Pager page={pgD.page} pages={pgD.pages} total={deals.length} qs={`tab=sales${searchParams.e ? '&e=' + searchParams.e : ''}`} label={T('Продаж: {n}', { n: deals.length })} />}
         {tab === 'tranches' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Продажа', 'Застройщик', 'Транш', 'Сумма', 'Статус', 'Ожидаем', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{tranches.length === 0 ? <tr><td colSpan={7} className="muted">{T('Траншей пока нет — они появляются с «Договор подписан»')}</td></tr> : tranches.map((x) => (
@@ -114,12 +117,12 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
         {tab === 'register' && fin && <EntChips />}
         {tab === 'register' && <>
           <form className="row" style={{ gap: 8 }}><input type="hidden" name="tab" value="register" /><label className="field"><span>{T('Месяц среза')}</span><input className="in" type="month" name="m" defaultValue={month} /></label><button className="btn btn--sm">{T('Показать')}</button></form>
-          {!reg && <div className="card stack" style={{ gap: 8 }}><div>{T('Реестр за {m} ещё не собран. Открытых начислений по поступлениям до конца месяца: {n} на {s}.', { m: month, n: pending?.n || 0, s: usd(L, pending?.s || 0) })}</div>
+          {!reg && <div className="card stack" style={{ gap: 8 }}><div>{T('Реестр за {m} ещё не собран. Открытых начислений по поступлениям до конца месяца: {n} на {s}.', { m: monthName(L, month), n: pending?.n || 0, s: usd(L, pending?.s || 0) })}</div>
             {fin && <form action={registerCollect}><input type="hidden" name="month" value={month} /><button className="btn btn--p btn--sm">{T('Собрать реестр')}</button></form>}
             <div className="tiny muted">{T('Финансы собирают к 5-му, руководитель рынка подтверждает свой рынок, админ утверждает, после оплаты в банке финансы отмечают «Оплачено». Меньше 100 $ и без документа — перенос на следующий месяц.')}</div></div>}
           {reg && <div className="card stack" style={{ gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span><b>{T('Реестр за {m}', { m: reg.month.slice(0, 7) })}</b> <Pill kind={reg.status === 'paid' ? 'ok' : reg.status === 'approved' ? 'ink' : 'warn'}>{T(reg.status === 'paid' ? 'оплачен' : reg.status === 'approved' ? 'утверждён' : 'собран')}</Pill>
+              <span><b>{T('Реестр за {m}', { m: monthName(L, reg.month.slice(0, 7)) })}</b> <Pill kind={reg.status === 'paid' ? 'ok' : reg.status === 'approved' ? 'ink' : 'warn'}>{T(reg.status === 'paid' ? 'оплачен' : reg.status === 'approved' ? 'утверждён' : 'собран')}</Pill>
                 <span className="small muted"> · {T('подтверждено рынками')}: {Object.keys(reg.confirmations || {}).join(', ') || '—'}</span></span>
               <span className="row" style={{ gap: 6 }}>
                 {fin && reg.status === 'collected' && <form action={registerCollect}><input type="hidden" name="month" value={month} /><button className="btn btn--sm btn--ghost">{T('Собрать заново')}</button></form>}
@@ -158,7 +161,7 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
           <thead><tr>{['Акт', 'Получатель', 'Реестр', 'К выплате', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{acts.length === 0 ? <tr><td colSpan={6} className="muted">{T('Актов пока нет — номера присваиваются при утверждении реестра')}</td></tr> : acts.map((a) => (
             <tr key={a.id}><td><b>{a.act_no}</b><div className="tiny muted">{date(L, a.act_date)}</div></td><td className="small">{a.who || '—'}<div className="tiny muted">{T(ROLE_LABEL[a.role] || a.role)}{a.market ? ' · ' + a.market : ''}</div></td>
-              <td className="small"><a href={`?tab=register&m=${a.reg_month.slice(0, 7)}`}>{a.reg_month.slice(0, 7)}</a></td>
+              <td className="small"><a href={`?tab=register&m=${a.reg_month.slice(0, 7)}`}>{monthName(L, a.reg_month.slice(0, 7))}</a></td>
               <td>{usd(L, a.net)}{a.currency && a.currency !== 'USD' ? <div className="tiny muted">{a.amount_cur?.toLocaleString('en')} {a.currency}</div> : null}</td>
               <td><Pill kind={a.reg_status === 'paid' && !a.carried ? 'ink' : a.carried ? 'warn' : a.agreed ? 'ok' : 'warn'}>{T(a.reg_status === 'paid' && !a.carried ? 'выплачено' : a.carried ? 'перенесено' : a.agreed ? 'согласован' : 'ждём согласия')}</Pill>{a.needs_inv && <div className="tiny muted">{T(a.invoice ? 'счёт есть' : 'ждём счёт')}</div>}</td>
               <td><a className="btn btn--sm" href={`/commission/act/${a.id}`}>{T('Открыть')}</a></td></tr>))}</tbody></table></div>

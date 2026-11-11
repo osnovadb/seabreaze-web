@@ -24,8 +24,9 @@ import { dealSchedules } from '@/lib/clientPayments'
 const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
 const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'расторгнута' } // О5: как в «Финансах»
 
-export default async function ClientCard(props: { params: Promise<{ id: string }> }) {
+export default async function ClientCard(props: { params: Promise<{ id: string }>; searchParams: Promise<{ hist?: string }> }) {
   const params = await props.params;
+  const allHist = (await props.searchParams).hist === 'all' // О55: история — последние 30, всё — по ссылке
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
@@ -66,7 +67,8 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
   const kycLocked = cl.kyc_status === 'pending' || (cl.kyc_status === 'passed' && !canReviewKyc(c.user.role))
   // Ожидаемая комиссия: партнёру — его доля, команде — наш доход; по активным броням (снимок условий) и сделкам в работе
   const activeB = await q<{ snapshot: SplitCond; price_list: number; discount_pct: number; agent_role: string }>(`select b.snapshot, b.price_list::float, b.discount_pct::float, u.role agent_role from portal.bookings b join portal.users u on u.id = b.agent_id where b.client_id = $1 and b.status in ('requested','confirmed')`, [cl.id])
-  const dealSum = await one<{ d: number }>(`select coalesce(sum(case when $2 then agent_amount else our_amount end), 0)::float d from portal.deals where client_id = $1 and stage not in ('cancelled','paid_out')`, [cl.id, ext])
+  const dealSum = await one<{ d: number }>(`select coalesce(sum(case when $2 then agent_amount else our_amount end), 0)::float d from portal.deals where client_id = $1 and stage not in ('cancelled','paid_out','fee_received')`, [cl.id, ext]) // О73: полученное — не «ожидаемое»
+  const gotSum = await one<{ d: number }>(`select coalesce(sum(case when $2 then agent_amount else our_amount end), 0)::float d from portal.deals where client_id = $1 and stage in ('fee_received','paid_out')`, [cl.id, ext])
   const expected = activeB.reduce((a, b) => { const sp = split(b.snapshot, b.price_list, b.discount_pct, ['agent', 'agency_head'].includes(b.agent_role)); return a + (ext ? sp.agent : sp.ours) }, 0) + (dealSum?.d || 0)
   const hasDeal = await one(`select 1 from portal.deals where client_id = $1 and stage <> 'cancelled' limit 1`, [cl.id])
   return (
@@ -148,12 +150,13 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                 </div>
               </form>
               <div className="mt16">
-                {acts.map((a) => (
+                {(allHist ? acts : acts.slice(0, 30)).map((a) => (
                   <div key={a.id} className="kv" style={{ alignItems: 'flex-start', background: a.internal ? 'var(--warn-bg)' : undefined, padding: a.internal ? '9px 8px' : undefined, borderRadius: 6 }}>
                     <span style={{ color: 'var(--ink)' }}><span className="tiny muted">{T({ note: 'Заметка', call: 'Звонок', message: 'Сообщение', meeting: 'Встреча', email: 'Письмо', system: 'Система' }[a.kind] || a.kind)}{a.internal ? ' · ' + T('внутренний') : ''}{a.who ? ' · ' + a.who : ''}</span><div>{T(a.text, a.vars ? { ...fmtVars(L, a.vars), ...(a.vars.stage ? { stage: stageName(L, String(a.vars.stage)) } : {}) } : undefined)}</div></span>
                     <span className="tiny muted" style={{ whiteSpace: 'nowrap' }}>{dateTime(L, a.created_at)}</span>
                   </div>
                 ))}
+                {!allHist && acts.length > 30 && <Link className="small bronze" href="?hist=all">{T('Вся история · {n}', { n: acts.length })}</Link>}
               </div>
             </div>
           </div>
@@ -177,6 +180,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               <div className="h3">{T('Ожидаемая комиссия')}</div>
               <div className="big num">{usd(L, expected)}</div>
               <div className="tiny muted">{ext ? T('по активным броням и сделкам; выплата — после оплаты застройщиком') : T('наш доход по активным броням и сделкам')}</div>
+              {(gotSum?.d || 0) > 0 && <div className="small okc mt8">{T('Застройщик уже оплатил: {a}', { a: usd(L, gotSum!.d) })}</div>}
             </div>
             <div className="card">
               <div className="h3">{T('Показы')}</div>

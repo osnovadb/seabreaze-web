@@ -1984,7 +1984,7 @@
 "включая НДС": "VAT included",
 "вне очереди — выбрал квартиру": "out of turn — unit chosen",
 "дистанционно": "remote",
-"до какого числа у застройщика": "until which date with the developer",
+"до какого числа у застройщика": "Reserved with the developer until",
 "закреплён до {d}": "attached until {d}",
 "как у всех": "same as everyone",
 "как фикс": "as fixed",
@@ -2791,5 +2791,14 @@
 "Застройщик {d} отказал в регистрации: {r}": "Developer {d} refused the registration: {r}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl}": "Calculation option with a {d}% discount awaits approval: {n} · {u} · {cl}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl} — «{c}»": "Calculation option with a {d}% discount awaits approval: {n} · {u} · {cl} — “{c}”",
-"ждёт согласия клиента": "awaiting client consent"
+"ждёт согласия клиента": "awaiting client consent",
+"Материалы для партнёров и клиентов по проектам. Контент и новости сайтов ведутся в системе управления сайтами.": "Materials for partners and clients by project. Website content and news are managed in the website management system.",
+"Застройщик уже оплатил: {a}": "Already paid by the developer: {a}",
+"Для клиентов саб-агентов, если иначе": "For sub-agent clients, if different",
+"Все планировки · {n}": "All layouts · {n}",
+"Вся история · {n}": "Full history · {n}",
+"Клиент или номер": "Client or number",
+"Продаж: {n}": "Sales: {n}",
+"Со свободными · {n}": "With available units · {n}",
+"Фильтры": "Filters"
 }

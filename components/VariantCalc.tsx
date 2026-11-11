@@ -77,7 +77,7 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
       <div className="vcalc__ctrls noprint">
         <label className="field"><span>{T('Первый взнос')} · <b>{pct(lang, r.downPct)}</b>{r.minDown > 0 && r.minDown < 100 ? <span className="tiny muted"> · {T('мин. {p}', { p: pct(lang, r.minDown) })}</span> : null}</span>
           <input type="range" className="disc" min={0} max={100} step={1} value={r.downPct} onChange={(e) => { setAmt(null); setDownPct(Number(e.target.value)) }} />
-          <span className="row" style={{ gap: 6 }}>
+          <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>{/* О59: «USD» не падает на отдельную строку */}
             <input className="in in--sm" inputMode="decimal" value={pctS ?? String(Math.round(r.downPct * 10) / 10)} onFocus={() => setPctS(String(Math.round(r.downPct * 10) / 10))} onBlur={() => setPctS(null)} onChange={(e) => { setAmt(null); setPctS(e.target.value); setDownPct(Number(e.target.value.replace(',', '.')) || 0) }} style={{ width: 70 }} aria-label="%" /><span className="small">%</span>
             <input className="in in--sm" inputMode="decimal" value={amt ?? String(r.down)} onFocus={() => setAmt(String(r.down))} onBlur={() => setAmt(null)} onChange={(e) => { const t0 = e.target.value.replace(/[^\d]/g, ''); setAmt(t0); const v = Number(t0) || 0; setDownPct(r.total ? Math.min(100, (v / r.total) * 100) : 0) }} style={{ width: 120 }} aria-label="USD" /><span className="small">USD</span>
           </span></label>
@@ -87,6 +87,8 @@ export function VariantCalc({ list, plans, grid = [], promo, mode = 'chain', opt
         {/* 361/349: предел ползунка — пул выбранного плана (у партнёра — его часть), меняется вместе со взносом и сроком */}
         {ceiling > 0 && r.ceilingEff > 0 && r.poolAllowed && <label className="field"><span>{ext ? T('Скидка клиенту из вашей части') : T('Скидка клиенту')} · <b>{pct(lang, r.disc)}</b></span>
           <input type="range" className="disc" min={0} max={r.ceilingEff} step={0.5} value={Math.min(disc, r.ceilingEff)} onChange={(e) => setDisc(Number(e.target.value))} />
+          {/* О59 (обход 11.11): у скидки, как у взноса и срока, — поле для числа */}
+          <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input className="in in--sm" type="number" min={0} max={r.ceilingEff} step={0.5} value={Math.min(disc, r.ceilingEff)} onChange={(e) => setDisc(Math.max(0, Math.min(r.ceilingEff, Number(e.target.value) || 0)))} style={{ width: 70 }} aria-label="%" /><span className="small">%</span></span>
           <span className="between tiny muted"><span>0%</span>{r.capEff < r.ceilingEff && <span>{T('без согласования до {p}', { p: pct(lang, r.capEff) })}</span>}<span>{pct(lang, r.ceilingEff)}</span></span></label>}
         <label className="field"><span>{T('Дата первого взноса')}</span><input className="in" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} style={{ maxWidth: 200 }} /></label>
       </div>

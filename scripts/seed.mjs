@@ -32,9 +32,9 @@ const pass = () => crypto.randomBytes(6).toString('base64url')
 const pin = () => String(1000 + crypto.randomInt(9000))
 const people = [
   ['owner', 'denis@demo.getsestate', 'Денис', 'owner', 'GLOBAL', 'ru'],
-  ['de_head', 'anna.becker@demo.getsestate', 'Анна Беккер', 'market_head', 'DE', 'ru'],
-  ['de_seller', 'martin.schulz@demo.getsestate', 'Мартин Шульц', 'seller', 'DE', 'ru'],
-  ['il_seller', 'noam.cohen@demo.getsestate', 'Ноам Коэн', 'seller', 'IL', 'ru'],
+  ['de_head', 'anna.becker@demo.getsestate', 'Anna Becker', 'market_head', 'DE', 'ru'],
+  ['de_seller', 'martin.schulz@demo.getsestate', 'Martin Schulz', 'seller', 'DE', 'ru'],
+  ['il_seller', 'noam.cohen@demo.getsestate', 'Noam Cohen', 'seller', 'IL', 'ru'],
   ['office', 'leyla.baku@demo.getsestate', 'Лейла · офис Баку', 'office', 'GLOBAL', 'ru'],
   ['finance', 'irina.finance@demo.getsestate', 'Ирина · финансы', 'finance', 'GLOBAL', 'ru'],
   ['content', 'olga.content@demo.getsestate', 'Ольга · контент', 'content', 'GLOBAL', 'ru'],

@@ -2791,5 +2791,14 @@
 "Застройщик {d} отказал в регистрации: {r}": "Bauträger {d} hat die Registrierung abgelehnt: {r}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl}": "Berechnungsvariante mit {d} % Rabatt wartet auf Freigabe: {n} · {u} · {cl}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl} — «{c}»": "Berechnungsvariante mit {d} % Rabatt wartet auf Freigabe: {n} · {u} · {cl} – „{c}“",
-"ждёт согласия клиента": "wartet auf Einwilligung des Kunden"
+"ждёт согласия клиента": "wartet auf Einwilligung des Kunden",
+"Материалы для партнёров и клиентов по проектам. Контент и новости сайтов ведутся в системе управления сайтами.": "Materialien für Partner und Kunden nach Projekt. Inhalte und News der Websites werden im Website-Verwaltungssystem gepflegt.",
+"Застройщик уже оплатил: {a}": "Bereits vom Bauträger bezahlt: {a}",
+"Для клиентов саб-агентов, если иначе": "Für Kunden von Subagenten, falls abweichend",
+"Все планировки · {n}": "Alle Grundrisse · {n}",
+"Вся история · {n}": "Gesamter Verlauf · {n}",
+"Клиент или номер": "Kunde oder Nummer",
+"Продаж: {n}": "Verkäufe: {n}",
+"Со свободными · {n}": "Mit freien Einheiten · {n}",
+"Фильтры": "Filter"
 }

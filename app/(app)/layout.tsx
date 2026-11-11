@@ -77,13 +77,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {/* М2: во вкладке карточки клиента — только клиентский режим (полоса клиента ниже); общее меню — в разделах левого меню */}
         {!cur && <div className="row" style={{ alignItems: 'center' }}><div style={{ flex: 1, minWidth: 0 }}><EmbedNav items={em.filter((x) => x[2]).map(([h, l]) => [h, T(l)] as [string, string])} /></div>
           {!isExternal(u.role) && <Suspense><OpenFull label={T('Открыть на весь экран')} /></Suspense>}</div>}
-        {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
+        {/* М3 (обход 11.11): во вкладке Units полоса клиента не нужна — там свои вкладки; на других экранах — имя и возврат в сделку, без «выйти из клиента» */}
+        {cur && !xpath.startsWith('/b24/units/') && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '6px 24px', background: 'var(--deep-3)', color: '#fff' }}>
           <span className="small">{T('Клиент')}: <b>{cur.name}</b></span>
-          <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>
-          <Link href={`/b24/units/${cur.id}?tab=pick`} className="small" style={{ color: '#fff' }}>{T('Подбор')}</Link>
-          <Link href={`/b24/units/${cur.id}?tab=units`} className="small" style={{ color: '#fff' }}>{T('Квартиры клиента')}</Link>
-          {/* QA 09.11: выйти из клиента — иначе он «залипал» на 12 часов на всех экранах фрейма */}
-          <a href="/catalog" data-nocl="1" className="small" style={{ color: '#fff', marginInlineStart: 'auto', opacity: .85 }}>{T('Выйти из клиента')} ×</a>
+          <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline', marginInlineStart: 'auto' }}>{T('← Units')}</Link>
         </div>}
         {children}</div></div>
     );
@@ -108,8 +105,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <button className="btn btn--sm btn--p">{T('Переключить')}</button>
             </form>
           )}
-          <Link href="/profile" className="me" title={T('Профиль')}><span className="ava">{initials}</span><span style={{ flex: 1 }}>{u.name}</span><span className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Профиль')}</span></Link>
-          <form action={logout}><button className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Выйти')}</button></form>
+          <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{/* О57: «Выйти» — в строке с профилем, не отдельной строкой */}
+            <Link href="/profile" className="me" title={T('Профиль')} style={{ flex: 1, minWidth: 0 }}><span className="ava">{initials}</span><span style={{ flex: 1 }}>{u.name}</span><span className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Профиль')}</span></Link>
+            <form action={logout}><button className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Выйти')}</button></form></div>
         </div>
       </aside>
       <div className="main">

@@ -62,6 +62,8 @@ export default async function Catalog(
               {!p && <div className="tiny muted" style={{ maxWidth: 180 }}>{T('Выберите проект, чтобы сохранить поиск')}</div>}{/* М10 */}</form>
         </>} />
       <div className="page cat">
+        {/* О57 (обход 11.11): на телефоне фильтры — под кнопкой, первый экран — квартиры */}
+        <input type="checkbox" id="catf" className="catf-t" aria-label={T('Фильтры')} /><label htmlFor="catf" className="btn btn--sm catf-b">{T('Фильтры')} <i className="chev">▾</i></label>
         <form className="card stack cat__f" style={{ gap: 12 }}>
           {view === 'table' && <input type="hidden" name="view" value="table" />}
           {sp.s && <input type="hidden" name="s" value={sp.s} />}

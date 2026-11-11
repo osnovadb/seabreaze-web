@@ -29,6 +29,7 @@ export function t(lang: Lang, ru: string, vars?: Record<string, string | number>
   }
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v))
   if (lang === 'he' && vars) s = heOne(s)
+  if (lang === 'ru' && vars) s = ruPlural(s)
   if (lang === 'en' && vars) s = s.replace(/(^|[^\d.,])1 (room|day|month|apartment|unit|booking|client|floor|week|project|deal|hour|working day|file|row)s\b/g, (_m, p: string, w: string) => `${p}1 ${w}`) // М6: «1 rooms»
   return s
 }
@@ -37,6 +38,15 @@ const HE_ONE: [RegExp, string][] = [[/(^|[^\d.,])1 ימי עסקים/g, '$1יו�
   [/(^|[^\d.,])1 חודשים/g, '$1חודש אחד'], [/(^|[^\d.,])1 שעות/g, '$1שעה אחת'], [/(^|[^\d.,])1 לקוחות/g, '$1לקוח אחד'], [/(^|[^\d.,])1 הזמנות/g, '$1הזמנה אחת'],
   [/(^|[^\d.,])1 קומות/g, '$1קומה אחת'], [/(^|[^\d.,])1 שבועות/g, '$1שבוע אחד'], [/(^|[^\d.,])1 פרויקטים/g, '$1פרויקט אחד'], [/(^|[^\d.,])1 עסקאות/g, '$1עסקה אחת']]
 const heOne = (s: string) => HE_ONE.reduce((a, [re, to]) => a.replace(re, to), s)
+// О70 (обход 11.11): «1 квартир», «2 клиентов» — русская форма слова после числа (строки пишутся с формой «много»)
+const RU_FORMS: Record<string, [string, string, string]> = {
+  квартир: ['квартира', 'квартиры', 'квартир'], клиентов: ['клиент', 'клиента', 'клиентов'], броней: ['бронь', 'брони', 'броней'], сделок: ['сделка', 'сделки', 'сделок'],
+  строк: ['строка', 'строки', 'строк'], дней: ['день', 'дня', 'дней'], месяцев: ['месяц', 'месяца', 'месяцев'], проектов: ['проект', 'проекта', 'проектов'],
+  планировок: ['планировка', 'планировки', 'планировок'], платежей: ['платёж', 'платежа', 'платежей'], вариантов: ['вариант', 'варианта', 'вариантов'], пользователей: ['пользователь', 'пользователя', 'пользователей'],
+}
+const ruForm = (n: number, f: [string, string, string]) => { const a = n % 100, b = n % 10; return a >= 11 && a <= 14 ? f[2] : b === 1 ? f[0] : b >= 2 && b <= 4 ? f[1] : f[2] }
+const RU_RE = new RegExp(`(^|[^\\d.,])(\\d+) (${Object.keys(RU_FORMS).join('|')})(?![а-яё])`, 'g')
+const ruPlural = (s: string) => s.replace(RU_RE, (_m, p: string, n: string, w: string) => `${p}${n} ${ruForm(Number(n), RU_FORMS[w])}`)
 export const tr = (lang: Lang) => (ru: string, vars?: Record<string, string | number>) => t(lang, ru, vars)
 
 function dump(lang: Lang, ru: string) {
@@ -52,10 +62,18 @@ export const m2u = (lang: Lang) => (lang === 'ru' ? 'м²' : lang === 'he' ? 'מ
 export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + ' ' + m2u(lang)
 // М6: в английском «07/05/2027» непонятно — май или июль; пишем «7 May 2027»
 export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
-export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
+// О75 (обход 11.11): по-английски «04/11» читалось как 11 апреля — месяц словом, как в date()
+export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], lang === 'en' ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
 // Переменные шаблонов из базы: даты в ISO показываем в формате языка
 export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | undefined) =>
-  v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? date(lang, x) : x])) : undefined
+  v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fmtOne(lang, x)])) : undefined
+// О70 (обход 11.11): в истории и уведомлениях суммы и проценты — в формате языка экрана («$142 984», «12,5»), а не как записаны («$142,984», «12.5»)
+const fmtOne = (lang: Lang, x: string | number) => {
+  if (typeof x === 'number') return Number.isInteger(x) ? x : num(lang, x, Math.abs(x * 10) % 1 ? 2 : 1)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(x)) return date(lang, x)
+  if (/^−?-?\$\d{1,3}(,\d{3})+(\.\d+)?$/.test(x)) { const n = Number(x.replace(/[−$,]/g, '').replace(/^-/, '')); return usd(lang, /^[−-]/.test(x) ? -n : n) }
+  return x
+}
 
 // «Сегодня» по Баку (YYYY-MM-DD): портал работает по времени офиса, сервер — в UTC
 // «ноябрь 2026» из «2026-11»

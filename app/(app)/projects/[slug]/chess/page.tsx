@@ -78,7 +78,7 @@ export default async function ChessPage(
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [T('Шахматка')]]} title={`${p.name} · ${b.name}`}
         sub={sync ? T('Данные на {d} · источник {s}', { d: dateTime(L, sync.at), s: sync.src }) : T('Цены застройщика в USD')}
-        right={<><ViewTabs lang={L} base={`/projects/${p.slug}`} b={b.id} active={side ? "sides" : "chess"} facade={hasFacade} /><Link className="btn" href={`/catalog?p=${p.slug}`}>{T('Список')}</Link></>} />
+        right={<><ViewTabs lang={L} base={`/projects/${p.slug}`} b={b.id} active={side ? "sides" : "chess"} facade={hasFacade} /></>} />
       <div className="page">
         <div className="chips">{bs.map((x) => <Link key={x.id} href={`?b=${x.id}`} className={'chip' + (x.id === b.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>
         {lim && <div className="card card--tight mt16 row" style={{ gap: 18 }}>

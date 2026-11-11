@@ -2791,5 +2791,14 @@
 "Застройщик {d} отказал в регистрации: {r}": "Tikinti şirkəti qeydiyyatdan imtina etdi: {d} · {r}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl}": "Endirimli hesablama variantı ({d}%) razılaşdırma gözləyir: {n} · {u} · {cl}",
 "Вариант расчёта со скидкой {d}% ждёт согласования: {n} · {u} · {cl} — «{c}»": "Endirimli hesablama variantı ({d}%) razılaşdırma gözləyir: {n} · {u} · {cl} — “{c}”",
-"ждёт согласия клиента": "müştərinin razılığını gözləyir"
+"ждёт согласия клиента": "müştərinin razılığını gözləyir",
+"Материалы для партнёров и клиентов по проектам. Контент и новости сайтов ведутся в системе управления сайтами.": "Layihələr üzrə tərəfdaşlar və müştərilər üçün materiallar. Saytların məzmunu və xəbərləri saytların idarəetmə sistemində aparılır.",
+"Застройщик уже оплатил: {a}": "Tikinti şirkəti artıq ödəyib: {a}",
+"Для клиентов саб-агентов, если иначе": "Subagentlərin müştəriləri üçün, fərqlidirsə",
+"Все планировки · {n}": "Bütün planlar · {n}",
+"Вся история · {n}": "Bütün tarixçə · {n}",
+"Клиент или номер": "Müştəri və ya nömrə",
+"Продаж: {n}": "Satışlar: {n}",
+"Со свободными · {n}": "Satışda olanlarla · {n}",
+"Фильтры": "Filtrlər"
 }

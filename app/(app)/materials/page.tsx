@@ -17,13 +17,13 @@ export default async function Materials() {
   const get = (pid: string, k: string) => stat.find((x) => x.project_id === pid && x.kind === k)
   return (
     <>
-      <Top title={T('Материалы')} sub={isExternal(c.user.role) ? T('Презентации, планы и видео по проектам — для вас и ваших клиентов') : T('Материалы для партнёров и клиентов по проектам. Контент и новости сайтов — в CMS (Payload).')} />
+      <Top title={T('Материалы')} sub={isExternal(c.user.role) ? T('Презентации, планы и видео по проектам — для вас и ваших клиентов') : T('Материалы для партнёров и клиентов по проектам. Контент и новости сайтов ведутся в системе управления сайтами.')} />
       <div className="page grid g2">
         {ps.map((p) => { const m = get(p.id, 'material'), d = get(p.id, 'document'); return (
           <div key={p.id} className="card">
             <div className="h3">{p.name}</div>
-            <Link className="kv" href={`/projects/${p.slug}?tab=materials`}><span style={{ color: 'var(--ink)' }}>{T('Материалы для клиента')}</span><span className="small">{m ? `${m.n} · ${date(L, m.last)}` : '—'} →</span></Link>
-            <Link className="kv" href={`/projects/${p.slug}?tab=docs`}><span style={{ color: 'var(--ink)' }}>{T('Документы')}</span><span className="small">{d ? `${d.n} · ${date(L, d.last)}` : '—'} →</span></Link>
+            <Link className="kv" href={`/projects/${p.slug}?tab=materials`}><span style={{ color: 'var(--ink)' }}>{T('Материалы для клиента')}</span><span className="small">{m ? `${m.n} · ${date(L, m.last)}` : '—'}{m ? ' →' : ''}</span></Link>
+            <Link className="kv" href={`/projects/${p.slug}?tab=docs`}><span style={{ color: 'var(--ink)' }}>{T('Документы')}</span><span className="small">{d ? `${d.n} · ${date(L, d.last)}` : '—'}{d ? ' →' : ''}</span></Link>
           </div>
         ) })}
       </div>

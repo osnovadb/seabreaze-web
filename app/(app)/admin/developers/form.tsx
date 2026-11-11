@@ -8,7 +8,7 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [st, act] = useActionState(saveDeveloper, null)
   const N = (k: keyof Developer, label: string, unit: string) => (
-    <label className="field"><span>{T(label)}</span><div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input className="in" name={k} defaultValue={cur[k] === null ? '' : String(cur[k])} inputMode="numeric" disabled={!canEdit} /><span className="small muted" style={{ width: 70 }}>{T(unit)}</span></div></label>
+    <label className="field"><span>{T(label)}</span><div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}><input className="in" name={k} defaultValue={cur[k] === null ? '' : String(cur[k])} inputMode="numeric" disabled={!canEdit} style={{ flex: 1, minWidth: 0 }} /><span className="small muted nowrap" style={{ flex: '0 0 auto' }}>{T(unit)}</span>{/* О63: единица в одну строку, поля одной ширины */}</div></label>
   )
   const C = (k: keyof Developer, label: string) => <label className="row small" style={{ gap: 8 }}><input type="checkbox" name={k} defaultChecked={Boolean(cur[k])} disabled={!canEdit} /> {T(label)}</label>
   return (
@@ -27,7 +27,7 @@ export function DevForm({ lang, cur, canEdit }: { lang: Lang; cur: Developer; ca
           <label className="field"><span>{T('Молчание застройщика')}</span><select key={`silence_rule:${String(cur.silence_rule)}`} className="in" name="silence_rule" defaultValue={cur.silence_rule} disabled={!canEdit}><option value="confirm">{T('= подтверждение (по договору)')}</option><option value="remind">{T('только напоминание бэк-офису')}</option></select></label>
           {N('silence_extra_days', 'Плюс к сроку ответа', 'р. дней')}
           {N('protect_months', 'Защита регистрации', 'мес.')}
-          {N('protect_months_sub', 'Для клиентов саб-агентов', 'мес., если иначе')}
+          {N('protect_months_sub', 'Для клиентов саб-агентов, если иначе', 'мес.')}
           {N('renew_remind_days', 'Напомнить о продлении за', 'дней')}
         </div>
         <div className="label mt16">{T('Бронь')}</div>

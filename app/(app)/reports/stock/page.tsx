@@ -69,7 +69,7 @@ export default async function Stock(props: { searchParams: Promise<{ p?: string;
           <thead><tr>{[by === 'rooms' ? 'Комнаты / тип' : 'Корпус', 'Всего', 'Свободно', 'Наша бронь и сделки', 'Бронь застройщика', 'Продано', 'Не в продаже', 'Свободно, м²', 'Свободно, $', '$/м² свободных', '$/м² проданных'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{[...rows, tot].map((r, i) => (
             <tr key={r.key} style={i === rows.length ? { fontWeight: 600 } : undefined}>
-              <td>{i === rows.length ? r.key : label(r.key)}</td><td className="num">{r.total}</td><td className="num okc">{r.free}</td><td className="num">{r.ours}</td><td className="num">{r.hold}</td><td className="num">{r.sold}</td><td className="num muted">{r.off}</td>
+              <td style={{ minWidth: 180 }}>{i === rows.length ? r.key : label(r.key)}</td>{/* О56: первая колонка не в пять строк */}<td className="num">{r.total}</td><td className="num okc">{r.free}</td><td className="num">{r.ours}</td><td className="num">{r.hold}</td><td className="num">{r.sold}</td><td className="num muted">{r.off}</td>
               <td className="num small">{num(L, r.free_m2)}</td><td className="num small">{usd(L, r.free_usd)}</td><td className="num small">{ppm(r.free_usd, r.free_m2)}</td><td className="num small muted">{ppm(r.sold_usd, r.sold_m2)}</td>
             </tr>))}</tbody>
         </table></div>

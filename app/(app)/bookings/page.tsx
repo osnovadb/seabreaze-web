@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
@@ -65,13 +66,16 @@ export default async function Bookings(
                 const left = Math.ceil((new Date(r.ends_at).getTime() - now) / 86400000)
                 const total = Math.max(1, Math.ceil((new Date(r.ends_at).getTime() - new Date(r.starts_at).getTime()) / 86400000))
                 const live = ['requested', 'confirmed'].includes(r.status)
-                const decline = <form action={bookingAction} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="reject" />
-                  <select className="in in--sm" name="reason" required defaultValue="">{/* Б11: причина не выбрана заранее */}<option value="" disabled>{T('Причина')}</option>{[['sold', 'Продана'], ['developer_refused', 'Застройщик отказал'], ['registration_failed', 'Нет регистрации'], ['other', 'Другое']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select><button className="btn btn--sm">{T('Отклонить')}</button></form>
-                const confirm = <form action={bookingAction} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="confirm" />
-                  <input className="in in--sm" name="dev_no" placeholder={T('№ брони застройщика')} style={{ width: 150 }} /><input className="in in--sm" type="date" name="until" title={T('до какого числа у застройщика')} /><ConfirmBtn className="btn btn--sm btn--p" msg={T('Подтвердить бронь {u} у застройщика? Без даты срок посчитается по условиям проекта.', { u: r.unit })}>{T('Подтвердить')}</ConfirmBtn></form>
+                const decline = <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="reject" />
+                  <label className="field"><span>{T('Причина отказа')}</span><select className="in in--sm" name="reason" required defaultValue="">{/* Б11: причина не выбрана заранее */}<option value="" disabled>{T('Причина')}</option>{[['sold', 'Продана'], ['developer_refused', 'Застройщик отказал'], ['registration_failed', 'Нет регистрации'], ['other', 'Другое']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select></label><button className="btn btn--sm">{T('Отклонить')}</button></form>
+                const confirm = <form action={bookingAction} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value="confirm" />
+                  <label className="field"><span>{T('№ брони застройщика')}</span><input className="in in--sm" name="dev_no" style={{ width: 150 }} /></label><label className="field"><span>{T('до какого числа у застройщика')}</span><input className="in in--sm" type="date" name="until" /></label><ConfirmBtn className="btn btn--sm btn--p" msg={T('Подтвердить бронь {u} у застройщика? Без даты срок посчитается по условиям проекта.', { u: r.unit })}>{T('Подтвердить')}</ConfirmBtn></form>
                 const act = (a: string, l: string, p = false, ask?: string) => <form action={bookingAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="act" value={a} /><input type="hidden" name="back" value="bookings" />{ask ? <ConfirmBtn className={'btn btn--sm' + (p ? ' btn--p' : '')} msg={ask}>{T(l)}</ConfirmBtn> : <button className={'btn btn--sm' + (p ? ' btn--p' : '')}>{T(l)}</button>}</form>
+                // О52 (обход 11.11): подтверждение и отказ — строкой под бронью с подписями полей, как во вкладке Units
+                const sub = (r.status === 'requested' && r.approval !== 'pending' && r.fee_status !== 'due' && canConfirmBooking(c.user.role)) || (['requested', 'queued'].includes(r.status) && canConfirmBooking(c.user.role))
                 return (
-                  <tr key={r.id}>
+                  <Fragment key={r.id}>
+                  <tr>
                     <td><Link href={`/units/${r.unit_id}`}><b>{r.unit}</b></Link>{r.group_id && <div className="tiny bronze">{T('пакет')}: {rows.filter((x) => x.group_id === r.group_id && x.id !== r.id).map((x) => x.unit).join(', ') || '—'}</div>}</td>
                     <td><Link href={`/clients/${r.client_id}`}>{r.client}</Link></td>
                     <td className="small muted">{ext ? '' : `${r.agent}${r.market ? ' · ' + r.market : ''}`}</td>
@@ -83,8 +87,6 @@ export default async function Bookings(
                       {r.status === 'requested' && r.approval === 'pending' && canApproveDiscount(c.user.role) && <>{r.plan_pool != null && r.discount_pct > r.plan_pool + 1e-9 ? <span className="tiny bad">{T('больше максимума по плану ({p}) — только отказ', { p: pct(L, r.plan_pool) })}</span> : act('approve', 'Согласовать', true)}{act('decline', 'Отказать')}</>}
                       {r.fee_status === 'due' && live && ['owner', 'office', 'finance'].includes(c.user.role) && act('fee_paid', 'Взнос получен', true)}
                       {r.fee_status === 'paid' && ['cancelled', 'expired'].includes(r.status) && ['owner', 'finance'].includes(c.user.role) && <>{act('fee_refund', 'Вернуть взнос')}{act('fee_keep', 'Удержать')}</>}
-                      {r.status === 'requested' && r.approval !== 'pending' && r.fee_status !== 'due' && canConfirmBooking(c.user.role) && confirm}
-                      {['requested', 'queued'].includes(r.status) && canConfirmBooking(c.user.role) && decline}
                       {r.status === 'release_pending' && canConfirmBooking(c.user.role) && act('release_confirm', 'Снята у застройщика', true)}
                       {r.status === 'hold' && (r.agent_id === c.user.id || c.user.role === 'market_head') && act('release_hold', 'Снять холд')}
                       {r.status === 'hold' && r.agent_id === c.user.id && <Link className="btn btn--sm btn--p" href={`/units/${r.unit_id}/book`}>{T('Запросить бронь')}</Link>}
@@ -93,6 +95,10 @@ export default async function Bookings(
                       {(live || r.status === 'queued') && (r.agent_id === c.user.id || canConfirmBooking(c.user.role)) && act('cancel', 'Снять')}
                     </div></td>
                   </tr>
+                  {sub && <tr className="subrow"><td colSpan={8}><div className="row" style={{ gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    {r.status === 'requested' && r.approval !== 'pending' && r.fee_status !== 'due' && confirm}
+                    {['requested', 'queued'].includes(r.status) && decline}</div></td></tr>}
+                  </Fragment>
                 )
               })}
             </tbody>

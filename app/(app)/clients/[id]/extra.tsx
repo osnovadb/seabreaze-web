@@ -38,13 +38,12 @@ export function DocUpload({ lang, clientId, team }: { lang: Lang; clientId: stri
       <input type="hidden" name="client" value={clientId} />
       {st?.error && <div className="err">{T(st.error)}</div>}
       {st?.ok && <div className="tiny okc">{T('Сохранено')}</div>}
-      <div className="row" style={{ gap: 6 }}>
-        <select className="in" name="kind" style={{ flex: 1 }}>{KINDS.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
-        <input className="in" type="file" name="file" required style={{ flex: 2, paddingTop: 6 }} />
-      </div>
-      <div className="row" style={{ gap: 6 }}>
-        <input className="in" name="note" placeholder={T('комментарий')} style={{ flex: 1 }} />
-        {team && <label className="check tiny"><input type="checkbox" name="internal" /> <span>{T('только команда')}</span></label>}
+      {/* О51 (обход 11.11): правая колонка узкая — поля одно под другим во всю ширину */}
+      <select className="in" name="kind" aria-label={T('Вид документа')}>{KINDS.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select>
+      <input className="in" type="file" name="file" required style={{ paddingTop: 6 }} />
+      <input className="in" name="note" placeholder={T('комментарий')} />
+      <div className="row" style={{ gap: 6, justifyContent: 'space-between' }}>
+        {team ? <label className="check tiny"><input type="checkbox" name="internal" /> <span>{T('только команда')}</span></label> : <span />}
         <button className="btn btn--sm">{T('Загрузить')}</button>
       </div>
     </form>

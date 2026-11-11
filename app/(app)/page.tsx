@@ -147,8 +147,8 @@ export default async function Home() {
             <div className="h3">{T('Задачи')}</div>
             {tasks.length === 0 && <div className="muted small mt8">{T('Задач нет')}</div>}
             {tasks.map((x) => (
-              <div key={x.id} className="kv">
-                <form action={toggleTask.bind(null, x.id)} className="row" style={{ gap: 8 }}><button className="check" title="✓"><input type="checkbox" readOnly checked={x.done} /></button><span>{T(x.title, fmtVars(L, x.vars))}{x.client && <div className="small muted">{x.client}</div>}</span></form>
+              <div key={x.id} className="kv" style={{ alignItems: 'flex-start' }}>{/* О60: флажок и текст в одной строке, дата справа */}
+                <form action={toggleTask.bind(null, x.id)} className="row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'flex-start', flex: 1, minWidth: 0 }}><button className="check" title="✓"><input type="checkbox" readOnly checked={x.done} /></button><span style={{ minWidth: 0 }}>{T(x.title, fmtVars(L, x.vars))}{x.client && <div className="small muted">{x.client}</div>}</span></form>
                 <span className="small muted">{date(L, x.due)}</span>
               </div>
             ))}

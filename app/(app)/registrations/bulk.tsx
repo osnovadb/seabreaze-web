@@ -29,8 +29,8 @@ export function RegBulk({ lang, query, edit, canSend, total = 0 }: { lang: Lang;
     <div className="card card--tight row mt16" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
       <span className="small muted">{T('Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):')}</span>
       <button type="button" className="btn btn--sm btn--p" onClick={() => dl('dev')}>{T('Файл застройщику (xlsx)')}</button>
-      <span className="small muted">{T('Язык файла')}:</span>{/* М8: у списка языка не было подписи */}
-      <select className="in in--sm" value={fl} onChange={(e) => setFl(e.target.value)} title={T('Язык файла')} style={{ width: 90 }}><option value="ru">RU</option><option value="en">EN</option><option value="az">AZ</option></select>
+      <label className="row nowrap" style={{ gap: 6, flexWrap: 'nowrap' }}><span className="small muted">{T('Язык файла')}:</span>{/* М8, О53: подпись не отрывается от списка */}
+      <select className="in in--sm" value={fl} onChange={(e) => setFl(e.target.value)} style={{ width: 'auto', minWidth: 80 }}><option value="ru">RU</option><option value="en">EN</option><option value="az">AZ</option></select></label>
       <button type="button" className="btn btn--sm" onClick={() => dl('full')}>{T('Полный список (xlsx)')}</button>
       {edit && canSend && <button type="button" className="btn btn--sm" disabled={pending} onClick={send}>{T(pending ? 'Отмечаем…' : 'Отметить отправленными')}</button>}
       {msg && <span className="small okc" role="status" style={{ flexBasis: '100%' }}>{msg}</span>}

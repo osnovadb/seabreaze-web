@@ -215,6 +215,9 @@ select.in[multiple] { background-image: none; padding-inline-end: 12px; height: 
 .gp a:hover polygon { fill: var(--bronze); fill-opacity: .35; stroke: #F3E3CC; stroke-width: 3; }
 .gp .tag { position: absolute; transform: translate(-50%, -50%); background: var(--paper); border-radius: 8px; padding: 8px 12px; font-size: 12px; box-shadow: 0 6px 16px rgba(0,0,0,.18); pointer-events: none; white-space: nowrap; }
 .gp .tag b { display: block; font-size: 13.5px; }
+/* О58 (обход 11.11): подписи блоков наезжали — на картинке только название, цифры — в списке блоков под генпланом */
+.gp .tag { padding: 5px 10px; }
+.gp .tag__s { display: none; }
 
 /* Поэтажный план (схема) */
 .floor { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; }
@@ -324,7 +327,7 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .ucard { display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; transition: box-shadow .12s, border-color .12s; }
 .ucard:hover { border-color: var(--bronze); box-shadow: 0 6px 18px rgba(0, 0, 0, .08); }
 .ucard__img { position: relative; aspect-ratio: 4 / 3; background: #fff; display: grid; place-items: center; border-bottom: 1px solid var(--line); }
-.ucard__img img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.ucard__img img { position: absolute; inset: 4%; width: 92%; height: 92%; object-fit: contain; } /* О54: картинка не растягивает карточку — названия в ряду на одной высоте */
 .ucard__promo { position: absolute; left: 8px; top: 8px; background: var(--bronze); color: #fff; font-size: 11px; font-weight: 600; border-radius: 10px; padding: 2px 8px; }
 .ucard__b { padding: 12px 14px 14px; flex: 1; display: flex; flex-direction: column; }
 .ucard__b > .ucard__price { margin-top: auto; padding-top: 8px; } /* М10: цена — по низу карточки, карточки в ряду одной высоты */
@@ -468,3 +471,19 @@ select.in { padding-inline-end: 36px; }
 details.pop { position: relative; }
 details.pop > form { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 30; width: 300px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 @media (max-width: 640px) { details.pop > form { position: static; width: auto; box-shadow: none; } }
+/* О57 (обход 11.11): телефон — шапка страницы не липкая (в карточке клиента занимала 220 px), фильтры каталога под кнопкой */
+.catf-t, .catf-b { display: none; }
+@media (max-width: 640px) {
+  .top { position: static; }
+  .catf-b { display: inline-flex; justify-self: start; }
+  .catf-t:not(:checked) ~ .cat__f { display: none; }
+  .catf-t:checked + .catf-b .chev { transform: rotate(180deg); }
+}
+/* О59: статус-плашка не растягивается на всю ширину в колонке и в карточке таблицы */
+.pill { max-width: max-content; justify-self: start; }
+.stack > .pill, .card > .pill, .vcalc__cmp .pill { align-self: flex-start; }
+/* М4 (обход 11.11): во фрейме Bitrix24 над шахматкой 430 px служебного — шапка страницы компактная, без пути и подзаголовка */
+.app--embed .top { position: static; padding: 8px 16px; gap: 10px; flex-wrap: wrap; }
+.app--embed .top .crumbs, .app--embed .top .sub { display: none; }
+.app--embed .top h1 { font-size: 18px; }
+.app--embed .page { padding-top: 12px; padding-bottom: 16px; } /* и М5: без пустой полосы 70 px внизу */
