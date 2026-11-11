@@ -8,12 +8,12 @@
 - [ ] Живой v1 не трогаем до переключения nginx.
 
 ## База
-- [ ] Новая база portal22: каталог (public) без клиентов и сделок; портал — миграции 001–069 по порядку (scripts/migrate.mjs).
+- [ ] База portal, роль portal_app, каталог /opt/getsestate/portal22: каталог (public) без клиентов и сделок; портал — миграции 001–069 по порядку (scripts/migrate.mjs).
 - [ ] db/stand/2026-11-12_contracts_381.sql — условия застройщиков по договорам и черновик Premium.
 - [ ] Генплан BRABUS: portal.genplans (title, views, полигоны) + файлы /files/473bb0f0-… и /files/20b586fe-… в FILES_DIR, file_id совпадают.
 - [ ] BRABUS 589 квартир, 31 поэтажный план; Marina Village — все 39 листов. Скрытого блока «ТЕСТ · QA» на бою нет.
 - [ ] Нет TEST/QA-клиентов, броней, сделок, KYC, писем в очереди.
-- [ ] FILES_DIR — владелец пользователь службы; заливка файлов по одному, без rsync -a каталога.
+- [ ] FILES_DIR (/opt/getsestate/portal22/files) — свой, UPLOADS_DIR — общий с v1; владелец — пользователь службы; заливка файлов по одному, без rsync -a каталога.
 
 ## Окружение (deploy/prod/portal.env.example)
 - [ ] Все секреты новые: SESSION_SECRET, LEADS_SECRET, пароль базы.
