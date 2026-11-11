@@ -53,15 +53,17 @@ try {
     'BRABUS Island — сайт партнёра Treva (Profitbase застройщика, проект 56881)', proj.developer_id,
     'API treva.realestate /api/v1/unit-layouts: номер, этаж, площади, цена USD, статус, поквартирный план. Скрипт scripts/treva-import.mjs. До получения ключа Profitbase от застройщика.'])
 
-  // Корпуса: по названию дома в Profitbase; срок сдачи берём наш (в выгрузке 2026 — для всех домов одинаково)
+  // Корпуса: башня в Profitbase одна, но у застройщика (листы планировок, номера A-…/D-…) это блоки A–D — корпус по подъезду;
+  // виллы — по названию дома. Срок сдачи берём наш (в выгрузке 2026 — для всех домов одинаково)
+  const bname = (x) => (x.realEstateType === 'Villa' || !x.entrance ? x.house.title : `Block ${x.entrance}`)
   const delivery = (await q('select max(delivery) d from buildings where project_id = $1', [proj.id]))[0].d
   const bld = {}
-  for (const name of [...new Set(units.map((x) => x.house.title))]) {
-    const villa = units.some((x) => x.house.title === name && x.realEstateType === 'Villa')
-    const floors = Math.max(...units.filter((x) => x.house.title === name).map((x) => x.floor || 0)) || null
+  for (const name of [...new Set(units.map(bname))].sort()) {
+    const villa = units.some((x) => bname(x) === name && x.realEstateType === 'Villa')
+    const floors = Math.max(...units.filter((x) => bname(x) === name).map((x) => x.floor || 0)) || null
     const [b] = await q(`insert into buildings (project_id, name, kind, floors_total, delivery, source_id, sort) values ($1,$2,$3,$4,$5,$6,$7)
       on conflict (project_id, name) do update set source_id = excluded.source_id, kind = excluded.kind, floors_total = coalesce(excluded.floors_total, buildings.floors_total) returning id`,
-      [proj.id, name, villa ? 'villa_cluster' : 'tower', villa ? null : floors, delivery, SOURCE, villa ? 9 : 0])
+      [proj.id, name, villa ? 'villa_cluster' : 'block', villa ? null : floors, delivery, SOURCE, villa ? 9 : 0])
     bld[name] = b.id
   }
 
@@ -104,7 +106,7 @@ try {
       st.plans++
       await sleep(200)
     }
-    const row = [proj.id, bld[x.house.title], lay.id, no, x.realEstateType === 'Villa' ? null : x.floor, type, x.rooms, x.totalArea, x.internalArea, x.balconyArea,
+    const row = [proj.id, bld[bname(x)], lay.id, no, x.realEstateType === 'Villa' ? null : x.floor, type, x.rooms, x.totalArea, x.internalArea, x.balconyArea,
       x.status, x.prices.USD, SOURCE, x.externalId, x.status, JSON.stringify(x), FINISH[x.renovation] || null, x.updatedAt]
     const [prev] = await q('select status, price_list::float p from units where source_id = $1 and external_id = $2', [SOURCE, x.externalId])
     await q(`insert into units (project_id, building_id, layout_id, number, floor, unit_type, bedrooms, area_total_m2, area_internal_m2, area_external_m2,
@@ -120,6 +122,8 @@ try {
     else if (prev.status !== x.status || prev.p !== x.prices.USD) st.updated++
     else st.same++
   }
+  // Корпуса источника, в которых не осталось квартир (прежняя «BRABUS Tower» до разбивки на блоки)
+  await q(`delete from buildings b where b.project_id = $1 and b.source_id = $2 and not exists (select 1 from units u where u.building_id = b.id)`, [proj.id, SOURCE])
   await q(`update sources set last_sync_at = now(), last_sync_status = 'ok' where id = $1`, [SOURCE])
   await db.query(`select set_config('app.skip_refresh', '', true)`)
   await q('select refresh_catalog()')
