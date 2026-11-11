@@ -14,11 +14,11 @@ test('Б9: клиент вкладки Bitrix24 — из адреса (?cl=), б
   const cl = (await register(S)).result.id
   const name = (await one('select name from portal.clients where id = $1', [cl])).name
   const withCl = await get(S, `/catalog?cl=${cl}`, '; ge_embed=1')
-  assert.equal(withCl.status, 200); assert.ok(withCl.html.includes('data-nocl') && withCl.html.includes(name), 'в вкладке с ?cl= нет полосы клиента')
+  assert.equal(withCl.status, 200); assert.ok(withCl.html.includes(`/b24/units/${cl}`) && withCl.html.includes(name), 'в вкладке с ?cl= нет полосы клиента') // М3 (обход 11.11): в полосе — имя и «← Units», без «выйти из клиента»
   const without = await get(S, '/catalog', `; ge_embed=1; ge_client=${cl}`)
-  assert.ok(!without.html.includes('data-nocl'), 'клиент взялся из старой общей cookie — залипает между окнами')
+  assert.ok(!without.html.includes(`/b24/units/${cl}`), 'клиент взялся из старой общей cookie — залипает между окнами')
   const card = await get(S, `/b24/units/${cl}`, '; ge_embed=1')
-  assert.ok(card.html.includes(name) && card.html.includes('data-nocl'), 'в Units клиента нет полосы с «Выйти из клиента»')
+  assert.ok(card.html.includes(name) && !card.html.includes('class="banner"'), 'в Units клиента — повтор полосы клиента (М3: там свои вкладки)')
 })
 test('Б10: новый пользователь — без роли не создаётся', async () => {
   const OW = await user('owner', { market: null })
