@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
-import { t, usd, dateTime, pct } from '@/lib/i18n'
+import { t, usd, dateTime, pct, tzOf } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, unitsOfBuilding, viewMode, codeFor, conditionsFor, riserInfo, orientOf, orientText, VIEW_NAME, riser, unitNo, planUrl, TYPE_NAME } from '@/lib/catalog'
 import { offersFor, promoOf, promoBadge } from '@/lib/promo'
 import { clientScope } from '@/lib/scope'
@@ -26,6 +26,7 @@ export default async function ChessPage(
   const params = await props.params;
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const p = await projectBySlug(params.slug, c.user)
   if (!p) notFound()
   const bs = await buildingsOf(p.id, c.user)
@@ -77,7 +78,7 @@ export default async function ChessPage(
   return (
     <>
       <Top crumbs={[[T('Проекты'), '/projects'], [p.name, `/projects/${p.slug}`], [T('Шахматка')]]} title={`${p.name} · ${b.name}`}
-        sub={sync ? T('Данные на {d} · источник {s}', { d: dateTime(L, sync.at), s: sync.src }) : T('Цены застройщика в USD')}
+        sub={sync ? T('Данные на {d} · источник {s}', { d: dateTime(L, sync.at, TZ), s: sync.src }) : T('Цены застройщика в USD')}
         right={<><ViewTabs lang={L} base={`/projects/${p.slug}`} b={b.id} active={side ? "sides" : "chess"} facade={hasFacade} /></>} />
       <div className="page">
         <div className="chips">{bs.map((x) => <Link key={x.id} href={`?b=${x.id}`} className={'chip' + (x.id === b.id ? ' on' : '')}>{x.name} <span className="n">{x.free}</span></Link>)}</div>

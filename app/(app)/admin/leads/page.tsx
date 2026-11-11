@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 
 const RES: Record<string, [string, 'ok' | 'warn' | 'off' | 'bad' | 'ink']> = { new_client: ['новый клиент', 'ok'], existing: ['уже наш клиент', 'ink'], partner_client: ['клиент партнёра', 'warn'], spam: ['спам', 'off'], error: ['ошибка', 'bad'] }
@@ -12,6 +12,7 @@ export default async function Leads(props: { searchParams: Promise<{ f?: string 
   const c = await requireCtx()
   if (!['owner', 'market_head', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const mk = c.user.role === 'market_head' ? c.user.market : null
   const rows = await q<{ id: string; source: string; site: string | null; name: string | null; phone: string | null; email: string | null; market: string; lang: string; result: string; client_id: string | null; utm: Record<string, string> | null; created_at: string; bx: string | null; bx_err: string | null }>(`
     select l.id, l.source, l.site, l.name, l.phone, l.email, l.market, l.lang, l.result, l.client_id, l.utm, l.created_at,
@@ -31,7 +32,7 @@ export default async function Leads(props: { searchParams: Promise<{ f?: string 
             {rows.length === 0 && <tr><td colSpan={7} className="muted">{T('Заявок пока нет')}</td></tr>}
             {rows.map((r) => (
               <tr key={r.id}>
-                <td className="small">{dateTime(L, r.created_at)}</td><td className="small">{r.source}{r.site ? <div className="tiny muted">{r.site}</div> : null}</td>
+                <td className="small">{dateTime(L, r.created_at, TZ)}</td><td className="small">{r.source}{r.site ? <div className="tiny muted">{r.site}</div> : null}</td>
                 <td>{r.client_id ? <Link href={`/clients/${r.client_id}`}><b>{r.name || '—'}</b></Link> : <b>{r.name || '—'}</b>}<div className="tiny muted">{[r.phone, r.email].filter(Boolean).join(' · ')}</div></td>
                 <td className="small">{r.market} · {r.lang.toUpperCase()}</td>
                 <td className="tiny muted">{r.utm ? Object.entries(r.utm).filter(([k]) => k !== 'page').map(([k, v]) => `${k.replace('utm_', '')}=${v}`).join(' ') : ''}</td>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { RuleForm, PL_STATUS } from './form'
 import { normRule } from '@/lib/priceRule'
@@ -14,6 +14,7 @@ export default async function Prices(props: { searchParams: Promise<{ p?: string
   const c = await requireCtx()
   if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const ps = await q<{ id: string; name: string }>('select id, name from projects order by sort, name')
   const p = ps.find((x) => x.id === searchParams.p) || ps[0]
   const lists = p ? await q<{ id: string; title: string; status: string; n: number; applied: number; by: string; created_at: string; published_at: string | null }>(`
@@ -30,7 +31,7 @@ export default async function Prices(props: { searchParams: Promise<{ p?: string
             {lists.length === 0 && <div className="small muted">{T('Прайс-листов по проекту ещё нет.')}</div>}
             {lists.length > 0 && <table className="tbl"><thead><tr>{['Название', 'Статус', 'Квартир', 'Автор', 'Создан', 'Опубликован'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
               <tbody>{lists.map((l) => <tr key={l.id}><td><Link href={`/admin/prices/${l.id}`}><b>{l.title}</b></Link></td><td><Pill kind={PL_STATUS[l.status][1]}>{T(PL_STATUS[l.status][0])}</Pill></td>
-                <td className="num">{l.status === 'draft' ? l.n : `${l.applied} / ${l.n}`}</td><td className="small">{l.by}</td><td className="small muted">{dateTime(L, l.created_at)}</td><td className="small muted">{l.published_at ? dateTime(L, l.published_at) : '—'}</td></tr>)}</tbody></table>}
+                <td className="num">{l.status === 'draft' ? l.n : `${l.applied} / ${l.n}`}</td><td className="small">{l.by}</td><td className="small muted">{dateTime(L, l.created_at, TZ)}</td><td className="small muted">{l.published_at ? dateTime(L, l.published_at, TZ) : '—'}</td></tr>)}</tbody></table>}
           </div>
           {p && <RuleForm lang={L} projectId={p.id} rule={searchParams.units ? normRule({ units: searchParams.units.split(',').filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 500) }) : undefined} />}
         </div>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { ROLE_NAMES, type Role } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { endSessions, setUserActive } from '@/lib/actions'
@@ -16,6 +16,7 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const u = await one<{ id: string; name: string; email: string; role: Role; market: string | null; agency_id: string | null; curator_id: string | null; locale: string; license_note: string | null; contract_signed_at: string | null; active: boolean; last_login_at: string | null; created_at: string; languages: string[]; b24_user_id: string | null; leads_partners: boolean }>(
     'select id, name, email, role, market, agency_id, curator_id, locale, license_note, contract_signed_at::text, active, last_login_at, created_at, languages, b24_user_id::text, leads_partners from portal.users where id = $1', [params.id])
   if (!u) notFound()
@@ -33,7 +34,7 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
   return (
     <>
       <Top crumbs={[[T('Админка'), owner ? '/admin/users' : '/admin/agents'], [u.name]]} title={u.name}
-        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind="ink">{T(ROLE_NAMES[u.role])}</Pill>{u.market && <Pill kind="off">{u.market}</Pill>}{!u.active && <Pill kind="bad">{T('отключён')}</Pill>}<span className="small muted">{T('Последний вход')}: {dateTime(L, u.last_login_at)}</span></span>} />
+        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind="ink">{T(ROLE_NAMES[u.role])}</Pill>{u.market && <Pill kind="off">{u.market}</Pill>}{!u.active && <Pill kind="bad">{T('отключён')}</Pill>}<span className="small muted">{T('Последний вход')}: {dateTime(L, u.last_login_at, TZ)}</span></span>} />
       <div className="page split">
         <EditUser lang={L} owner={owner} agencies={agencies} curators={curators} u={u} />
         <div className="stack">
@@ -59,7 +60,7 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
           {app && (
             <div className="card">
               <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Заявка и документы')}</div><Link className="small bronze" href={`/admin/agents/app/${app.id}`}>{T('Открыть заявку')} →</Link></div>
-              <div className="small muted mt8">{T('заявка от {d}', { d: dateTime(L, app.created_at) })}{app.license ? ' · ' + app.license : ''}</div>
+              <div className="small muted mt8">{T('заявка от {d}', { d: dateTime(L, app.created_at, TZ) })}{app.license ? ' · ' + app.license : ''}</div>
               {docs.length === 0 && <div className="small muted mt8">{T('Документы не приложены.')}</div>}
               {docs.map((d) => <a key={d.file_id} className="kv" href={`/files/${d.file_id}`} target="_blank" rel="noopener"><span style={{ color: 'var(--ink)' }}>{d.filename}</span><span className="small">↗</span></a>)}
             </div>
@@ -67,7 +68,7 @@ export default async function UserCard(props: { params: Promise<{ id: string }> 
           <div className="card">
             <div className="h3">{T('Журнал')}</div>
             {log.length === 0 && <div className="small muted">—</div>}
-            {log.map((x, i) => <div key={i} className="kv"><span className="small"><code>{x.action}</code> · {x.who}</span><span className="tiny muted">{dateTime(L, x.created_at)}</span></div>)}
+            {log.map((x, i) => <div key={i} className="kv"><span className="small"><code>{x.action}</code> · {x.who}</span><span className="tiny muted">{dateTime(L, x.created_at, TZ)}</span></div>)}
           </div>
         </div>
       </div>

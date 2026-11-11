@@ -17,7 +17,9 @@ const H: Record<string, { title: string; dev: string; date: string; cols: string
   az: { title: 'GetsEstate — müştərilərin qeydiyyatı', dev: 'Tikinti şirkəti', date: 'Tarix', cols: ['№', 'GetsEstate qeydiyyat nömrəsi', 'Müştəri (ad, soyad)', 'Telefon', 'E-poçt', 'Ölkə', 'Layihə', 'Agentlik'] },
 }
 const day = (d: Date) => d.toISOString().slice(0, 10)
-const fmt = (s: string | null) => (s ? String(s).slice(0, 10).split('-').reverse().join('.') : '')
+// Ревью 11.11: из базы timestamptz приходит объектом Date — String(Date) давал «Wed Nov 11»; даты — по Баку, дд.мм.гггг
+const BAKU = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Baku' })
+const fmt = (s: string | Date | null) => (!s ? '' : s instanceof Date ? BAKU.format(s) : String(s).slice(0, 10).split('-').reverse().join('.'))
 
 export async function GET(req: Request) {
   const c = await requireCtx()

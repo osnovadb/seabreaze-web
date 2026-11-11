@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, date, dateTime, usd, fmtVars } from '@/lib/i18n'
+import { t, date, dateTime, usd, fmtVars, tzOf } from '@/lib/i18n'
 import { isExternal } from '@/lib/perm'
 import { clientScope } from '@/lib/scope'
 import { Top, Pill, PARTNER_STAGES, STAGES, stageName } from '@/components/ui'
@@ -30,6 +30,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const ext = isExternal(c.user.role)
   const cs = clientScope(c.user)
   const cl = await one<any>(`select cl.*, us.name as owner_name, us.role as owner_role from portal.clients cl join portal.users us on us.id = cl.owner_id where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
@@ -153,7 +154,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                 {(allHist ? acts : acts.slice(0, 30)).map((a) => (
                   <div key={a.id} className="kv" style={{ alignItems: 'flex-start', background: a.internal ? 'var(--warn-bg)' : undefined, padding: a.internal ? '9px 8px' : undefined, borderRadius: 6 }}>
                     <span style={{ color: 'var(--ink)' }}><span className="tiny muted">{T({ note: 'Заметка', call: 'Звонок', message: 'Сообщение', meeting: 'Встреча', email: 'Письмо', system: 'Система' }[a.kind] || a.kind)}{a.internal ? ' · ' + T('внутренний') : ''}{a.who ? ' · ' + a.who : ''}</span><div>{T(a.text, a.vars ? { ...fmtVars(L, a.vars), ...(a.vars.stage ? { stage: stageName(L, String(a.vars.stage)) } : {}) } : undefined)}</div></span>
-                    <span className="tiny muted" style={{ whiteSpace: 'nowrap' }}>{dateTime(L, a.created_at)}</span>
+                    <span className="tiny muted" style={{ whiteSpace: 'nowrap' }}>{dateTime(L, a.created_at, TZ)}</span>
                   </div>
                 ))}
                 {!allHist && acts.length > 30 && <Link className="small bronze" href="?hist=all">{T('Вся история · {n}', { n: acts.length })}</Link>}
@@ -234,7 +235,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                 </form>
               )}
               {canReviewKyc(c.user.role) && cl.kyc_status === 'passed' && <form action={reviewKyc}><input type="hidden" name="client" value={cl.id} /><button className="btn btn--sm" name="decision" value="none">{T('Сбросить KYC')}</button></form>}
-              {cl.kyc_checked_at && <div className="tiny muted">{T('Проверено {d}', { d: dateTime(L, cl.kyc_checked_at) })}</div>}
+              {cl.kyc_checked_at && <div className="tiny muted">{T('Проверено {d}', { d: dateTime(L, cl.kyc_checked_at, TZ) })}</div>}
               <div className="tiny muted">{T('Без пройденного KYC сделку нельзя перевести в «Договор подписан».')}</div>
             </div>
             {owners.length > 0 && (

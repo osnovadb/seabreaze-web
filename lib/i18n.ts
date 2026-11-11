@@ -66,9 +66,12 @@ export const pct = (lang: Lang, n: number) => num(lang, n, Number(n) % 1 ? 1 : 0
 export const m2u = (lang: Lang) => (lang === 'ru' ? 'м²' : lang === 'he' ? 'מ״ר' : 'm²') // М6: в английском была кириллическая «м²»
 export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + ' ' + m2u(lang)
 // М6: в английском «07/05/2027» непонятно — май или июль; пишем «7 May 2027»
-export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
+export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], { ...(lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }), timeZone: 'Asia/Baku' } as Intl.DateTimeFormatOptions).format(new Date(d)) : '—')
 // О75 (обход 11.11): по-английски «04/11» читалось как 11 апреля — месяц словом, как в date()
-export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], lang === 'en' ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
+// Ревью 11.11: время — в поясе рынка пользователя (сервер в UTC: клиент, заведённый в Баку в 13:59, показывался «09:59»)
+export const MARKET_TZ: Record<string, string> = { DE: 'Europe/Berlin', IL: 'Asia/Jerusalem', GLOBAL: 'Asia/Baku' }
+export const tzOf = (market?: string | null) => MARKET_TZ[market || ''] || 'Asia/Baku'
+export const dateTime = (lang: Lang, d: string | Date | null, tz = 'Asia/Baku') => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], { ...(lang === 'en' ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), timeZone: tz } as Intl.DateTimeFormatOptions).format(new Date(d)) : '—')
 // Переменные шаблонов из базы: даты в ISO показываем в формате языка
 export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | undefined) =>
   v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fmtOne(lang, x)])) : undefined

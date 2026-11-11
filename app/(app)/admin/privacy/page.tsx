@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { SOURCE_LABEL } from '@/lib/stages'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, date, dateTime } from '@/lib/i18n'
+import { t, date, dateTime, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
 import { executePrivacyRequest, rejectPrivacyRequest } from '@/lib/privacy'
@@ -13,6 +13,7 @@ export default async function Privacy() {
   const c = await requireCtx()
   if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const reqs = await q<{ id: string; client_label: string; channel: string | null; requested_at: string; due_at: string; status: string; result: Record<string, unknown> | null; note: string | null }>(
     'select id, client_label, channel, requested_at, due_at::text, status, result, note from portal.privacy_requests order by status = \'open\' desc, requested_at desc limit 100')
   const cnt = (await q<{ st: string; n: number }>(`select consent_status st, count(*)::int n from portal.clients where anonymized_at is null group by 1`))
@@ -45,7 +46,7 @@ export default async function Privacy() {
           <div className="card"><div className="h3">{T('Ждём согласие')}</div>
             {pending.length === 0 ? <div className="muted small">{T('Пусто')}</div> : pending.map((p) => <div key={p.id} className="kv"><span><a href={`/clients/${p.id}`}>{p.reg_no}</a> · {p.name} <span className="tiny muted">· {p.owner}</span></span><span className="tiny muted">{p.consent_requested_at ? T('ссылка {d}, напоминаний {n}', { d: date(L, p.consent_requested_at), n: p.consent_reminders }) : T('ссылка не отправлена')}</span></div>)}</div>
           <div className="card"><div className="h3">{T('Журнал согласий')}</div>
-            {log.length === 0 ? <div className="muted small">{T('Пусто')}</div> : log.map((x, i) => <div key={i} className="kv"><span className="small">{x.client || '—'} · {T(KIND[x.kind] || x.kind)}: <b className={x.granted ? 'okc' : 'badc'}>{T(x.granted ? 'да' : 'нет')}</b> <span className="tiny muted">· {T(SOURCE_LABEL[x.source] || x.source)}{x.who ? ' · ' + x.who : ''}</span></span><span className="tiny muted">{dateTime(L, x.at)}</span></div>)}</div>
+            {log.length === 0 ? <div className="muted small">{T('Пусто')}</div> : log.map((x, i) => <div key={i} className="kv"><span className="small">{x.client || '—'} · {T(KIND[x.kind] || x.kind)}: <b className={x.granted ? 'okc' : 'badc'}>{T(x.granted ? 'да' : 'нет')}</b> <span className="tiny muted">· {T(SOURCE_LABEL[x.source] || x.source)}{x.who ? ' · ' + x.who : ''}</span></span><span className="tiny muted">{dateTime(L, x.at, TZ)}</span></div>)}</div>
         </div>
       </div>
     </>

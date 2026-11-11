@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, dateTime, pct } from '@/lib/i18n'
+import { t, usd, m2, dateTime, pct, tzOf } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
 import { planLabel, type Plan } from '@/lib/plans'
 import { clientScope } from '@/lib/scope'
@@ -20,6 +20,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const cs = clientScope(c.user)
   const s = await one<{ id: string; token: string; title: string; lang: string; opened: number; last_opened_at: string | null; client: string; client_id: string; user_id: string }>(
     `select s.*, cl.name client from portal.selections s join portal.clients cl on cl.id = s.client_id where s.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, params.id])
@@ -45,7 +46,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
   return (
     <>
       <Top crumbs={[[T('Подборки'), '/selections'], [s.client, `/clients/${s.client_id}`], [T(s.title || 'Подборка')]]} title={T('Подборка для {c}', { c: s.client })}
-        sub={T('{n} квартир · клиент открывал {o} раз{l}', { n: items.length, o: s.opened, l: s.last_opened_at ? ', ' + T('последний — {d}', { d: dateTime(L, s.last_opened_at) }) : '' })}
+        sub={T('{n} квартир · клиент открывал {o} раз{l}', { n: items.length, o: s.opened, l: s.last_opened_at ? ', ' + T('последний — {d}', { d: dateTime(L, s.last_opened_at, TZ) }) : '' })}
         right={<><a className="btn" href={`/s/${s.token}?preview=1`} target="_blank">{T('Как видит клиент ↗')}</a><Link className="btn btn--p" href="/catalog">{T('Добавить квартиры')}</Link></>} />
       <div className="page split">
         <form action={selectionUpdate} className="card stack">
@@ -91,7 +92,7 @@ export default async function SelectionEdit(props: { params: Promise<{ id: strin
               </div>
             )
           })}
-          {changed && <div className="tiny muted">{T('Изменено: {w}, {d}', { w: changed.who, d: dateTime(L, changed.at) })}</div>}
+          {changed && <div className="tiny muted">{T('Изменено: {w}, {d}', { w: changed.who, d: dateTime(L, changed.at, TZ) })}</div>}
           {canEdit ? <button className="btn">{T('Сохранить заметки, графики и варианты')}</button>
             : <div className="note small">{T('Менять подборку может её автор ({a}) или владелец', { a: author || '—' })}</div>}
         </form>

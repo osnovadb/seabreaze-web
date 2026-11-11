@@ -22,11 +22,11 @@ export async function GET(req: Request) {
   const d = await one<{ name: string }>('select name from portal.developers where id = $1', [dev])
   if (!d) return NextResponse.json({ error: 'not found' }, { status: 404 })
   const rows = await q<{ reg_no: string; client: string; project: string; sent: string | null; decided: string | null; contacts: string | null; last: string | null; deal: string | null }>(
-    `select cl.reg_no, cl.name client, p.name project, r.sent_at::date::text sent, r.decided_at::date::text decided,
-       (select string_agg(to_char(a.created_at, 'DD.MM.YYYY'), ', ' order by a.created_at) from portal.activities a where a.client_id = cl.id and a.kind <> 'system'
+    `select cl.reg_no, cl.name client, p.name project, (r.sent_at at time zone 'Asia/Baku')::date::text sent, (r.decided_at at time zone 'Asia/Baku')::date::text decided,
+       (select string_agg(to_char(a.created_at at time zone 'Asia/Baku', 'DD.MM.YYYY'), ', ' order by a.created_at) from portal.activities a where a.client_id = cl.id and a.kind <> 'system'
           and a.created_at >= $2::date and a.created_at < ($2::date + interval '1 month')) contacts,
-       (select max(a.created_at)::date::text from portal.activities a where a.client_id = cl.id and a.kind <> 'system') last,
-       (select min(dl.created_at)::date::text from portal.deals dl where dl.client_id = cl.id and dl.project_id = r.project_id and dl.stage <> 'cancelled') deal
+       (select (max(a.created_at) at time zone 'Asia/Baku')::date::text from portal.activities a where a.client_id = cl.id and a.kind <> 'system') last,
+       (select (min(dl.created_at) at time zone 'Asia/Baku')::date::text from portal.deals dl where dl.client_id = cl.id and dl.project_id = r.project_id and dl.stage <> 'cancelled') deal
      from portal.registrations r join portal.clients cl on cl.id = r.client_id join public.projects p on p.id = r.project_id
      where r.developer_id = $1 and r.status in ('sent','confirmed','confirmed_silence') and cl.anonymized_at is null
        and ($3 <> 'market_head' or cl.market = $4)

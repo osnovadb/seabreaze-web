@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, date, dateTime } from '@/lib/i18n'
+import { t, date, dateTime, tzOf } from '@/lib/i18n'
 import { canReviewAgents } from '@/lib/perm'
 import { fmtSize } from '@/lib/files'
 import { Top, Pill } from '@/components/ui'
@@ -23,6 +23,7 @@ export default async function Application(props: { params: Promise<{ id: string 
   const c = await requireCtx()
   if (!canReviewAgents(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const a = await one<any>(`select a.*, r.name reviewer, u.name user_name from portal.agent_applications a left join portal.users r on r.id = a.reviewed_by left join portal.users u on u.id = a.user_id where a.id = $1`, [params.id])
   if (!a || (c.user.role !== 'owner' && a.market !== c.user.market)) notFound()
   const files = await q<{ file_id: string; filename: string; mime: string; size: number; created_at: string }>(`select af.file_id, f.filename, f.mime, f.size::int, af.created_at from portal.application_files af join portal.files f on f.id = af.file_id where af.application_id = $1 order by af.created_at`, [a.id])
@@ -70,7 +71,7 @@ export default async function Application(props: { params: Promise<{ id: string 
           <div className="card">
             <div className="h3">{T('Журнал')}</div>
             {log.length === 0 && <div className="small muted">—</div>}
-            {log.map((x, i) => <div key={i} className="kv"><span className="small">{T(JLAB[x.action] || x.action)}{x.who ? ' · ' + x.who : ''}</span><span className="tiny muted">{dateTime(L, x.created_at)}</span></div>)}
+            {log.map((x, i) => <div key={i} className="kv"><span className="small">{T(JLAB[x.action] || x.action)}{x.who ? ' · ' + x.who : ''}</span><span className="tiny muted">{dateTime(L, x.created_at, TZ)}</span></div>)}
           </div>
         </div>
       </div>

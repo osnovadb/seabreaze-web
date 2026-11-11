@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, usd, dateTime, date, fmtVars } from '@/lib/i18n'
+import { t, usd, dateTime, date, fmtVars, tzOf } from '@/lib/i18n'
 import { isExternal, canConfirmBooking, canSeeFinance, canSeeClients } from '@/lib/perm'
 import { clientScope, bookingScope } from '@/lib/scope'
 import { listProjects } from '@/lib/catalog'
@@ -14,6 +14,7 @@ import { payoutGaps } from '@/lib/money22'
 export default async function Home() {
   const c = await requireCtx()
   const u = c.user, L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const ext = isExternal(u.role)
   const cs = clientScope(u), bs = bookingScope(u)
   const clients = await q<{ id: string; name: string; stage: string; last_activity_at: string; protected_until: string; pause_until: string | null }>(
@@ -92,7 +93,7 @@ export default async function Home() {
           ? [[T('Проектов'), projects.length], [T('Квартир в каталоге'), projects.reduce((a, p) => a + p.units, 0)], [T('Свободно'), projects.reduce((a, p) => a + p.free, 0)], [T('Языков'), 4]]
           : [[T('Клиентов в работе'), active.length], [T('Активных броней'), bookings.length], [T('Сделок в работе'), deals.length], [canSeeFinance(u.role) ? T('Наш доход по сделкам') : T('Заявок агентов'), canSeeFinance(u.role) ? usd(L, ourSum) : apps!.n]]
 
-  const hour = new Date().getHours()
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: TZ }).format(new Date())) // приветствие по часам рынка, а не сервера (UTC)
   const hello = hour < 12 ? T('Доброе утро') : hour < 18 ? T('Добрый день') : T('Добрый вечер')
   return (
     <>
@@ -141,7 +142,7 @@ export default async function Home() {
           <div className="card">
             <div className="between"><div className="h3">{T('Уведомления')}</div><span className="row" style={{ gap: 10 }}><Link className="small bronze" href="/notifications">{T('Все')} →</Link><form action={readAll}><button className="small bronze">{T('Прочитать все')}</button></form></span></div>
             {notif.length === 0 && <div className="muted small mt8">{T('Пока пусто')}</div>}
-            {notif.map((n) => <Link key={n.id} href={n.link || '/'} className="kv"><span style={{ color: n.read ? 'var(--muted)' : 'var(--ink)', fontWeight: n.read ? 400 : 600 }}>{T(n.text, fmtVars(L, n.vars))}</span><span className="tiny muted">{dateTime(L, n.created_at)}</span></Link>)}
+            {notif.map((n) => <Link key={n.id} href={n.link || '/'} className="kv"><span style={{ color: n.read ? 'var(--muted)' : 'var(--ink)', fontWeight: n.read ? 400 : 600 }}>{T(n.text, fmtVars(L, n.vars))}</span><span className="tiny muted">{dateTime(L, n.created_at, TZ)}</span></Link>)}
           </div>
           <div className="card">
             <div className="h3">{T('Задачи')}</div>
@@ -156,7 +157,7 @@ export default async function Home() {
           {changes && (changes.prices + changes.freed + changes.opened > 0) && (
             <div className="card">
               <div className="h3">{T('Изменения в каталоге')}</div>
-              <div className="tiny muted">{T('с прошлого входа')} · {dateTime(L, since)}</div>
+              <div className="tiny muted">{T('с прошлого входа')} · {dateTime(L, since, TZ)}</div>
               {changes.freed > 0 && <Link className="kv" href="/catalog"><span style={{ color: 'var(--ink)' }}>{T('Обновились и сейчас свободны, квартир: {n}', { n: changes.freed })}</span><span className="small">→</span></Link>}
               {changes.prices > 0 && <div className="kv"><span style={{ color: 'var(--ink)' }}>{T('Изменились цены: {n} квартир', { n: changes.prices })}</span><span className={changes.in_sel ? 'small warnc' : 'small muted'}>{changes.in_sel ? T('{n} — в ваших подборках', { n: changes.in_sel }) : ''}</span></div>}
               {changes.opened > 0 && <Link className="kv" href="/projects"><span style={{ color: 'var(--ink)' }}>{T('Проекты в продаже обновлены: {n}', { n: changes.opened })}</span><span className="small">→</span></Link>}

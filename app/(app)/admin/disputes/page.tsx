@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime, date } from '@/lib/i18n'
+import { t, dateTime, date, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
 import { resolveDispute } from '@/lib/actions'
@@ -16,6 +16,7 @@ export default async function Disputes(props: { searchParams: Promise<{ f?: stri
   const c = await requireCtx()
   if (!['owner', 'market_head'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const f = searchParams.f === 'closed' ? 'closed' : 'open'
   const rows = await q<D>(`select d.id, d.status, d.name, d.phone, d.email, d.comment, d.created_at, d.decided_at, d.decision, cl.id client_id, cl.name client, cl.reg_no, cl.created_at registered, cl.market,
       ow.name owner, oa.name owner_agency, rq.name requester, ra.name requester_agency, dc.name decider
@@ -43,17 +44,17 @@ export default async function Disputes(props: { searchParams: Promise<{ f?: stri
                 <div>
                   <div className="label">{T('Закреплён за')}</div>
                   <div><b>{r.owner}</b>{r.owner_agency ? ' · ' + r.owner_agency : ''}</div>
-                  <div className="small muted">{T('Регистрация {d}', { d: dateTime(L, r.registered) })}</div>
+                  <div className="small muted">{T('Регистрация {d}', { d: dateTime(L, r.registered, TZ) })}</div>
                 </div>
                 <div>
                   <div className="label">{T('Запрос проверки')}</div>
                   <div><b>{r.requester}</b>{r.requester_agency ? ' · ' + r.requester_agency : ''}</div>
-                  <div className="small muted">{dateTime(L, r.created_at)} · {[r.name, r.phone, r.email].filter(Boolean).join(' · ')}</div>
+                  <div className="small muted">{dateTime(L, r.created_at, TZ)} · {[r.name, r.phone, r.email].filter(Boolean).join(' · ')}</div>
                   {r.comment && <div className="small mt8">«{r.comment}»</div>}
                 </div>
               </div>
               <div className="label mt16">{T('Журнал по клиенту')}</div>
-              {log.filter((x) => x.entity_id === r.client_id).map((x, i) => <div key={i} className="kv"><span className="small"><code>{x.action}</code> · {x.who}</span><span className="tiny muted">{dateTime(L, x.created_at)}</span></div>)}
+              {log.filter((x) => x.entity_id === r.client_id).map((x, i) => <div key={i} className="kv"><span className="small"><code>{x.action}</code> · {x.who}</span><span className="tiny muted">{dateTime(L, x.created_at, TZ)}</span></div>)}
               {r.status === 'open' ? (
                 <form action={resolveDispute} className="row mt16">
                   <input type="hidden" name="id" value={r.id} />

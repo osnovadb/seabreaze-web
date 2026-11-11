@@ -2802,5 +2802,7 @@
 "Со свободными · {n}": "With available units · {n}",
 "Фильтры": "Filters",
 "Кому исключение": "Exception for",
-"Спасибо! Консультант свяжется с вами.": "Thank you! A consultant will contact you."
+"Спасибо! Консультант свяжется с вами.": "Thank you! A consultant will contact you.",
+"Клиенту отправлена ссылка на согласие (e-mail)": "Consent link sent to the client (e-mail)",
+"Ссылка на согласие создана — отправьте её клиенту": "Consent link created — send it to the client"
 }

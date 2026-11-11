@@ -17,7 +17,7 @@ import { pbEnqueue } from './pbQueue'
 import { issueLink, mailLink, tokenUser, loginBlocked, noteLogin, clientIp, mailOn } from './access'
 import { promoForUnit } from './promo'
 import { storeFile, isFile } from './files'
-import { LANGS, t, bakuYear, type Lang } from './i18n'
+import { LANGS, t, bakuYear, dateTime, tzOf, type Lang } from './i18n'
 import { stageBlock, LOST_REASONS, B24_LOST } from './stages'
 import { canReviewKyc, kycMissing, type KycFields, type Buyer } from './kyc'
 import { autoPost } from './posts'
@@ -71,10 +71,11 @@ async function deviceCheck(userId: string, ip: string) {
   const known = await one<{ n: number; me: boolean }>('select count(*)::int n, bool_or(device_id = $2) me from portal.user_devices where user_id = $1', [userId, dev])
   await q(`insert into portal.user_devices (user_id, device_id, ua, ip) values ($1,$2,$3,$4) on conflict (user_id, device_id) do update set last_at = now(), ip = excluded.ip`, [userId, dev, ua, ip || null])
   if (!known?.n || known.me) return
-  const u = await one<{ email: string; name: string; locale: Lang }>('select email, name, locale from portal.users where id = $1', [userId])
+  const u = await one<{ email: string; name: string; locale: Lang; market: string | null }>('select email, name, locale, market from portal.users where id = $1', [userId])
   if (!u) return
   const L = (LANGS.includes(u.locale) ? u.locale : 'en') as Lang
-  const when = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+  // ревью 11.11: время входа — в поясе рынка пользователя, а не UTC
+  const tzU = tzOf(u.market), when = dateTime(L, new Date(), tzU) + ' (' + tzU + ')'
   await q(`insert into portal.outbox_messages (channel, to_addr, user_id, subject, body, kind) values ('email',$1,$2,$3,$4,'new_device')`, [u.email, userId, 'GetsEstate · ' + t(L, 'Вход с нового устройства'),
     [t(L, 'Здравствуйте, {n}!', { n: u.name }), t(L, 'В ваш кабинет GetsEstate вошли с нового устройства: {w}, {d}.', { w: when, d: ua.slice(0, 120) || '—' }), t(L, 'Если это были не вы — смените пароль и напишите вашему куратору.')].join('\n\n')])
   await notify(userId, 'security', 'Вход с нового устройства: {d}', '/profile', { d: when })

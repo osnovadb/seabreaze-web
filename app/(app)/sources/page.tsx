@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { canSeeSources } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { ActionForm } from '@/components/ActionForm'
@@ -11,6 +11,7 @@ export default async function Sources() {
   const c = await requireCtx()
   if (!canSeeSources(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const src = await q<{ id: string; kind: string; name: string; last_sync_at: string | null; last_sync_status: string | null; units: number; synced: string | null }>(
     `select s.id, s.kind, s.name, s.last_sync_at, s.last_sync_status, (select count(*)::int from units u where u.source_id = s.id) units,
        (select max(u.synced_at) from units u where u.source_id = s.id) synced from sources s order by s.id`)
@@ -32,7 +33,7 @@ export default async function Sources() {
         <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Источник', 'Тип', 'Квартир', 'Подтверждено', 'Статус'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>
-            {src.map((s) => <tr key={s.id}><td><b>{s.name}</b><div className="tiny muted">{s.id}</div></td><td>{s.kind}</td><td>{s.units}</td><td className="small">{dateTime(L, s.synced || s.last_sync_at)}</td><td>{s.last_sync_status === 'ok' ? <Pill kind="ok">ok</Pill> : <Pill kind="off">{s.last_sync_status || '—'}</Pill>}</td></tr>)}
+            {src.map((s) => <tr key={s.id}><td><b>{s.name}</b><div className="tiny muted">{s.id}</div></td><td>{s.kind}</td><td>{s.units}</td><td className="small">{dateTime(L, s.synced || s.last_sync_at, TZ)}</td><td>{s.last_sync_status === 'ok' ? <Pill kind="ok">ok</Pill> : <Pill kind="off">{s.last_sync_status || '—'}</Pill>}</td></tr>)}
             <tr><td><b>{T('Кабинет агента Profitbase · Premium')}</b><div className="tiny muted">pr:lka-manual-231026</div></td><td>{T('ручной снимок')}</td><td>{lka[0].n}</td><td className="small">{lka[0].at}</td><td><Pill kind="warn">{T('устаревает — нужен API-ключ')}</Pill></td></tr>
           </tbody>
         </table></div>
@@ -42,7 +43,7 @@ export default async function Sources() {
           {pbs.map((p) => (
             <div key={p.id} className="card stack" style={{ gap: 8 }}>
               <div className="between"><b>{p.name}</b><span className="row" style={{ gap: 6 }}>{!p.active && <Pill kind="off">{T('выключен')}</Pill>}<Pill kind={p.last_sync_status === 'ok' ? 'ok' : p.last_sync_status === 'partial' ? 'warn' : p.last_sync_status === 'failed' ? 'bad' : 'off'}>{p.last_sync_status || T('не запускался')}</Pill></span></div>
-              <div className="tiny muted">{p.id} · {p.config.account || p.config.base_url} · {T('ключ')} {p.config.key_env}: {keyOk(p.config.key_env) ? <span className="okc">{T('задан')}</span> : <span className="badc">{T('не задан на сервере')}</span>} · {T('последний прогон')} {dateTime(L, p.last_sync_at)}</div>
+              <div className="tiny muted">{p.id} · {p.config.account || p.config.base_url} · {T('ключ')} {p.config.key_env}: {keyOk(p.config.key_env) ? <span className="okc">{T('задан')}</span> : <span className="badc">{T('не задан на сервере')}</span>} · {T('последний прогон')} {dateTime(L, p.last_sync_at, TZ)}</div>
               <div className="small">{T('Проекты')}: {Object.entries(p.config.projects || {}).map(([k, v]) => `${k} → ${v}`).join(', ') || '—'}</div>
               <ActionForm action={runPbSource} lang={L} okText={T('Прогон завершён, изменено квартир')} className="row" style={{ gap: 6 }}>
                 <input type="hidden" name="id" value={p.id} />
@@ -70,11 +71,11 @@ export default async function Sources() {
         </form>}
         {outbox.length > 0 && <div className="card mt16">
           <div className="h3">{T('Запись в Profitbase: брони и продажи')}</div>
-          {outbox.map((o) => <div key={o.id} className="kv"><span style={{ color: 'var(--ink)' }}>{o.no} · {T(o.op === 'reserve' ? 'поставить бронь' : o.op === 'release' ? 'снять бронь' : 'продано')} → {o.status_alias}<div className="tiny muted">{dateTime(L, o.created_at)} · {o.source_id}{o.last_error ? ' · ' + o.last_error : ''}</div></span>
+          {outbox.map((o) => <div key={o.id} className="kv"><span style={{ color: 'var(--ink)' }}>{o.no} · {T(o.op === 'reserve' ? 'поставить бронь' : o.op === 'release' ? 'снять бронь' : 'продано')} → {o.status_alias}<div className="tiny muted">{dateTime(L, o.created_at, TZ)} · {o.source_id}{o.last_error ? ' · ' + o.last_error : ''}</div></span>
             <span className="row" style={{ gap: 6 }}><Pill kind={o.state === 'sent' ? 'ok' : o.state === 'error' ? 'bad' : o.state === 'skipped' ? 'off' : 'warn'}>{o.state}{o.attempts ? ' · ' + o.attempts : ''}</Pill>{owner && ['error', 'skipped'].includes(o.state) && <form action={retryPbOutbox}><input type="hidden" name="id" value={o.id} /><button className="btn btn--sm">{T('Повторить')}</button></form>}</span></div>)}
         </div>}
         <div className="grid g2 mt16">
-          <div className="card"><div className="h3">{T('Журнал синхронизаций')}</div>{runs.map((r, i) => <div key={i} className="kv"><span style={{ color: 'var(--ink)' }}>{dateTime(L, r.started_at)}<div className="tiny muted">{r.source_id}</div></span><span className={'small ' + (r.status === 'ok' ? 'okc' : r.status === 'failed' ? 'badc' : 'warnc')}>{r.status}{r.stats?.checked != null ? ` · ${T('проверено')} ${r.stats.checked}, ${T('изменено')} ${r.stats.changed || 0}${r.stats.created ? ', ' + T('новых') + ' ' + r.stats.created : ''}${r.stats.gone ? ', ' + T('исчезло') + ' ' + r.stats.gone : ''}${r.stats.floors ? ', ' + T('планов этажей') + ' ' + r.stats.floors : ''}` : ''}{r.error ? <div className="tiny badc">{r.error}</div> : null}{r.stats?.errors?.length ? <div className="tiny warnc">{r.stats.errors.slice(0, 3).join('; ')}</div> : null}</span></div>)}</div>
+          <div className="card"><div className="h3">{T('Журнал синхронизаций')}</div>{runs.map((r, i) => <div key={i} className="kv"><span style={{ color: 'var(--ink)' }}>{dateTime(L, r.started_at, TZ)}<div className="tiny muted">{r.source_id}</div></span><span className={'small ' + (r.status === 'ok' ? 'okc' : r.status === 'failed' ? 'badc' : 'warnc')}>{r.status}{r.stats?.checked != null ? ` · ${T('проверено')} ${r.stats.checked}, ${T('изменено')} ${r.stats.changed || 0}${r.stats.created ? ', ' + T('новых') + ' ' + r.stats.created : ''}${r.stats.gone ? ', ' + T('исчезло') + ' ' + r.stats.gone : ''}${r.stats.floors ? ', ' + T('планов этажей') + ' ' + r.stats.floors : ''}` : ''}{r.error ? <div className="tiny badc">{r.error}</div> : null}{r.stats?.errors?.length ? <div className="tiny warnc">{r.stats.errors.slice(0, 3).join('; ')}</div> : null}</span></div>)}</div>
           <div className="card"><div className="h3">{T('Конфликты: наша бронь, а у застройщика не свободно')}</div>{conflicts.length === 0 ? <div className="small muted">{T('Конфликтов нет')}</div> : conflicts.map((x, i) => <div key={i} className="kv"><span>{x.unit} · {x.client}</span><span className="badc small">{x.status}</span></div>)}
             <div className="tiny muted mt16">{T('Новый снимок или xlsx сначала показывается как предпросмотр изменений и применяется после подтверждения; ручные правки команды не перетираются. Загрузка xlsx — следующий шаг.')}</div></div>
         </div>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, date, dateTime } from '@/lib/i18n'
+import { t, date, dateTime, tzOf } from '@/lib/i18n'
 import { leaveWaitlist, deleteSearch } from '@/lib/waitActions'
 import { Top, Pill } from '@/components/ui'
 
@@ -9,6 +9,7 @@ import { Top, Pill } from '@/components/ui'
 export default async function Waitlist() {
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const waits = await q<{ id: string; unit_id: string; unit: string; project: string; client: string | null; created_at: string; pos: number; free: boolean }>(`
     select w.id, w.unit_id, portal.unit_no(b.external_id, u.number) unit, p.name project, cl.name client, w.created_at,
       (select count(*)::int from portal.waitlist w2 where w2.unit_id = w.unit_id and w2.active and w2.created_at <= w.created_at) pos,
@@ -34,7 +35,7 @@ export default async function Waitlist() {
           <div className="h3">{T('Сохранённые поиски')}</div>
           {searches.length === 0 && <div className="small muted">{T('Пусто. Сохранить поиск можно в каталоге с фильтрами.')}</div>}
           {searches.map((x) => (
-            <div key={x.id} className="kv"><span><Link href={link(x)}><b>{x.name}</b></Link><div className="tiny muted">{x.checked_at ? T('сейчас подходит: {n} · проверено {d}', { n: x.n, d: dateTime(L, x.checked_at) }) : T('проверим в течение 15 минут')}</div></span>
+            <div key={x.id} className="kv"><span><Link href={link(x)}><b>{x.name}</b></Link><div className="tiny muted">{x.checked_at ? T('сейчас подходит: {n} · проверено {d}', { n: x.n, d: dateTime(L, x.checked_at, TZ) }) : T('проверим в течение 15 минут')}</div></span>
               <form action={deleteSearch}><input type="hidden" name="id" value={x.id} /><button className="btn btn--sm" title={T('Удалить')}>×</button></form></div>
           ))}
         </div>

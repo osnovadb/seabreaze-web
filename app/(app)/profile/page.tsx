@@ -1,6 +1,6 @@
 import { isExternal } from '@/lib/perm'
 import { requireCtx } from '@/lib/auth'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { ROLE_NAMES } from '@/lib/perm'
 import { one } from '@/lib/db'
 import { Top } from '@/components/ui'
@@ -11,6 +11,7 @@ import { PasswordForm, PinForm } from './form'
 export default async function Profile() {
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const bot = process.env.TG_BOT_NAME, mail = !!process.env.SMTP_URL && process.env.SMTP_URL !== 'log'
   const u = c.real
   const me = await one<{ last_login_at: string | null; agency: string | null; curator: string | null; notify_email: boolean; notify_telegram: boolean; notify_digest: boolean; telegram_chat_id: string | null; tg_link_code: string | null }>(`select u.last_login_at, a.name agency, cu.name curator, u.notify_email, u.notify_telegram, u.notify_digest, u.telegram_chat_id, u.tg_link_code from portal.users u
@@ -27,7 +28,7 @@ export default async function Profile() {
             {me?.agency && <div className="kv"><span>{T('Агентство')}</span><span>{me.agency}</span></div>}
             {me?.curator && <div className="kv"><span>{T('Куратор')}</span><span>{me.curator}</span></div>}
             {/* Л5: «Последний вход —» не показываем; язык — подписанное поле с кнопкой «Сохранить» */}
-            {me?.last_login_at && <div className="kv"><span>{T('Последний вход')}</span><span className="small">{dateTime(L, me.last_login_at)}</span></div>}
+            {me?.last_login_at && <div className="kv"><span>{T('Последний вход')}</span><span className="small">{dateTime(L, me.last_login_at, TZ)}</span></div>}
             <form action={setOwnLocale} className="row mt8" style={{ alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 1 }}><span>{T('Язык писем и уведомлений')}</span><select key={`locale:${String(u.locale)}`} className="in" name="locale" defaultValue={u.locale}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
               <button className="btn">{T('Сохранить')}</button>

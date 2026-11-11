@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, dateTime, num } from '@/lib/i18n'
+import { t, dateTime, num, tzOf } from '@/lib/i18n'
 import { normRule } from '@/lib/priceRule'
 import { publishPriceList, revertPriceList, deletePriceList } from '@/lib/priceActions'
 import { Top, Pill } from '@/components/ui'
@@ -19,6 +19,7 @@ export default async function PriceList(props: { params: Promise<{ id: string }>
   const c = await requireCtx()
   if (!['owner', 'office', 'finance'].includes(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const l = await one<{ id: string; project_id: string; pname: string; title: string; status: string; rule: Record<string, unknown>; note: string | null; by: string; created_at: string; pub: string | null; published_at: string | null; rev: string | null; reverted_at: string | null }>(`
     select pl.id, pl.project_id, p.name pname, pl.title, pl.status, pl.rule, pl.note, a.name by, pl.created_at, b.name pub, pl.published_at, r.name rev, pl.reverted_at
     from portal.price_lists pl join projects p on p.id = pl.project_id join portal.users a on a.id = pl.created_by left join portal.users b on b.id = pl.published_by left join portal.users r on r.id = pl.reverted_by where pl.id = $1`, [params.id])
@@ -36,7 +37,7 @@ export default async function PriceList(props: { params: Promise<{ id: string }>
   return (
     <>
       <Top crumbs={[[T('Прайс-листы'), `/admin/prices?p=${l.project_id}`], [l.title]]} title={l.title}
-        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind={st[1]}>{T(st[0])}</Pill><span className="small muted">{l.pname} · {l.by} · {dateTime(L, l.created_at)}{l.pub ? ' · ' + T('опубликовал {u} {d}', { u: l.pub, d: dateTime(L, l.published_at!) }) : ''}{l.rev ? ' · ' + T('откатил {u} {d}', { u: l.rev, d: dateTime(L, l.reverted_at!) }) : ''}</span></span>} />
+        sub={<span className="row" style={{ gap: 8, marginTop: 6 }}><Pill kind={st[1]}>{T(st[0])}</Pill><span className="small muted">{l.pname} · {l.by} · {dateTime(L, l.created_at, TZ)}{l.pub ? ' · ' + T('опубликовал {u} {d}', { u: l.pub, d: dateTime(L, l.published_at!, TZ) }) : ''}{l.rev ? ' · ' + T('откатил {u} {d}', { u: l.rev, d: dateTime(L, l.reverted_at!, TZ) }) : ''}</span></span>} />
       <div className="page split">
         <div className="stack">
           <div className="grid g3">{byCur.map((x) => <div key={x.cur} className="card card--tight kpi"><div className="v" style={{ fontSize: 22 }}>{x.d >= 0 ? '+' : '−'}{money(Math.abs(x.d), x.cur)}</div><div className="small muted">{T('{n} кв. · {p} к сумме прайса', { n: x.n, p: (x.pct >= 0 ? '+' : '') + x.pct.toFixed(2) + '%' })}</div></div>)}

@@ -14,8 +14,10 @@ export async function requestConsent(clientId: string, by: string | null, opts: 
   if (!cl || cl.consent_status === 'given') return null
   const token = cl.consent_token || crypto.randomBytes(12).toString('base64url')
   await q(`update portal.clients set consent_token = $2, consent_status = case when consent_status = 'none' then 'pending' else consent_status end, consent_requested_at = coalesce(consent_requested_at, now()) where id = $1`, [clientId, token])
-  if (opts.mail !== false && cl.email) await mailConsent(cl.id, cl.email, cl.name, (LANGS.includes(cl.language || '') ? cl.language : 'en') as Lang, token)
-  if (by) await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system','Клиенту отправлена ссылка на согласие')`, [clientId, by])
+  const mailed = opts.mail !== false && !!cl.email
+  if (mailed) await mailConsent(cl.id, cl.email!, cl.name, (LANGS.includes(cl.language || '') ? cl.language : 'en') as Lang, token)
+  // Ревью 11.11: «отправлена» — только если письмо поставлено в очередь; без e-mail ссылку отправляет партнёр или сейлз сам
+  if (by) await q(`insert into portal.activities (client_id, user_id, kind, text) values ($1,$2,'system',$3)`, [clientId, by, mailed ? 'Клиенту отправлена ссылка на согласие (e-mail)' : 'Ссылка на согласие создана — отправьте её клиенту'])
   return consentUrl(token)
 }
 export async function mailConsent(clientId: string, email: string, name: string, L: Lang, token: string, reminder = false) {

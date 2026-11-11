@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
 
@@ -13,6 +13,7 @@ export default async function Outbox(props: { searchParams: Promise<{ s?: string
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const st = ST[searchParams.s || ''] ? searchParams.s! : ''
   const rows = await q<{ id: string; channel: string; to_addr: string; subject: string | null; body: string; kind: string; status: string; attempts: number; last_error: string | null; created_at: string; sent_at: string | null }>(
     `select id, channel, to_addr, subject, body, kind, status, attempts, last_error, created_at, sent_at from portal.outbox_messages where ($1 = '' or status = $1) order by created_at desc limit 100`, [st])
@@ -31,7 +32,7 @@ export default async function Outbox(props: { searchParams: Promise<{ s?: string
         <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Создано', 'Канал', 'Кому', 'Тема', 'Вид', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{rows.length === 0 ? <tr><td colSpan={7} className="muted">{T('Пусто')}</td></tr> : rows.map((r) => (
-            <tr key={r.id}><td className="small">{dateTime(L, r.created_at)}</td><td className="small">{r.channel}</td><td className="small">{r.to_addr}</td><td className="small">{r.subject || '—'}</td><td className="tiny">{r.kind}</td>
+            <tr key={r.id}><td className="small">{dateTime(L, r.created_at, TZ)}</td><td className="small">{r.channel}</td><td className="small">{r.to_addr}</td><td className="small">{r.subject || '—'}</td><td className="tiny">{r.kind}</td>
               <td><Pill kind={ST[r.status][1]}>{T(ST[r.status][0])}</Pill>{r.last_error && <div className="tiny badc">{r.last_error}</div>}</td>
               <td><details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Текст')}</summary><pre className="tiny" style={{ whiteSpace: 'pre-wrap', maxWidth: 420 }}>{r.body}</pre></details></td></tr>))}</tbody>
         </table></div>

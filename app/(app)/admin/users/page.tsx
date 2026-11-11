@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { ROLE_NAMES, canManageUsers, type Role } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
@@ -14,6 +14,7 @@ export default async function Users(props: { searchParams: Promise<{ s?: string;
   const c = await requireCtx()
   if (!canManageUsers(c.user.role)) redirect('/admin')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   // О12 (обход 11.11): поиск, без пользователей автотестов по умолчанию, по 100 на странице
   const qs0 = (sp.s || '').trim(), withQa = sp.qa === '1'
   const rows = await q<{ id: string; name: string; email: string; role: Role; market: string | null; agency: string | null; curator: string | null; locale: string; active: boolean; last_login_at: string | null }>(
@@ -37,7 +38,7 @@ export default async function Users(props: { searchParams: Promise<{ s?: string;
               <tr key={u.id} style={{ opacity: 1, color: u.active ? undefined : 'var(--off)' }}>
                 <td><Link href={`/admin/users/${u.id}`}><b>{u.name}</b></Link><div className="tiny muted">{u.email}</div></td><td>{T(ROLE_NAMES[u.role])}</td><td>{u.market || '—'}</td>
                 <td className="small">{u.agency || '—'}{u.curator && <div className="tiny muted">{T('куратор')}: {u.curator}</div>}</td><td>{u.locale.toUpperCase()}</td>
-                <td className="small muted">{dateTime(L, u.last_login_at)}</td>
+                <td className="small muted">{dateTime(L, u.last_login_at, TZ)}</td>
                 <td><Link className="btn btn--sm" href={`/admin/users/${u.id}`}>{T('Изменить')}</Link>{!u.active && <Pill kind="off">{T('отключён')}</Pill>}</td>
               </tr>
             ))}</tbody>

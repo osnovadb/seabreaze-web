@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { Top, Pill } from '@/components/ui'
 import { AdminTabs } from '@/components/AdminTabs'
 import { b24Retry, b24RetryDead, b24PullNow } from '@/lib/b24Actions'
@@ -15,6 +15,7 @@ export default async function B24Exchange(props: { searchParams: Promise<{ s?: s
   const c = await requireCtx()
   if (c.user.role !== 'owner') redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const tab = searchParams.tab === 'in' ? 'in' : 'out'
   const st = ST[searchParams.s || ''] ? searchParams.s! : ''
   const jobs = await q<{ id: number; kind: string; method: string | null; notes: string[]; status: string; attempts: number; last_error: string | null; created_at: string; updated_at: string; client: string | null; client_id: string | null; reg_no: string | null }>(
@@ -37,7 +38,7 @@ export default async function B24Exchange(props: { searchParams: Promise<{ s?: s
         <AdminTabs lang={L} on="b24" role={c.user.role} />
         <div className="grid g3">
           <div className="card card--tight"><b>{T('Подключение')}</b> · {process.env.B24_WEBHOOK ? <span className="okc">{domain || 'Bitrix24'}</span> : <span className="warnc">{T('не подключён — нужен B24_WEBHOOK в настройках сервера')}</span>}</div>
-          <div className="card card--tight"><b>{T('Последний обмен')}</b> · {lastRun ? <span className={stale ? 'badc' : 'okc'}>{dateTime(L, lastRun.at)}</span> : <span className="warnc">{T('ещё не было')}</span>}
+          <div className="card card--tight"><b>{T('Последний обмен')}</b> · {lastRun ? <span className={stale ? 'badc' : 'okc'}>{dateTime(L, lastRun.at, TZ)}</span> : <span className="warnc">{T('ещё не было')}</span>}
             {lastRun && <div className="tiny muted">{T('сделок')}: {String(lastRun.b24_deals ?? 0)} · {T('лидов')}: {String(lastRun.b24_leads ?? 0)} · {T('контактов')}: {String(lastRun.b24_contacts ?? 0)} · {T('в очереди')}: {String(lastRun.queue_left ?? 0)}</div>}
             {errs.map(([k, v]) => <div key={k} className="tiny badc">{k}: {String(v)}</div>)}</div>
           <div className="card card--tight row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -51,7 +52,7 @@ export default async function B24Exchange(props: { searchParams: Promise<{ s?: s
           <div className="tbl-wrap"><table className="tbl">
             <thead><tr>{['Обновлено', 'Клиент', 'Что', 'Записи в ленту', 'Статус', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
             <tbody>{jobs.length === 0 ? <tr><td colSpan={6} className="muted">{T('Пусто')}</td></tr> : jobs.map((j) => (
-              <tr key={j.id}><td className="small">{dateTime(L, j.updated_at)}</td>
+              <tr key={j.id}><td className="small">{dateTime(L, j.updated_at, TZ)}</td>
                 <td className="small">{j.client_id ? <a href={`/clients/${j.client_id}`}>{j.client}</a> : '—'} <span className="tiny muted">{j.reg_no}</span></td>
                 <td className="tiny">{j.kind === 'call' ? j.method : T('лид, контакт и сделка клиента')}</td>
                 <td className="tiny">{(j.notes || []).join(' · ') || '—'}</td>
@@ -62,7 +63,7 @@ export default async function B24Exchange(props: { searchParams: Promise<{ s?: s
           <div className="tbl-wrap"><table className="tbl">
             <thead><tr>{['Получено', 'Bitrix24', 'Событие', 'Клиент', 'Что сделано'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
             <tbody>{inbox.length === 0 ? <tr><td colSpan={5} className="muted">{T('Пусто')}</td></tr> : inbox.map((i) => (
-              <tr key={i.id}><td className="small">{dateTime(L, i.created_at)}</td>
+              <tr key={i.id}><td className="small">{dateTime(L, i.created_at, TZ)}</td>
                 <td className="small">{domain && i.entity !== 'comment' ? <a href={`https://${domain}/crm/${i.entity}/details/${i.b24_id}/`} target="_blank" rel="noreferrer">{i.entity} {i.b24_id}</a> : `${i.entity} ${i.b24_id}`}</td>
                 <td className="tiny">{i.event ? `${i.event} · ${T(EV[i.event] || '')}` : '—'}</td>
                 <td className="small">{i.client_id ? <a href={`/clients/${i.client_id}`}>{i.client}</a> : '—'}</td>

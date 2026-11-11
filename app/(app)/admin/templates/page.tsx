@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { t, dateTime } from '@/lib/i18n'
+import { t, dateTime, tzOf } from '@/lib/i18n'
 import { DOC_KINDS, DOC_KIND_NAMES, VARS, varAllowed, canEditTemplates } from '@/lib/docs'
 import { uploadTemplate, activateTemplate } from '@/lib/docActions'
 import { ActionForm } from '@/components/ActionForm'
@@ -12,6 +12,7 @@ export default async function Templates() {
   const c = await requireCtx()
   if (!canEditTemplates(c.user.role)) redirect('/')
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const rows = await q<{ id: string; kind: string; lang: string; version: number; name: string; file_id: string; vars: string[]; active: boolean; created_at: string; who: string | null }>(
     `select t.id, t.kind, t.lang, t.version, t.name, t.file_id, t.vars, t.active, t.created_at, u.name who from portal.doc_templates t left join portal.users u on u.id = t.created_by order by t.kind, t.lang, t.version desc`)
   return (
@@ -28,7 +29,7 @@ export default async function Templates() {
                   <div key={lg} className="kv"><span><b>{lg.toUpperCase()}</b></span>
                     <span className="small" style={{ textAlign: 'end' }}>{vs.length === 0 ? <span className="muted">{T('нет шаблона')}</span> : vs.map((r) => (
                       <div key={r.id} className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
-                        <a href={`/files/${r.file_id}`}>{r.name}</a><span className="tiny muted">v{r.version} · {dateTime(L, r.created_at)}{r.who ? ' · ' + r.who : ''}</span>
+                        <a href={`/files/${r.file_id}`}>{r.name}</a><span className="tiny muted">v{r.version} · {dateTime(L, r.created_at, TZ)}{r.who ? ' · ' + r.who : ''}</span>
                         {r.active ? <Pill kind="ok">{T('активный')}</Pill> : <form action={activateTemplate}><input type="hidden" name="id" value={r.id} /><button className="btn btn--sm">{T('Сделать активным')}</button></form>}
                       </div>))}</span></div>
                 )

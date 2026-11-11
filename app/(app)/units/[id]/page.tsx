@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, date, dateTime, num } from '@/lib/i18n'
+import { t, usd, m2, date, dateTime, num, tzOf } from '@/lib/i18n'
 import { unitById, unitsOfBuilding, viewMode, codeFor, planUrl, unitNo, projectBySlug, projectVisible, plansFor, downGridFor, conditionsFor, riserInfo, orientOf, orientText, riser } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
@@ -40,6 +40,7 @@ export default async function UnitPage(
   needUuid(params.id)
   const c = await requireCtx()
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  const TZ = tzOf(c.user.market) // время — в поясе рынка пользователя
   const u = await unitById(params.id)
   if (!u || (isExternal(c.user.role) && !(await projectVisible(u.project_id, c.user)))) notFound()
   const mode = viewMode(c.user, false)
@@ -155,7 +156,7 @@ export default async function UnitPage(
               {seesSource(c.user.role) && <>
                 <div className="kv mt8"><span>{T('Источник')}</span><span className="small">{u.source_id}</span></div>
                 <div className="kv"><span>{T('Статус в источнике')}</span><span>{u.external_status || u.status}</span></div>
-                <div className="kv"><span>{T('Подтверждено')}</span><span>{dateTime(L, u.synced_at)}</span></div>
+                <div className="kv"><span>{T('Подтверждено')}</span><span>{dateTime(L, u.synced_at, TZ)}</span></div>
                 <div className="kv"><span>{T('Ручные правки')}</span><span className="small">{u.locked.length ? '🔒 ' + u.locked.map((x) => T(x === 'price_list' ? 'цена' : x === 'status' ? 'статус' : x)).join(', ') + ' · ' + T('синхронизация не меняет') : T('нет · синхронизация может менять цену и статус')}</span></div>
                 {u.locked.length > 0 && ['owner', 'office', 'finance'].includes(c.user.role) && !c.impersonating && <form action={unlockUnits} className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                   <input type="hidden" name="unit" value={u.id} />
@@ -169,7 +170,7 @@ export default async function UnitPage(
                 const what = h.kind === 'status' ? `${T(ST_NAME[h.old_value || ''] || h.old_value || '—')} → ${T(ST_NAME[h.new_value || ''] || h.new_value || '—')}`
                   : h.kind === 'price' ? `${money(h.old_price)} → ${money(h.new_price)}${h.old_price && h.new_price ? ` (${h.new_price >= h.old_price ? '+' : ''}${((h.new_price / h.old_price - 1) * 100).toFixed(1)}%)` : ''}` : T('заведена') + (h.new_price ? ' · ' + money(h.new_price) : '')
                 const who = h.list ? T('прайс-лист «{t}»', { t: h.list }) : h.source.startsWith('sync:') ? T('синхронизация') + ' ' + h.source.slice(5) : h.source === 'portal' ? T('портал') : T('вручную в базе')
-                return <div key={i} className="kv"><span className="small">{dateTime(L, h.at)}</span><span className="small" style={{ textAlign: 'end' }}>{what}<div className="tiny muted">{[who, h.who].filter(Boolean).join(' · ')}</div></span></div>
+                return <div key={i} className="kv"><span className="small">{dateTime(L, h.at, TZ)}</span><span className="small" style={{ textAlign: 'end' }}>{what}<div className="tiny muted">{[who, h.who].filter(Boolean).join(' · ')}</div></span></div>
               })}</>}
               <div className="kv"><span>{T('В подборках')}</span><span className="small">{inSel.length ? inSel.map((x) => x.client).join(', ') : '—'}</span></div>
             </div>

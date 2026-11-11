@@ -2802,5 +2802,7 @@
 "Со свободными · {n}": "Satışda olanlarla · {n}",
 "Фильтры": "Filtrlər",
 "Кому исключение": "İstisna kimə",
-"Спасибо! Консультант свяжется с вами.": "Təşəkkür edirik! Məsləhətçi Sizinlə əlaqə saxlayacaq."
+"Спасибо! Консультант свяжется с вами.": "Təşəkkür edirik! Məsləhətçi Sizinlə əlaqə saxlayacaq.",
+"Клиенту отправлена ссылка на согласие (e-mail)": "Razılıq keçidi müştəriyə göndərildi (e-poçt)",
+"Ссылка на согласие создана — отправьте её клиенту": "Razılıq keçidi yaradıldı — zəhmət olmasa, onu müştəriyə göndərin"
 }
