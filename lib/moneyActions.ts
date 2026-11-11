@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { q, one, audit, notify } from './db'
 import { t, LANGS, type Lang } from './i18n'
 import { requireCtx } from './auth'
-import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares, addAdjustment, writeOffDebt } from './money22'
+import { receiveTranche, collectRegister, confirmMarket, approveRegister, payRegister, computeShares, addAdjustment, writeOffDebt, clawbackDeal, decideClawback } from './money22'
 import { storeFile, isFile } from './files'
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
@@ -14,6 +14,29 @@ async function role(roles: string[]) {
   return c
 }
 const done = () => { revalidatePath('/finance'); revalidatePath('/commission') }
+
+// 352 (Денис 11.11): «Расторжение» у бэк-офиса — дата, причина, вернули ли деньги клиенту; возврат комиссии утверждают финансы
+export async function terminateDeal(_: unknown, f: FormData) {
+  const c = await role(['owner', 'office', 'finance'])
+  const id = s(f, 'deal'), date = s(f, 'date'), reason = s(f, 'reason').slice(0, 300)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !reason) return { error: t(c.lang, 'Укажите дату и причину расторжения') }
+  const refunded = s(f, 'refunded') === 'yes' ? true : s(f, 'refunded') === 'no' ? false : null
+  if (refunded === null) return { error: t(c.lang, 'Укажите, вернули ли клиенту деньги') }
+  const d = await one<{ client_id: string; stage: string }>('select client_id, stage from portal.deals where id = $1', [id])
+  if (!d || d.stage === 'cancelled') return { error: t(c.lang, 'Сделка уже расторгнута') }
+  const r = await clawbackDeal(id, c.user.id, reason, { date, refunded })
+  await q(`insert into portal.activities (client_id, user_id, kind, text, vars) values ($1,$2,'system','Сделка расторгнута {d}: {r}',$3)`, [d.client_id, c.user.id, { d: date, r: reason }])
+  await audit(c.real.id, 'deal.terminate', 'deal', id, { date, reason, refunded, clawback: r?.claw.length || 0 })
+  revalidatePath(`/b24/units/${d.client_id}`); done()
+  return { ok: true }
+}
+export async function clawbackDecision(f: FormData) {
+  const c = await role(['owner', 'finance'])
+  const amount = s(f, 'amount') ? Number(s(f, 'amount').replace(',', '.')) : null
+  const r = await decideClawback(s(f, 'id'), s(f, 'act') === 'approve', amount != null && Number.isFinite(amount) ? amount : null, c.user.id)
+  if (r) await audit(c.real.id, 'clawback.' + (s(f, 'act') === 'approve' ? 'approve' : 'reject'), 'deal', r.deal_id, { amount })
+  done()
+}
 
 export async function trancheReceived(f: FormData) {
   const c = await role(['owner', 'finance'])

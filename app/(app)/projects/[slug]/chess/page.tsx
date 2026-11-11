@@ -103,7 +103,7 @@ export default async function ChessPage(
           {!sel && <span>{T('Наведите на квартиру — краткая карточка; нажмите — подробная справа')}</span>}
           {/* Л12: диапазон — по тому, что на экране (выбранная сторона дома) */}
           {(() => { const fr = shown.filter((u) => u.code === 'F' && u.usd); return fr.length > 0 && <span>· {T('цены свободных')} {usd(L, Math.min(...fr.map((u) => u.usd || 0)))} – {usd(L, Math.max(...fr.map((u) => u.usd || 0)))}</span> })()}
-          {isExternal(c.user.role) && <span>· {T('Недоступные квартиры показаны серым без причины')}</span>}
+          {isExternal(c.user.role) && <span>· {T('Бронь — можно встать в лист ожидания; кто бронирует, не показываем')}</span>}
         </div>
       </div>
     </>

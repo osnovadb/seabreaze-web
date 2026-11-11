@@ -6,7 +6,7 @@ import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { dealPaid } from '@/lib/actions'
 import { ROLE_LABEL } from '@/lib/money22'
-import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding, adjustment, writeOff } from '@/lib/moneyActions'
+import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding, adjustment, writeOff, clawbackDecision } from '@/lib/moneyActions'
 
 // 2.2 · §8 Деньги. Админ — весь путь денег; руководитель рынка — свой рынок без доли Caspian; финансы — суммы к получению и выплате.
 // Платим только из полученного: начисление появляется, когда финансы отмечают транш Received.
@@ -60,6 +60,11 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
     `select l.id, l.act_no, l.act_date::text, coalesce(u.name, l.recipient) who, l.role, l.market, l.net::float, l.currency, l.amount_cur::float, l.agreed_at is not null agreed, l.invoice_file_id is not null invoice,
        coalesce(u.partner_form in ('company','sole'), false) needs_inv, l.carried, r.status reg_status, r.month::text reg_month
      from portal.payout_lines l join portal.payout_registers r on r.id = l.register_id left join portal.users u on u.id = l.user_id where l.act_no is not null ${entSql} order by l.act_date desc, l.act_no desc limit 300`) : []
+  // 352: возврат комиссии после расторжения — сумму утверждают финансы
+  const claws = tab === 'debts' && fin ? await q<{ id: string; role: string; who: string | null; proposed: number; note: string | null; unit: string; date: string | null; refunded: boolean | null }>(
+    `select r.id, r.role, u.name who, r.proposed::float, r.note, portal.unit_no(bl.external_id, un.number) unit, d.termination_date::text date, d.client_refunded refunded
+     from portal.clawback_requests r join portal.deals d on d.id = r.deal_id join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id left join portal.users u on u.id = r.user_id
+     where r.status = 'pending' order by r.created_at`) : []
   const wh = tab === 'tax' ? await q<{ entity: string; country: string; rate: number }>('select entity, country, rate::float from portal.withholding order by entity, country') : []
   return (
     <>
@@ -118,6 +123,13 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
               {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
           </div>}
         </>}
+        {tab === 'debts' && fin && claws.length > 0 && <div className="card mt8" style={{ marginBottom: 16 }}>
+          <div className="h3" style={{ margin: 0 }}>{T('Возврат комиссии после расторжения — на утверждение')}</div>
+          {claws.map((x) => <form key={x.id} action={clawbackDecision} className="kv mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <span className="small"><b>{x.unit}</b> · {x.who || '—'} · {T(ROLE_LABEL[x.role] || x.role)}<div className="tiny muted">{x.note}{x.date ? ' · ' + date(L, x.date) : ''}{x.refunded === false ? ' · ' + T('деньги клиенту не вернули') : ''}</div></span>
+            <span className="row" style={{ gap: 6 }}><input type="hidden" name="id" value={x.id} /><input className="in in--sm" name="amount" defaultValue={Math.round(x.proposed * 100) / 100} inputMode="decimal" style={{ width: 120 }} title={T('Сумма к удержанию, USD')} />
+              <button className="btn btn--sm btn--p" name="act" value="approve">{T('Утвердить')}</button><button className="btn btn--sm" name="act" value="reject">{T('Не удерживать')}</button></span></form>)}
+        </div>}
         {tab === 'debts' && <div><div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Кто', 'Роль', 'Долг', 'С какого числа'].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
           <tbody>{debts.length === 0 ? <tr><td colSpan={4} className="muted">{T('Долгов нет')}</td></tr> : debts.map((d, i) => (

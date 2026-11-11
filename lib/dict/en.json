@@ -2698,5 +2698,22 @@
 "фикс {f} · пул {p}": "fixed {f} · pool {p}",
 "Люди": "People",
 "Объекты и условия": "Properties and terms",
-"Интеграции": "Integrations"
+"Интеграции": "Integrations",
+"Бронь — можно встать в лист ожидания; кто бронирует, не показываем": "Booked — you can join the waitlist; who booked is not shown",
+"Расторжение": "Termination",
+"Сделка расторгнута": "Deal terminated",
+"Дата расторжения": "Termination date",
+"Деньги клиенту вернули?": "Was the client refunded?",
+"Расторгнуть": "Terminate",
+"Возврат комиссии — только при расторжении в первые 3 месяца и с возвратом денег клиенту; сумму утверждают финансы.": "Commission is clawed back only if terminated within the first 3 months with a client refund; the finance team approves the amount.",
+"Укажите дату и причину расторжения": "Enter the termination date and reason",
+"Укажите, вернули ли клиенту деньги": "Specify whether the client was refunded",
+"Сделка уже расторгнута": "The deal is already terminated",
+"Сделка расторгнута {d}: {r}": "Deal terminated {d}: {r}",
+"Возврат комиссии после расторжения — на утверждение": "Commission clawback after termination — for approval",
+"деньги клиенту не вернули": "client not refunded",
+"Сумма к удержанию, USD": "Amount to withhold, USD",
+"Утвердить": "Approve",
+"Не удерживать": "Do not withhold",
+"Расторжение сделки: возврат комиссии на утверждение": "Deal termination: commission clawback for approval"
 }

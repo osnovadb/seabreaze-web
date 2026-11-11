@@ -23,7 +23,7 @@ export function UnitPanel({ u, code, lang, mode, closeHref, canBook, booking, or
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const outdoor = (u.plot_area || 0) + (u.ext_area || 0)
   const plan = planUrl(u.plan_file)
-  const [cn, ck] = CODE_NAME[code]
+  const [cn, ck] = mode === 'agent' && code === 'O' ? (['Забронирована', 'warn'] as const) : CODE_NAME[code] // 312: партнёру — «бронь», без «наша»
   const show = mode === 'show'
   return (
     <div className="card upanel">

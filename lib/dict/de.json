@@ -2698,5 +2698,22 @@
 "фикс {f} · пул {p}": "Fixum {f} · Pool {p}",
 "Люди": "Personen",
 "Объекты и условия": "Objekte und Konditionen",
-"Интеграции": "Integrationen"
+"Интеграции": "Integrationen",
+"Бронь — можно встать в лист ожидания; кто бронирует, не показываем": "Reserviert — Sie können auf die Warteliste; wer reserviert hat, wird nicht angezeigt",
+"Расторжение": "Kündigung",
+"Сделка расторгнута": "Geschäft gekündigt",
+"Дата расторжения": "Kündigungsdatum",
+"Деньги клиенту вернули?": "Wurde dem Kunden erstattet?",
+"Расторгнуть": "Kündigen",
+"Возврат комиссии — только при расторжении в первые 3 месяца и с возвратом денег клиенту; сумму утверждают финансы.": "Provisionsrückforderung nur bei Kündigung in den ersten 3 Monaten mit Rückzahlung an den Kunden; den Betrag genehmigt die Finanzabteilung.",
+"Укажите дату и причину расторжения": "Datum und Grund der Kündigung angeben",
+"Укажите, вернули ли клиенту деньги": "Angeben, ob dem Kunden erstattet wurde",
+"Сделка уже расторгнута": "Das Geschäft ist bereits gekündigt",
+"Сделка расторгнута {d}: {r}": "Geschäft gekündigt {d}: {r}",
+"Возврат комиссии после расторжения — на утверждение": "Provisionsrückforderung nach Kündigung — zur Genehmigung",
+"деньги клиенту не вернули": "dem Kunden nicht erstattet",
+"Сумма к удержанию, USD": "Einzubehaltender Betrag, USD",
+"Утвердить": "Genehmigen",
+"Не удерживать": "Nicht einbehalten",
+"Расторжение сделки: возврат комиссии на утверждение": "Kündigung: Provisionsrückforderung zur Genehmigung"
 }

@@ -95,7 +95,11 @@ export function codeFor(u: Unit, viewer: User | null, mode: 'team' | 'agent' | '
   if (mode === 'agent') {
     if (u.hidden) return 'X'
     if (mine) return 'M'
-    return free && !u.booking_id && !u.deal_id ? 'F' : 'X'
+    if (free && !u.booking_id && !u.deal_id) return 'F'
+    // 312 (Денис 11.11): у партнёра три статуса — свободно, бронь, продано; на бронь — лист ожидания. Кто бронирует и цена — не видны
+    if (u.deal_id || u.status === 'sold') return 'S'
+    if (u.booking_id || u.status === 'reserved') return 'O'
+    return 'X' // не в продаже — не показываем
   }
   if (u.deal_id) return 'D'
   if (u.booking_id) return mine ? 'M' : 'O'

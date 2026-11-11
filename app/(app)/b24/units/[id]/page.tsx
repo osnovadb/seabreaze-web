@@ -9,7 +9,8 @@ import { bookingAction, dealPaid, refuseClient } from '@/lib/actions'
 import { kycLink } from '@/lib/kycActions'
 import { B24_LOST } from '@/lib/stages'
 import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
-import { setEscort } from '@/lib/moneyActions'
+import { setEscort, terminateDeal } from '@/lib/moneyActions'
+import { ActionForm } from '@/components/ActionForm'
 import { ConsentBox } from '@/components/ConsentBox'
 import { clientScope } from '@/lib/scope'
 import { unitById, codeFor, viewMode } from '@/lib/catalog'
@@ -145,6 +146,16 @@ export default async function Units(
                     <label className="field"><span>{T('Оплачено клиентом, %')}</span><input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>
                     <button className="btn btn--sm btn--p">{T('Сохранить оплату')}</button></form>
                 : <div className="small muted">{T('Оплачено клиентом')}: {u.paid ?? 0}%</div>)}
+              {/* 352: расторжение — у бэк-офиса: дата, причина, вернули ли деньги клиенту; возврат комиссии утверждают финансы */}
+              {u.status === 'converted' && u.deal_id && ['owner', 'office', 'finance'].includes(c.user.role) && <details><summary className="small bronze" style={{ cursor: 'pointer' }}>{T('Расторжение')}</summary>
+                <ActionForm action={terminateDeal} lang={L} className="row mt8" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }} okText={T('Сделка расторгнута')}>
+                  <input type="hidden" name="deal" value={u.deal_id} />
+                  <label className="field"><span>{T('Дата расторжения')}</span><input className="in" type="date" name="date" required /></label>
+                  <label className="field" style={{ flex: '1 1 200px' }}><span>{T('Причина')}</span><input className="in" name="reason" required maxLength={300} /></label>
+                  <label className="field"><span>{T('Деньги клиенту вернули?')}</span><select className="in" name="refunded" required defaultValue=""><option value="" disabled>{T('Выберите')}</option><option value="yes">{T('да')}</option><option value="no">{T('нет')}</option></select></label>
+                  <button className="btn btn--sm">{T('Расторгнуть')}</button>
+                  <div className="tiny muted" style={{ flexBasis: '100%' }}>{T('Возврат комиссии — только при расторжении в первые 3 месяца и с возвратом денег клиенту; сумму утверждают финансы.')}</div>
+                </ActionForm></details>}
             </div>
           })}
           {['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role) && <form action={refuseClient} className="card card--tight row noprint" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>

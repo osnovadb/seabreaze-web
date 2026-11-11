@@ -148,23 +148,41 @@ export async function receiveTranche(trancheId: string, by: string) {
 }
 
 // Расторжение (§9 п.6): неполученные транши отменяются, неначисленное — аннулируется; уже начисленное партнёру и сейлзу в окне клаубэка — минус строкой
-export async function clawbackDeal(dealId: string, by: string | null, reason = 'расторжение') {
+// 352 (Денис 11.11): расторжение — сделка отменяется, неначисленное гасится; возврат уже выплаченного — только в окне клаубэка (3 мес.)
+// и если клиенту вернули деньги (refunded: null — неизвестно, решают финансы). Сумму возврата утверждают финансы (clawback_requests)
+export async function clawbackDeal(dealId: string, by: string | null, reason = 'расторжение', o: { date?: string | null; refunded?: boolean | null } = {}) {
   const d = await dealRow(dealId)
   if (!d) return null
   const c = await condOf(d)
-  const inWindow = Date.now() - new Date(d.created_at).getTime() <= c.clawback_months * 31 * 86400000
+  const at = o.date ? new Date(o.date + 'T12:00:00Z').getTime() : Date.now()
+  const inWindow = at - new Date(d.created_at).getTime() <= c.clawback_months * 31 * 86400000 && o.refunded !== false
   const res = await tx(async (t) => {
-    await t.query(`update portal.deals set stage = 'cancelled', terminated_at = coalesce(terminated_at, now()) where id = $1`, [dealId])
+    await t.query(`update portal.deals set stage = 'cancelled', terminated_at = coalesce(terminated_at, now()), termination_date = coalesce($2::date, termination_date, current_date),
+      termination_reason = coalesce($3, termination_reason), client_refunded = coalesce($4, client_refunded) where id = $1`, [dealId, o.date || null, reason, o.refunded ?? null])
     await t.query(`update portal.tranches set status = 'cancelled' where deal_id = $1 and status in ('scheduled','expected')`, [dealId])
     await t.query(`update portal.accruals set status = 'void', note = coalesce(note, '') || ' ' || $2 where deal_id = $1 and status = 'open' and kind = 'share'`, [dealId, reason])
     if (!inWindow) return { claw: [] as { role: string; user_id: string; amount: number }[] }
-    const month = (await t.query(`select date_trunc('month', now() at time zone 'Asia/Baku')::date::text m`)).rows[0].m
     const got = (await t.query(`select role, user_id, sum(amount)::float s from portal.accruals where deal_id = $1 and status in ('in_register','paid') and role in ('partner','seller') and kind in ('share','adjustment') group by role, user_id`, [dealId])).rows
-    for (const g of got) if (g.s > 0) await t.query(`insert into portal.accruals (deal_id, role, user_id, kind, amount, month, note) values ($1,$2,$3,'clawback',$4,$5,$6)`, [dealId, g.role, g.user_id, -g.s, month, `клаубэк: ${reason}`])
+    // сумма возврата — на утверждение финансам (не сразу в начисления)
+    for (const g of got) if (g.s > 0) await t.query(`insert into portal.clawback_requests (deal_id, role, user_id, proposed, note) values ($1,$2,$3,$4,$5)`, [dealId, g.role, g.user_id, g.s, reason])
     return { claw: got.filter((g: { s: number }) => g.s > 0).map((g: { role: string; user_id: string; s: number }) => ({ role: g.role, user_id: g.user_id, amount: g.s })) }
   })
-  for (const x of res.claw) if (x.user_id) await notify(x.user_id, 'payout', x.role === 'partner' ? 'Сделка расторгнута — выплаченная доля {a} будет удержана из следующих выплат' : 'Сделка расторгнута — бонус {a} будет удержан из будущих бонусов', x.role === 'partner' ? '/commission' : '/', { a: '$' + Math.round(x.amount).toLocaleString('en') })
+  if (res.claw.length) for (const x of await q<{ id: string }>(`select id from portal.users where active and role in ('finance','owner')`)) await notify(x.id, 'payout', 'Расторжение сделки: возврат комиссии на утверждение', '/finance?tab=debts', {})
   return { inWindow, ...res, by }
+}
+
+// Финансы утверждают сумму возврата комиссии (или отклоняют); утверждённое — удержание из следующих выплат (партнёр) или бонусов (сейлз)
+export async function decideClawback(reqId: string, approve: boolean, amount: number | null, by: string) {
+  const r = await one<{ deal_id: string; role: string; user_id: string | null; proposed: number; note: string | null }>(`update portal.clawback_requests set status = $2, amount = $3, decided_by = $4, decided_at = now()
+    where id = $1 and status = 'pending' returning deal_id, role, user_id, proposed::float, note`, [reqId, approve ? 'approved' : 'rejected', approve ? (amount ?? null) : null, by])
+  if (!r || !approve) return r
+  const a = Math.max(0, amount ?? r.proposed)
+  if (!a) return r
+  const month = (await one<{ m: string }>(`select date_trunc('month', now() at time zone 'Asia/Baku')::date::text m`))!.m
+  await q(`insert into portal.accruals (deal_id, role, user_id, kind, amount, month, note) values ($1,$2,$3,'clawback',$4,$5,$6)`, [r.deal_id, r.role, r.user_id, -a, month, `клаубэк: ${r.note || 'расторжение'}`])
+  await q(`update portal.clawback_requests set amount = $2 where id = $1`, [reqId, a])
+  if (r.user_id) await notify(r.user_id, 'payout', r.role === 'partner' ? 'Сделка расторгнута — выплаченная доля {a} будет удержана из следующих выплат' : 'Сделка расторгнута — бонус {a} будет удержан из будущих бонусов', r.role === 'partner' ? '/commission' : '/', { a: '$' + Math.round(a).toLocaleString('en') })
+  return r
 }
 
 // ── Реестр выплат за месяц (§8 «Выплаты») ──
