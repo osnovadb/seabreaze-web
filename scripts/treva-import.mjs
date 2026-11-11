@@ -1,7 +1,9 @@
 // Импорт раскладки проекта с сайта партнёра Treva (treva.realestate): их открытый API отдаёт выгрузку из Profitbase застройщика —
 // номер, корпус, этаж, площади, цены AZN/USD/EUR, статус и поквартирный план. Источник `treva:<проект>` (kind manual), повторный запуск
 // обновляет статус и цену по external_id (id квартиры в Profitbase), новые квартиры добавляет, планы докачивает.
-// На стенде: cd /opt/ge-portal22/src && set -a && . /opt/ge-portal22/portal.env && set +a && node scripts/treva-import.mjs [--replace-test] [--dry]
+// На стенде: cd /opt/ge-portal22/src && set -a && . /opt/ge-portal22/portal.env && set +a && node scripts/treva-import.mjs [brabus|marina] [--replace-test] [--dry]
+//   brabus (по умолчанию) — вся раскладка BRABUS Island; marina — Marina Village, только квартиры из scripts/treva-marina.txt
+//                   (листы застройщика «available units, 2026-10»: в фиде Treva у Marina почти всё «свободно», статусам там верить нельзя)
 //   --replace-test  первый прогон: убрать тестовые квартиры проекта (source 'test'); те, на которые ссылаются брони, сделки и подборки,
 //                   переносятся в корпус «ТЕСТ · QA» и скрываются от партнёров
 import fs from 'node:fs'
@@ -9,11 +11,21 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import pg from 'pg'
 
-const CATEGORY = 'brabus-island-baku' // categorySlug в API Treva
-const PROJECT = 'brabus-island-baku' // наш projects.slug
-const SOURCE = 'treva:brabus'
 const API = 'https://api.treva.realestate'
 const args = new Set(process.argv.slice(2))
+const KIND = args.has('marina') ? 'marina' : 'brabus'
+const CFG = {
+  brabus: { category: 'brabus-island-baku', project: 'brabus-island-baku', source: 'treva:brabus', title: 'BRABUS',
+    sourceName: 'BRABUS Island — сайт партнёра Treva (Profitbase застройщика, проект 56881)' },
+  marina: { category: 'marina-village', project: 'marina-village', source: 'treva:marina', title: 'Marina Village',
+    sourceName: 'Marina Village — сайт партнёра Treva (Profitbase застройщика, проект 57990), квартиры из листов застройщика 10.2026',
+    only: new Set(fs.readFileSync(new URL('./treva-marina.txt', import.meta.url), 'utf8').split('\n').map((l) => l.trim()).filter(Boolean)),
+    newProject: { name: 'Marina Village', status: 'under_construction', delivery: null, city: 'Baku', location: 'Sea Breeze, Nardaran', sales_channel: 'TREVA / ARAD',
+      notes: 'Квартиры — по листам застройщика «available units, 2026-10» (39 шт.), данные и планы — фид Treva. Реклама в соцсетях и презентации — с согласования Арада (договор v9, п. 10). Условия проекта не заведены.' } },
+}[KIND]
+const CATEGORY = CFG.category // categorySlug в API Treva
+const PROJECT = CFG.project // наш projects.slug
+const SOURCE = CFG.source
 const DRY = args.has('--dry')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -34,10 +46,19 @@ for (let page = 1; ; page++) {
   await sleep(1000)
 }
 console.log(`Treva: ${units.length} объектов`)
+// Marina: дом «Marina Village B5 (NEW)» → корпус B5, квартира — «B5-307»
+const blockOf = (x) => (KIND === 'marina' ? x.house.title.match(/B\d+/)?.[0] || x.house.title : null)
+if (CFG.only) {
+  const n = units.length
+  units.splice(0, n, ...units.filter((x) => CFG.only.has(`${blockOf(x)}-${x.unitCode}`)))
+  console.log(`по списку листов: ${units.length} из ${n}, ждали ${CFG.only.size}`)
+}
 
 const TYPE = { 0: 'studio', 1: '1br', 2: '2br', 3: '3br', 4: '4br' }
 const unitType = (x) => (x.realEstateType === 'Villa' ? 'villa' : TYPE[x.rooms] || null)
 const number = (x) => (x.realEstateType === 'Villa' ? `V-${x.unitCode}` : x.unitCode)
+// код планировки уникален в проекте: у Marina номера повторяются по корпусам
+const layCode = (x) => (KIND === 'marina' ? `${blockOf(x)}-${x.unitCode}` : number(x))
 const FINISH = { renovated: 'turnkey' }
 
 const db = new pg.Client({ connectionString: process.env.DATABASE_URL })
@@ -47,23 +68,35 @@ const st = { added: 0, updated: 0, same: 0, plans: 0, moved: 0, removed: 0, skip
 try {
   await db.query('begin')
   await db.query(`select set_config('app.sync_source', $1, true), set_config('app.skip_refresh', 'on', true)`, [SOURCE])
-  const [proj] = await q('select id, developer_id from projects where slug = $1', [PROJECT])
+  let [proj] = await q('select id, developer_id from projects where slug = $1', [PROJECT])
+  if (!proj && CFG.newProject) {
+    // застройщик тот же, что у BRABUS (Арад); проект заводится черновиком — партнёрам не виден, условия задаёт Денис
+    const np = CFG.newProject
+    ;[proj] = await q(`insert into projects (developer_id, slug, name, status, delivery, city, location, sales_channel, internal_notes, sort)
+      select developer_id, $1, $2, $3, $4, $5, $6, $7, $8, 2 from projects where slug = 'brabus-island-baku' returning id, developer_id`,
+      [PROJECT, np.name, np.status, np.delivery, np.city, np.location, np.sales_channel, np.notes])
+    await q(`insert into portal.project_settings (project_id, sales_status, agent_markets) values ($1, 'draft', '{DE,IL}') on conflict do nothing`, [proj.id])
+    console.log(`заведён проект ${PROJECT} (черновик)`)
+  }
   if (!proj) throw new Error(`нет проекта ${PROJECT}`)
   await q(`insert into sources (id, kind, name, developer_id, notes) values ($1, 'manual', $2, $3, $4) on conflict (id) do nothing`, [SOURCE,
-    'BRABUS Island — сайт партнёра Treva (Profitbase застройщика, проект 56881)', proj.developer_id,
+    CFG.sourceName, proj.developer_id,
     'API treva.realestate /api/v1/unit-layouts: номер, этаж, площади, цена USD, статус, поквартирный план. Скрипт scripts/treva-import.mjs. До получения ключа Profitbase от застройщика.'])
 
   // Корпуса: башня в Profitbase одна, но у застройщика (листы планировок, номера A-…/D-…) это блоки A–D — корпус по подъезду;
   // виллы — по названию дома. Срок сдачи берём наш (в выгрузке 2026 — для всех домов одинаково)
-  const bname = (x) => (x.realEstateType === 'Villa' || !x.entrance ? x.house.title : `Block ${x.entrance}`)
+  const bname = (x) => (KIND === 'marina' ? blockOf(x) : x.realEstateType === 'Villa' || !x.entrance ? x.house.title : `Block ${x.entrance}`)
   const delivery = (await q('select max(delivery) d from buildings where project_id = $1', [proj.id]))[0].d
   const bld = {}
   for (const name of [...new Set(units.map(bname))].sort()) {
     const villa = units.some((x) => bname(x) === name && x.realEstateType === 'Villa')
     const floors = Math.max(...units.filter((x) => bname(x) === name).map((x) => x.floor || 0)) || null
-    const [b] = await q(`insert into buildings (project_id, name, kind, floors_total, delivery, source_id, sort) values ($1,$2,$3,$4,$5,$6,$7)
-      on conflict (project_id, name) do update set source_id = excluded.source_id, kind = excluded.kind, floors_total = coalesce(excluded.floors_total, buildings.floors_total) returning id`,
-      [proj.id, name, villa ? 'villa_cluster' : 'block', villa ? null : floors, delivery, SOURCE, villa ? 9 : 0])
+    // у Marina external_id корпуса = «B1»: портал показывает номер как «B1-102» (unitNo)
+    const ext = KIND === 'marina' ? name : null, sort = KIND === 'marina' ? Number(name.slice(1)) : villa ? 9 : 0
+    const [b] = await q(`insert into buildings (project_id, name, kind, floors_total, delivery, source_id, external_id, sort) values ($1,$2,$3,$4,$5,$6,$7,$8)
+      on conflict (project_id, name) do update set source_id = excluded.source_id, kind = excluded.kind, external_id = coalesce(excluded.external_id, buildings.external_id),
+        floors_total = coalesce(excluded.floors_total, buildings.floors_total) returning id`,
+      [proj.id, name, villa ? 'villa_cluster' : 'block', villa ? null : floors, delivery, SOURCE, ext, sort])
     bld[name] = b.id
   }
 
@@ -90,18 +123,18 @@ try {
   for (const x of units) {
     const type = unitType(x)
     if (!type || !x.unitCode) { st.skipped++; continue }
-    const no = number(x)
+    const no = number(x), code = layCode(x)
     // Поквартирный план — своя планировка на квартиру (в выгрузке у каждой квартиры свой лист)
-    let [lay] = await q('select id, plan_file from layouts where project_id = $1 and code = $2', [proj.id, no])
+    let [lay] = await q('select id, plan_file from layouts where project_id = $1 and code = $2', [proj.id, code])
     if (!lay) [lay] = await q(`insert into layouts (project_id, code, unit_type, name, bedrooms, internal_area_m2, external_area_m2, total_area_m2, source_id, external_id)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id, plan_file`, [proj.id, no, type, x.unitTypeOption?.titleRu || null, x.rooms, x.internalArea, x.balconyArea, x.totalArea, SOURCE, x.externalId])
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id, plan_file`, [proj.id, code, type, x.unitTypeOption?.titleRu || null, x.rooms, x.internalArea, x.balconyArea, x.totalArea, SOURCE, x.externalId])
     const img = x.mainImage?.url || x.gallery?.[0]?.url // mainImage — лист застройщика 1414×2000, gallery — превью 495×700
     if (!lay.plan_file && img && dir && !DRY) {
       const buf = Buffer.from(await (await get(API + img)).arrayBuffer())
       const id = crypto.randomUUID(), ext = path.extname(img) || '.jpg'
       fs.writeFileSync(path.join(dir, id + ext), buf)
       await q(`insert into directus_files (id, storage, filename_disk, filename_download, title, type, filesize) values ($1,'local',$2,$3,$4,$5,$6)`,
-        [id, id + ext, `BRABUS ${no}${ext}`, `BRABUS ${no}`, ext === '.png' ? 'image/png' : 'image/jpeg', buf.length])
+        [id, id + ext, `${CFG.title} ${code}${ext}`, `${CFG.title} ${code}`, ext === '.png' ? 'image/png' : 'image/jpeg', buf.length])
       await q('update layouts set plan_file = $1 where id = $2', [id, lay.id])
       st.plans++
       await sleep(200)
