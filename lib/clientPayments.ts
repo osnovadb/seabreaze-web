@@ -8,5 +8,5 @@ export async function dealSchedules(clientId: string) {
   const ds = await q<DealSnap & { id: string; unit: string }>(`select d.id, portal.unit_no(bl.external_id, un.number) unit, d.final_price::float, b.options_usd::float, d.paid_pct::float, d.created_at, b.snapshot
     from portal.deals d join units un on un.id = d.unit_id join buildings bl on bl.id = un.building_id left join portal.bookings b on b.id = d.booking_id
     where d.client_id = $1 and d.stage <> 'cancelled' order by d.created_at`, [clientId])
-  return ds.map((d) => ({ id: d.id, unit: d.unit, s: scheduleOf(d) })).filter((x) => x.s)
+  return ds.map((d) => ({ id: d.id, unit: d.unit, paid: Number(d.paid_pct || 0), s: scheduleOf(d) }))
 }

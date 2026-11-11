@@ -2751,5 +2751,7 @@
 "Оплачено {p}% из {t}": "Bezahlt {p}% von {t}",
 "следующий платёж {a} до {d}": "nächste Zahlung {a} bis {d}",
 "График": "Zahlungsplan",
-"просрочен": "überfällig"
+"просрочен": "überfällig",
+"Оплачено {p}%": "Bezahlt {p}%",
+"график не задан: бронь без плана оплаты": "kein Zahlungsplan: Reservierung ohne Plan"
 }

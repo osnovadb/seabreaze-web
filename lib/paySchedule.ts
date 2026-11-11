@@ -4,7 +4,7 @@ import { paymentRows, type Plan, type Row } from './plans.ts'
 export type PayRow = Row & { cum: number; paid: boolean; overdue: boolean }
 export type PaySchedule = { rows: PayRow[]; total: number; paidPct: number; next: PayRow | null; overdue: PayRow[]; overdueAmount: number }
 
-export type DealSnap = { final_price: number; options_usd: number | null; paid_pct: number; created_at: string; snapshot: { plan?: { down?: number; months?: number | null } | null; variant?: { downPct?: number; months?: number; start?: string | null } | null } | null }
+export type DealSnap = { final_price: number; options_usd: number | null; paid_pct: number; created_at: string | Date; snapshot: { plan?: { down?: number; months?: number | null } | null; variant?: { downPct?: number; months?: number; start?: string | null } | null } | null }
 
 export function scheduleOf(d: DealSnap, today = new Date().toISOString().slice(0, 10)): PaySchedule | null {
   const v = d.snapshot?.variant, p = d.snapshot?.plan
@@ -13,7 +13,9 @@ export function scheduleOf(d: DealSnap, today = new Date().toISOString().slice(0
   const months = Number(v?.months ?? p?.months ?? 0)
   const plan: Plan = { id: 'deal', project_id: '', building_id: null, name: '', down_payment_pct: Number(down), months: months || null, full_payment_discount_pct: null, valid_from: null, valid_to: null, source_note: null, sort: 0, schedule: null }
   const total = Math.round(Number(d.final_price) + Number(d.options_usd || 0))
-  const start = new Date((v?.start || String(d.created_at).slice(0, 10)) + 'T00:00:00Z')
+  // дата договора из базы приходит объектом Date или строкой ISO
+  const created = new Date(d.created_at as unknown as string).toISOString().slice(0, 10)
+  const start = new Date(((v?.start && /^\d{4}-\d{2}-\d{2}$/.test(v.start) ? v.start : null) || created) + 'T00:00:00Z')
   const base = paymentRows(plan, total, start)
   let acc = 0
   const paidAmt = total * Number(d.paid_pct || 0) / 100

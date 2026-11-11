@@ -122,7 +122,9 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
                 : regs.map((r) => <div key={r.dev + r.project} className="kv"><span>{r.dev} · {r.project}</span><span className="small">{T(REG_ST[r.status]?.[0] || r.status)}</span></div>)}
             </div>}
             {/* 292: платежи клиента по рассрочке — график, следующий платёж, просрочка */}
-            {pays.map((x) => <div key={x.id} className="card">
+            {pays.filter((x) => !x.s).map((x) => <div key={x.id} className="card card--tight small"><b>{T('Платежи клиента · {u}', { u: x.unit })}</b>
+              <div className="muted">{T('Оплачено {p}%', { p: Math.round(x.paid * 10) / 10 })} · {T('график не задан: бронь без плана оплаты')}</div></div>)}
+            {pays.filter((x) => x.s).map((x) => <div key={x.id} className="card">
               <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Платежи клиента · {u}', { u: x.unit })}</div>
                 {x.s!.overdue.length > 0 ? <Pill kind="bad">{T('просрочка {a}', { a: usd(L, x.s!.overdueAmount) })}</Pill> : <Pill kind="ok">{T('по графику')}</Pill>}</div>
               <div className="small muted mt8">{T('Оплачено {p}% из {t}', { p: Math.round(x.s!.paidPct * 10) / 10, t: usd(L, x.s!.total) })}{x.s!.next ? ' · ' + T('следующий платёж {a} до {d}', { a: usd(L, x.s!.next.amount), d: date(L, x.s!.next.due) }) : ''}</div>

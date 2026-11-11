@@ -2751,5 +2751,7 @@
 "Оплачено {p}% из {t}": "Paid {p}% of {t}",
 "следующий платёж {a} до {d}": "next payment {a} by {d}",
 "График": "Schedule",
-"просрочен": "overdue"
+"просрочен": "overdue",
+"Оплачено {p}%": "Paid {p}%",
+"график не задан: бронь без плана оплаты": "no schedule: the booking has no payment plan"
 }
