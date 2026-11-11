@@ -24,7 +24,8 @@ export async function sendRegistrations(f: FormData) {
   await q(`update portal.registrations r set status = 'sent', sent_at = now(),
       answer_due = portal.add_workdays(current_date, coalesce(k.reg_response_days, 3) + coalesce(k.silence_extra_days, 0))
     from portal.registrations x cross join lateral (select * from portal.cur_conditions(x.project_id)) k
-    where x.id = r.id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')`, [ids])
+    where x.id = r.id and r.id = any($1::uuid[]) and r.status in ('to_send','expired')
+      and exists (select 1 from portal.clients cl where cl.id = r.client_id and cl.consent_status = 'given' and cl.anonymized_at is null)`, [ids]) // 313: только после согласия клиента
   await audit(c.real.id, 'registration.send', 'registration', ids[0], { n: ids.length })
   await queueSync((await q<{ client_id: string }>('select client_id from portal.registrations where id = any($1::uuid[])', [ids])).map((r) => r.client_id), 'регистрация отправлена застройщику') // §13 п.7
   revalidatePath('/registrations')

@@ -5,6 +5,8 @@ import { user, register, q, one, close, act, tick } from './h.mjs'
 
 after(close)
 let S, OF, cl
+// 313: застройщику — только после согласия клиента; клиент сам ставит галочку по ссылке
+const consent = async (cid) => { const c = await one('select consent_token from portal.clients where id = $1', [cid]); return act(null, 'answerConsent', { token: c.consent_token, data: 'on' }) }
 test('setup: клиент команды в очереди регистрации', async () => {
   S = await user('seller'); OF = await user('office')
   cl = (await register(S)).result.id
@@ -16,8 +18,15 @@ test('сейлз не может отправить регистрации', asy
   const r = await act(S, 'sendRegistrations', { id: ids })
   assert.ok(r.thrown, 'сейлз отправил регистрации')
 })
+test('без согласия клиента строка застройщику не уходит (313)', async () => {
+  const ids = (await q(`select id from portal.registrations where client_id = $1`, [cl])).map((r) => r.id)
+  assert.notEqual((await one('select consent_status from portal.clients where id = $1', [cl])).consent_status, 'given')
+  await act(OF, 'sendRegistrations', { id: ids })
+  assert.ok((await q(`select status from portal.registrations where client_id = $1`, [cl])).every((r) => r.status === 'to_send'), 'строка без согласия отмечена отправленной')
+})
 test('бэк-офис отправляет пакет → sent, срок ответа по условиям проекта', async () => {
   const ids = (await q(`select id from portal.registrations where client_id = $1`, [cl])).map((r) => r.id)
+  await consent(cl)
   await act(OF, 'sendRegistrations', { id: ids })
   const rows = await q(`select r.status, r.answer_due, k.reg_response_days, k.silence_extra_days from portal.registrations r cross join lateral (select * from portal.cur_conditions(r.project_id)) k where r.client_id = $1`, [cl])
   assert.ok(rows.every((r) => r.status === 'sent' && r.answer_due), JSON.stringify(rows))
@@ -69,6 +78,7 @@ test('выгрузка xlsx (09.11): файл застройщику без па
   // полная квалификация прямо в форме — клиент закрепляется сразу и встаёт в очередь регистраций
   const pc = (await register(H, { fields: { goal: 'invest', budget: '200-300k', timeline: '3m' } })).result?.id
   assert.equal((await one('select attach_status from portal.clients where id = $1', [pc])).attach_status, 'protected', 'полная квалификация в форме не закрепила клиента')
+  await consent(pc)
   const ids = (await q(`select id from portal.registrations where client_id = any($1::uuid[])`, [[cl, pc]])).map((r) => r.id)
   assert.ok(ids.length >= 2, 'нет регистраций для выгрузки')
   const get = async (u, qs) => { const r = await fetch(`${BASE}/api/registrations/export?${qs}`, { headers: { host: 'portal.pdna.pro', cookie: `ge_s=${await cookie(u)}` } }); return { status: r.status, type: r.headers.get('content-type') || '', buf: Buffer.from(await r.arrayBuffer()) } }

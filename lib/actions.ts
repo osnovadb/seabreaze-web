@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { q, one, tx, audit, notify, withKeyLock, personKeys } from './db'
 import { getCtx, requireCtx, signSession, clearSession, setShow, clearShow, Ctx } from './auth'
 import { canBook, canConfirmBooking, canEditConditions, canManageUsers, canRegisterClient, canReviewAgents, isExternal, maxDiscount, discountCeiling, canApproveDiscount, type Role } from './perm'
-import { conditionsFor, split, downGridFor, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
+import { conditionsFor, marketOverflow, split, downGridFor, unitById, unitsByIds, projectVisible, plansFor, unitNo, codeFor, viewMode } from './catalog'
 import { priceChain, isFull } from './plans'
 import { planPool, activeGrid } from './calc'
 import { planCond } from './money'
@@ -461,11 +461,12 @@ export async function createBooking(_: unknown, f: FormData) {
   if (unit.sales_status !== 'sales' && c.user.role !== 'owner') return { error: 'Проект на стоп-продажах — новые брони не принимаются' }
   if (unit.hidden && isExternal(c.user.role)) return { error: 'Квартира уже недоступна' }
   if (isExternal(c.user.role) && !(await projectVisible(unit.project_id, c.user))) return { error: 'Квартира уже недоступна' }
-  const cond = await conditionsFor(unit.project_id, isExternal(c.user.role) ? c.user : null)
+  // 344 (11.11): ставки — по рынку сделки (рынок клиента): ставка застройщика и ставки партнёра и рекомендателя
+  const cMarket = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [clientId]))?.m || 'GLOBAL'
+  const cond = await conditionsFor(unit.project_id, isExternal(c.user.role) ? c.user : null, cMarket)
   if (!cond) return { error: 'Для проекта не заведены условия' }
   const disc = Math.max(0, Number(s(f, 'discount') || 0))
   // 270: на рынке клиента выключены переговоры о цене — скидку и бронь запрашивает руководитель Global (или админ)
-  const cMarket = (await one<{ m: string | null }>('select market m from portal.clients where id = $1', [clientId]))?.m || 'GLOBAL'
   if (!(await priceNegotiation(cMarket)) && c.user.role !== 'owner' && !(c.user.role === 'market_head' && (c.user.market || 'GLOBAL') === 'GLOBAL'))
     return { error: 'На рынке клиента переговоры о цене выключены — бронь и скидку запрашивает руководитель Global' }
   // 10.11 (Денис): партнёру ползунок — до его части пула; больше — только «Попросить больше» (ask=1), без показа нашей части и всего пула
@@ -818,6 +819,15 @@ export async function saveConditions(_: unknown, f: FormData) {
   for (const k of fields) if (Number.isNaN(n(k))) return { error: 'Проверьте числа: ' + k }
   if (n('agent_pool_pct') > n('pool_pct')) return { error: 'Часть пула агента больше всего пула' }
   if (n('agent_fix_pct') > n('fix_pct')) return { error: 'Фикс агента больше нашего фикса' }
+  // 344 (11.11): на каждом рынке сделки партнёр + консультант + рекомендатель — не больше нашего фикса этого рынка
+  {
+    const rbm: Record<string, number> = {}
+    for (const m of ['DE', 'IL', 'GLOBAL']) { const v = Number(s(f, 'rate_' + m).replace(',', '.')); if (s(f, 'rate_' + m) && v > 0) rbm[m] = v }
+    const num0 = (k: string, d: number) => (s(f, k) === '' || Number.isNaN(n(k)) ? d : n(k))
+    const over = marketOverflow({ fix_pct: n('fix_pct'), agent_fix_pct: n('agent_fix_pct'), consultant_pct: num0('consultant_pct', 1), referrer_pct: num0('referrer_pct', 2), rates_by_market: rbm },
+      await q<{ market: string | null; agent_fix_pct: number; referrer_pct: number | null }>(`select market, agent_fix_pct::float, referrer_pct::float from portal.agent_rates where project_id = $1 and market is not null and agent_id is null and agency_id is null`, [pid]))
+    if (over.length) return { error: 'Доли больше нашего фикса: ' + over.map((o) => `${o.market} — партнёр + консультант + рекомендатель ${o.total}% при фиксе ${o.fix}%`).join('; ') + '. Задайте ставки рынка в исключениях' }
+  }
   if (n('booking_fee') < 0) return { error: 'Взнос за бронь не может быть отрицательным' }
   const feeCur = ['USD', 'AZN', 'EUR'].includes(s(f, 'booking_fee_currency')) ? s(f, 'booking_fee_currency') : 'USD'
   const draft = await one<{ id: string }>(`select id from portal.conditions where project_id = $1 and status = 'draft' order by version desc limit 1`, [pid])
@@ -1028,20 +1038,30 @@ export async function createFromApplication(_: unknown, f: FormData) {
 }
 
 /* ── Исключения по ставкам агентов и агентств ── */
-export async function saveAgentRate(f: FormData) {
+// Удаление — простой формой; добавление — с ответом (ошибка проверки долей видна на месте)
+export async function saveAgentRate(f: FormData) { await saveAgentRateState(null, f) }
+export async function saveAgentRateState(_: unknown, f: FormData): Promise<{ ok?: boolean; error?: string } | undefined> {
   const c = await writeCtx()
-  if (!canEditConditions(c.user.role)) return
+  if (!canEditConditions(c.user.role)) return { error: 'Нет прав' }
   if (s(f, 'delete')) {
     await q('delete from portal.agent_rates where id = $1', [s(f, 'delete')])
   } else {
     const [kind, id] = s(f, 'who').split(':')
-    const fix = Number(s(f, 'fix')), pool = Number(s(f, 'pool'))
-    if (!id || Number.isNaN(fix) || Number.isNaN(pool)) return
-    await q(`insert into portal.agent_rates (project_id, agent_id, agency_id, market, agent_fix_pct, agent_pool_pct, note) values ($1,$2,$3,$4,$5,$6,$7)`,
-      [s(f, 'project'), kind === 'user' ? id : null, kind === 'agency' ? id : null, kind === 'market' ? id : null, fix, pool, s(f, 'note') || null])
+    const fix = Number(s(f, 'fix').replace(',', '.')), pool = Number(s(f, 'pool').replace(',', '.')), ref = s(f, 'ref') ? Number(s(f, 'ref').replace(',', '.')) : null
+    if (!id || Number.isNaN(fix) || Number.isNaN(pool) || (ref != null && Number.isNaN(ref))) return { error: 'Проверьте числа' }
+    // 344 (11.11): ставка рынка — партнёр + консультант + рекомендатель не больше нашего фикса на этом рынке
+    if (kind === 'market') {
+      const k = await one<{ fix_pct: number; agent_fix_pct: number; consultant_pct: number | null; referrer_pct: number | null; rates_by_market: Record<string, number> | null }>(
+        'select fix_pct::float, agent_fix_pct::float, consultant_pct::float, referrer_pct::float, rates_by_market from portal.cur_conditions($1)', [s(f, 'project')])
+      const over = k ? marketOverflow(k, [{ market: id, agent_fix_pct: fix, referrer_pct: ref }]).filter((o) => o.market === id) : []
+      if (over.length) return { error: `${id}: партнёр + консультант + рекомендатель ${over[0].total}% больше нашего фикса ${over[0].fix}%` }
+    }
+    await q(`insert into portal.agent_rates (project_id, agent_id, agency_id, market, agent_fix_pct, agent_pool_pct, referrer_pct, note) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [s(f, 'project'), kind === 'user' ? id : null, kind === 'agency' ? id : null, kind === 'market' ? id : null, fix, pool, ref, s(f, 'note') || null])
   }
   await audit(c.real.id, 'conditions.rate', 'project', s(f, 'project'), { who: s(f, 'who'), del: s(f, 'delete') || undefined }, c.impersonating ? c.user.id : null)
   revalidatePath('/admin/conditions')
+  return { ok: true }
 }
 
 /* ── Контакты клиента: правка с проверкой дубля ── */

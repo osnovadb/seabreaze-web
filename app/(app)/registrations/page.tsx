@@ -8,6 +8,7 @@ import { Top, Pill } from '@/components/ui'
 import { decideRegistration, renewRegistration, massEnqueue } from '@/lib/regActions'
 import { loadRegistrations, groupOf, type RegParams } from '@/lib/regFilter'
 import { RegBulk, CheckAll } from './bulk'
+import { sendConsentLink } from '@/lib/consentActions'
 
 // 2.2 · Регистрации у застройщиков (§7, экран Бэк-офис 01): пакет на сегодня, ждём ответа, молчание, истекают, все.
 // 09.11 (Денис): фильтры (застройщик, проект, рынок, источник, согласие, период, поиск) и выгрузка в xlsx — файлом сразу застройщику
@@ -69,8 +70,11 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
                 const term = r.status === 'to_send' ? (r.due_send ? T('передать до {d}', { d: date(L, r.due_send) }) : '') : r.status === 'sent' ? T('ответ до {d}', { d: date(L, r.answer_due!) }) + (r.answer_due! < today ? ' · ' + T(r.silence_rule === 'confirm' ? 'молчание = да' : 'напомнить') : '') : r.valid_until ? T('до {d}', { d: date(L, r.valid_until) }) : ''
                 return (
                   <tr key={r.id}>
-                    <td><input type="checkbox" name="rid" value={r.id} defaultChecked={f === 'today'} aria-label={r.client} /></td>
-                    <td><Link href={`/clients/${r.client_id}`}>{r.client}</Link><div className="tiny muted">{r.reg_no}{r.country ? ' · ' + r.country : ''}{r.consent_status !== 'given' ? ' · ' : ''}{r.consent_status !== 'given' && <span className="warnc">{T('нет согласия')}</span>}</div>
+                    {/* 313 (Денис 11.11): застройщику — только после согласия клиента; без согласия строку не отметить; по умолчанию не отмечены */}
+                    <td><input type="checkbox" name="rid" value={r.id} disabled={r.consent_status !== 'given'} aria-label={r.client} title={r.consent_status !== 'given' ? T('Нет согласия клиента — отправьте ссылку согласия') : undefined} /></td>
+                    <td><Link href={`/clients/${r.client_id}`}>{r.client}</Link><div className="tiny muted">{r.reg_no}{r.country ? ' · ' + r.country : ''}</div>
+                      {r.consent_status !== 'given' && <div className="tiny warnc row" style={{ gap: 6, alignItems: 'center' }}>{T('нет согласия — отправьте ссылку согласия')}
+                        {edit && !r.anonymized && <form action={sendConsentLink}><input type="hidden" name="client" value={r.client_id} /><button className="btn btn--sm">{T('Отправить ссылку')}</button></form>}</div>}
                       {r.priority && <div className="tiny bronze">{T('вне очереди — выбрал квартиру')}</div>}{r.mass && <div className="tiny muted">{T('массовая регистрация')}</div>}</td>
                     <td>{r.developer} · {r.project}</td>
                     <td className="small muted">{r.owner_type === 'partner' ? r.owner + (r.agency ? ' · ' + r.agency : '') : r.owner_type === 'referrer' ? T('рекомендатель') + ' · ' + r.owner : T('команда')}{r.market ? ' · ' + r.market : ''}</td>

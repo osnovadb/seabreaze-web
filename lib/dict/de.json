@@ -2647,5 +2647,18 @@
 "Вам выделено {p} от прайса по этому плану: сколько отдать клиенту, а сколько оставить себе — решаете вы": "Ihnen stehen {p} vom Listenpreis für diesen Plan zu: Sie entscheiden, wie viel der Kunde bekommt und wie viel Sie behalten",
 "Максимум по плану {m}; сами — до {p}, больше — с согласованием руководителя": "Planmaximum {m}; selbst — bis {p}, mehr — mit Genehmigung",
 "Полная оплата — максимальная скидка по плану {p}": "Vollzahlung — maximaler Rabatt nach Plan {p}",
-"Скидка за 100 % — максимальная скидка клиенту при полной оплате (пул плана по договору), цену автоматически не снижает.": "Rabatt bei 100 % — maximaler Kundenrabatt bei Vollzahlung (Planpool laut Vertrag); senkt den Preis nicht automatisch."
+"Скидка за 100 % — максимальная скидка клиенту при полной оплате (пул плана по договору), цену автоматически не снижает.": "Rabatt bei 100 % — maximaler Kundenrabatt bei Vollzahlung (Planpool laut Vertrag); senkt den Preis nicht automatisch.",
+"Фикс партнёра, % от цены": "Partner-Fixum, % vom Preis",
+"Часть пула партнёра, % от прайса": "Poolanteil des Partners, % vom Listenpreis",
+"рекоменд., %": "Empfehler, %",
+"Рекомендатель на этом рынке, % от цены (пусто — как в условиях)": "Empfehler auf diesem Markt, % vom Preis (leer — wie in den Konditionen)",
+"рекоменд.": "Empfehler",
+"Доли больше нашего фикса": "Anteile übersteigen unser Fixum",
+"{m} — партнёр + консультант + рекомендатель {t} при фиксе {f}": "{m} — Partner + Berater + Empfehler {t} bei Fixum {f}",
+"Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.": "Legen Sie einen Marktsatz in den Ausnahmen fest — sonst kann keine neue Konditionsversion gespeichert werden.",
+"Проверьте числа": "Prüfen Sie die Zahlen",
+"Нет согласия клиента — отправьте ссылку согласия": "Keine Einwilligung des Kunden — Einwilligungslink senden",
+"нет согласия — отправьте ссылку согласия": "keine Einwilligung — Einwilligungslink senden",
+"Отправить ссылку": "Link senden",
+"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Markierte Zeilen oder, wenn keine, die ganze gefilterte Liste (Zeilen ohne Einwilligung kommen nicht in die Datei für den Bauträger):"
 }

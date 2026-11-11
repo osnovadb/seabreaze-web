@@ -123,6 +123,7 @@ export type Conditions = {
   id: string; project_id: string; version: number; status: string; valid_from: string; fix_pct: number; pool_pct: number
   agent_fix_pct: number; agent_pool_pct: number; agent_our_pool_share: number; seller_share_pct: number; seller_self_disc: number; seller_max_disc: number
   fix_base?: 'list' | 'final' // 11.11: фикс от прайса (Арад) или от цены клиента (Premium)
+  rate_market?: string | null // рынок сделки, чья ставка застройщика взята (null — общий фикс)
   booking_days: number; booking_ext_days: number; protect_months: number; max_bookings_client: number; max_bookings_agent: number; max_bookings_total: number
   pay_timing: string; payment_plans: { name: string; note: string }[]; note: string | null; created_at: string; booking_fee: number; booking_fee_currency: string
   // 2.2 · условия договора на проект
@@ -137,13 +138,32 @@ const COND = `id, project_id, version, status, valid_from::text valid_from, fix_
   reg_method, reg_response_days, silence_rule, silence_extra_days, reg_protect_months, reg_protect_months_sub, renew_remind_days, booking_write_api, rates_by_market, vat_mode,
   options_in_base, fx_rule, clawback_months, clawback_offset, payment_wait_days, sells_to_az,
   head_bonus_pct::float, escort_fix_usd::float, referrer_pct::float, consultant_pct::float, vat_rate::float, consultant_name`
-export async function conditionsFor(projectId: string, agent?: User | null): Promise<Conditions | undefined> {
+// market — рынок сделки (рынок клиента; без клиента — рынок пользователя). 344/314 (11.11): ставка застройщика — по рынку сделки
+// (rates_by_market, иначе общий фикс); ставка партнёра и рекомендателя — исключение на партнёра, агентство или рынок (agent_rates)
+export async function conditionsFor(projectId: string, agent?: User | null, market?: string | null): Promise<Conditions | undefined> {
   const c = await one<Conditions>(`select ${COND} from portal.conditions where project_id = $1 and status = 'published' and valid_from <= current_date order by valid_from desc, version desc limit 1`, [projectId])
-  if (!c || !agent) return c
-  const r = await one<{ agent_fix_pct: number; agent_pool_pct: number }>(`select agent_fix_pct::float, agent_pool_pct::float from portal.agent_rates
-    where project_id = $1 and (agent_id = $2 or (agency_id is not null and agency_id = $3) or (market is not null and market = $4)) order by (agent_id is not null) desc, (agency_id is not null) desc limit 1`,
-    [projectId, agent.id, agent.agency_id, agent.market])
-  return r ? { ...c, ...r } : c
+  if (!c) return c
+  const mk = market === undefined ? agent?.market || null : market
+  const rate = mk && c.rates_by_market ? Number(c.rates_by_market[mk]) : NaN
+  const own = Number.isFinite(rate) && rate > 0
+  const r = await one<{ agent_fix_pct: number; agent_pool_pct: number; referrer_pct: number | null }>(`select agent_fix_pct::float, agent_pool_pct::float, referrer_pct::float from portal.agent_rates
+    where project_id = $1 and ((agent_id is not null and agent_id = $2) or (agency_id is not null and agency_id = $3) or (market is not null and market = $4)) order by (agent_id is not null) desc, (agency_id is not null) desc limit 1`,
+    [projectId, agent?.id || null, agent?.agency_id || null, mk])
+  return { ...c, ...(r ? { agent_fix_pct: r.agent_fix_pct, agent_pool_pct: r.agent_pool_pct, ...(r.referrer_pct != null ? { referrer_pct: r.referrer_pct } : {}) } : {}),
+    fix_pct: own ? rate : c.fix_pct, rate_market: own ? mk : null }
+}
+
+// 344 (11.11): партнёр + консультант + рекомендатель не больше нашего фикса на каждом рынке сделки — иначе условия не сохраняются
+export function marketOverflow(c: { fix_pct: number; agent_fix_pct: number; consultant_pct?: number | null; referrer_pct?: number | null; rates_by_market?: Record<string, number> | null },
+  rates: { market: string | null; agent_fix_pct: number; referrer_pct: number | null }[]) {
+  const out: { market: string; fix: number; total: number }[] = []
+  for (const m of ['DE', 'IL', 'GLOBAL']) {
+    const rm = Number(c.rates_by_market?.[m]), fix = Number.isFinite(rm) && rm > 0 ? rm : Number(c.fix_pct)
+    const row = rates.find((x) => x.market === m)
+    const total = Number(row?.agent_fix_pct ?? c.agent_fix_pct) + Number(c.consultant_pct ?? 1) + Number(row?.referrer_pct ?? c.referrer_pct ?? 2)
+    if (total > fix + 1e-9) out.push({ market: m, fix, total: Math.round(total * 100) / 100 })
+  }
+  return out
 }
 export const conditionVersions = (projectId: string) => q<Conditions>(`select ${COND} from portal.conditions where project_id = $1 order by version desc`, [projectId])
 

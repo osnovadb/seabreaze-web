@@ -2647,5 +2647,18 @@
 "Вам выделено {p} от прайса по этому плану: сколько отдать клиенту, а сколько оставить себе — решаете вы": "You have {p} of the list price for this plan: you decide how much to give the client and how much to keep",
 "Максимум по плану {m}; сами — до {p}, больше — с согласованием руководителя": "Plan maximum {m}; on your own — up to {p}, more — with manager approval",
 "Полная оплата — максимальная скидка по плану {p}": "Full payment — maximum discount by plan {p}",
-"Скидка за 100 % — максимальная скидка клиенту при полной оплате (пул плана по договору), цену автоматически не снижает.": "Full-payment discount — the maximum client discount for full payment (plan pool per contract); it does not reduce the price automatically."
+"Скидка за 100 % — максимальная скидка клиенту при полной оплате (пул плана по договору), цену автоматически не снижает.": "Full-payment discount — the maximum client discount for full payment (plan pool per contract); it does not reduce the price automatically.",
+"Фикс партнёра, % от цены": "Partner fixed fee, % of price",
+"Часть пула партнёра, % от прайса": "Partner share of the pool, % of list price",
+"рекоменд., %": "referrer, %",
+"Рекомендатель на этом рынке, % от цены (пусто — как в условиях)": "Referrer on this market, % of price (empty — as in terms)",
+"рекоменд.": "referrer",
+"Доли больше нашего фикса": "Shares exceed our fixed fee",
+"{m} — партнёр + консультант + рекомендатель {t} при фиксе {f}": "{m} — partner + consultant + referrer {t} with fixed fee {f}",
+"Задайте ставку рынка в исключениях — иначе новую версию условий сохранить нельзя.": "Set a market rate in the exceptions — otherwise a new terms version cannot be saved.",
+"Проверьте числа": "Check the numbers",
+"Нет согласия клиента — отправьте ссылку согласия": "No client consent — send the consent link",
+"нет согласия — отправьте ссылку согласия": "no consent — send the consent link",
+"Отправить ссылку": "Send link",
+"Отмеченные галочкой, а если ничего не отмечено — весь список по фильтру (строки без согласия клиента в файл застройщику не попадают):": "Checked rows, or if none — the whole filtered list (rows without client consent are not included in the developer file):"
 }
