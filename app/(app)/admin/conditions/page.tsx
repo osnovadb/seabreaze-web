@@ -53,7 +53,10 @@ export default async function Conditions(props: { searchParams: Promise<{ p?: st
             {vers.map((v) => <div key={v.id} className="kv"><span style={{ color: 'var(--ink)' }}>v{v.version} · {T('с {d}', { d: date(L, v.valid_from) })}<div className="tiny muted">{T('фикс {f} · пул {p} · агенту {a}+{b}', { f: pct(L, v.fix_pct), p: pct(L, v.pool_pct), a: pct(L, v.agent_fix_pct), b: pct(L, v.agent_pool_pct) })}</div></span><Pill kind={v.status === 'published' ? 'ok' : 'warn'}>{T(v.status === 'published' ? 'действует' : 'черновик')}</Pill></div>)}
             <div className="label mt16">{T('Исключения для агентов')}</div>
             {rates.length === 0 && <div className="small muted">—</div>}
-            {rates.map((r) => <div key={r.id} className="kv"><span style={{ color: 'var(--ink)' }}>{r.who}<div className="tiny muted">{r.note}</div></span><span className="small row" style={{ gap: 6 }}>{pct(L, r.agent_fix_pct)} + {pct(L, r.agent_pool_pct)}{r.referrer_pct != null ? ` · ${T('рекоменд.')} ${pct(L, r.referrer_pct)}` : ''}{edit && <form action={saveAgentRate}><input type="hidden" name="project" value={p.id} /><input type="hidden" name="delete" value={r.id} /><button className="btn btn--sm" title={T('Удалить')}>×</button></form>}</span></div>)}
+            {rates.map((r) => <div key={r.id} className="stack" style={{ gap: 2, paddingBottom: 8, borderBottom: '1px solid var(--line-2)' }}>
+              <div className="between" style={{ gap: 6 }}><b className="small">{r.who}</b>{edit && <form action={saveAgentRate}><input type="hidden" name="project" value={p.id} /><input type="hidden" name="delete" value={r.id} /><button className="btn btn--sm" title={T('Удалить')}>×</button></form>}</div>
+              <div className="small">{T('партнёру')} {pct(L, r.agent_fix_pct)} + {pct(L, r.agent_pool_pct)}{r.referrer_pct != null ? ` · ${T('рекоменд.')} ${pct(L, r.referrer_pct)}` : ''}</div>
+              {r.note && <div className="tiny muted">{r.note}</div>}</div>)}
             {edit && (
               <ActionForm action={saveAgentRateState} lang={L} reset className="stack mt8" style={{ gap: 6 }}>
                 <input type="hidden" name="project" value={p.id} />

@@ -53,7 +53,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (canManageUsers(u.role) || u.role === 'market_head' || u.role === 'finance') items.push({ href: '/admin', label: T('Админка') })
   else if (canSeeJournal(u.role)) items.push({ href: '/admin/journal', label: T('Журнал') })
   if (u.role === 'referrer') items.splice(0, items.length, { href: '/refer', label: T('Рекомендации') }, { href: '/notifications', label: T('Уведомления'), cnt: cnt!.notif })
-  const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>('select id, name, role from portal.users where active order by role, name') : []
+  // В5: в «Войти как» — без пользователей автотестов (их десятки «QA Head»), кроме того, под кем сейчас
+  const users = c.real.role === 'owner' ? await q<{ id: string; name: string; role: string }>(`select id, name, role from portal.users where active and (email not like 'qa-%@qa.test' or id = $1) order by role, name`, [u.id]) : []
   const initials = u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase()
   // 2.2: внутри Bitrix24 (фрейм приложения) — без нашего левого меню: навигация — меню GetsEstate в Bitrix24
   if ((await cookies()).get('ge_embed')?.value === '1') {
@@ -97,7 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <select key={`user:${String(u.id)}`} name="user" className="in" defaultValue={u.id} style={{ height: 32, background: 'var(--deep-2)', color: '#fff', borderColor: '#1F5D5B', fontSize: 12.5 }}>
                 {users.map((x) => <option key={x.id} value={x.id}>{x.name} · {T(ROLE_NAMES[x.role as keyof typeof ROLE_NAMES])}</option>)}
               </select>
-              <button className="btn btn--sm">{T('Переключить')}</button>
+              <button className="btn btn--sm btn--p">{T('Переключить')}</button>
             </form>
           )}
           <Link href="/profile" className="me" title={T('Профиль')}><span className="ava">{initials}</span><span style={{ flex: 1 }}>{u.name}</span><span className="tiny" style={{ color: 'var(--mist-2)' }}>{T('Профиль')}</span></Link>

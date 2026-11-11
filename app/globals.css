@@ -37,6 +37,8 @@ h1, h2, h3 { margin: 0; font-weight: 500; }
 .nav a.on { background: #1F5D5B; color: #fff; font-weight: 600; }
 .nav .cnt { background: var(--gold); color: var(--deep); border-radius: 10px; font-size: 11px; font-weight: 600; padding: 1px 7px; }
 .side__foot { margin-top: auto; padding: 12px; border-top: 1px solid #1F5D5B; display: flex; flex-direction: column; gap: 10px; }
+/* В5 (ревью 10.11): у владельца 20 пунктов — меню прокручивается само, низ (язык, «Войти как», профиль) закреплён */
+@media (min-width: 1101px) { .side { overflow: hidden; } .side > .nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1F5D5B transparent; } }
 .langs { display: flex; gap: 8px; font-size: 12.5px; }
 .langs button { color: var(--mist-2); font-weight: 500; min-height: 32px; padding: 0 6px; } /* В2: на телефоне переключатель был 18 px */
 .langs button.on { color: #fff; font-weight: 700; }

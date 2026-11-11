@@ -2693,5 +2693,10 @@
 "пт": "Fr",
 "сб": "Sa",
 "вс": "So",
-"Скопировать ссылку": "Link kopieren"
+"Скопировать ссылку": "Link kopieren",
+"партнёру": "Partner",
+"фикс {f} · пул {p}": "Fixum {f} · Pool {p}",
+"Люди": "Personen",
+"Объекты и условия": "Objekte und Konditionen",
+"Интеграции": "Integrationen"
 }

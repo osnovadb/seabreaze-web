@@ -20,7 +20,9 @@ export default async function Users() {
       <Top title={T('Админка')} sub={T('Пользователи команды и партнёров')} />
       <div className="page">
         <AdminTabs lang={L} on="users" role={c.user.role} />
-        <div className="split">
+        {/* М13: форма — по кнопке, таблица во всю ширину */}
+        <details className="mt8" style={{ marginBottom: 16 }}><summary className="btn btn--p" style={{ display: 'inline-flex' }}>{T('Новый пользователь')}</summary><div className="mt8" style={{ maxWidth: 520 }}><NewUser lang={L} agencies={agencies} /></div></details>
+        <div>
           <div className="tbl-wrap"><table className="tbl">
             <thead><tr>{['Пользователь', 'Роль', 'Рынок', 'Агентство / куратор', 'Язык', 'Вход', ''].map((h) => <th key={h}>{T(h)}</th>)}</tr></thead>
             <tbody>{rows.map((u) => (
@@ -32,7 +34,6 @@ export default async function Users() {
               </tr>
             ))}</tbody>
           </table></div>
-          <NewUser lang={L} agencies={agencies} />
         </div>
       </div>
     </>

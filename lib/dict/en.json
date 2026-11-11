@@ -2693,5 +2693,10 @@
 "пт": "Fri",
 "сб": "Sat",
 "вс": "Sun",
-"Скопировать ссылку": "Copy link"
+"Скопировать ссылку": "Copy link",
+"партнёру": "partner",
+"фикс {f} · пул {p}": "fixed {f} · pool {p}",
+"Люди": "People",
+"Объекты и условия": "Properties and terms",
+"Интеграции": "Integrations"
 }
