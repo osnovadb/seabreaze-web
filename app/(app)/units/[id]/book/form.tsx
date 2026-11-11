@@ -6,7 +6,7 @@ import { split, planCond, type SplitCond } from '@/lib/money'
 import { planPool, type DownStep } from '@/lib/calc'
 import { priceChain, isFull, termUnknown, hasSchedule, planLabel, type Plan, type PromoView, type PromoMode } from '@/lib/plans'
 import { ScheduleTable, type FxView } from '@/components/Calculator'
-import { t, usd, pct, num, type Lang } from '@/lib/i18n'
+import { t, usd, pct, num, date, type Lang } from '@/lib/i18n'
 import type { Opt } from '@/lib/options'
 
 function Submit({ label, pending }: { label: string; pending: boolean }) {
@@ -53,7 +53,7 @@ export function BookForm({ lang, unitId, list: priceList, ext, cap, ceiling, con
   const optSum = options.filter((o) => picked.includes(o.id)).reduce((a, o) => a + o.usd, 0)
   return (
     <form method="post" onSubmit={submit} className="stack">
-      {variant && <div className="note">{T('Бронь по варианту «{n}»: взнос {p}', { n: variant.name, p: pct(lang, variant.downPct) })}{variant.months ? ' · ' + T('{m} мес.', { m: variant.months }) : ''}{variant.disc > 0 ? ' · ' + T('скидка {p}', { p: pct(lang, variant.disc) }) : ''}{variant.start ? ' · ' + T('первый взнос {d}', { d: variant.start.split('-').reverse().join('.') }) : ''}
+      {variant && <div className="note">{T('Бронь по варианту «{n}»: взнос {p}', { n: variant.name, p: pct(lang, variant.downPct) })}{variant.months ? ' · ' + T('{m} мес.', { m: variant.months }) : ''}{variant.disc > 0 ? ' · ' + T('скидка {p}', { p: pct(lang, variant.disc) }) : ''}{variant.start ? ' · ' + T('первый взнос {d}', { d: date(lang, variant.start) }) : ''}
         <input type="hidden" name="variant" value={variant.id} /></div>}
       <div className="card">
         {plans.length > 0 && (

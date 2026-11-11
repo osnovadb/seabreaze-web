@@ -55,15 +55,20 @@ function dump(lang: Lang, ru: string) {
 }
 
 const LOCALE: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', de: 'de-DE', he: 'he-IL', az: 'az-AZ' }
-export const num = (lang: Lang, n: number, d = 0) => new Intl.NumberFormat(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).format(n)
+// Ревью 11.11 (az): в Chrome нет данных ICU для az-AZ — браузер давал «220,400» и «2031-11-11», сервер — «220.400» и «11.11.2031».
+// Формат az-AZ задаём явно: числа как de-DE (точка — тысячи, запятая — дробь), даты как ru-RU (дд.мм.гггг)
+const NUM_LOC: Record<Lang, string> = { ...LOCALE, az: 'de-DE' }
+const DATE_LOC: Record<Lang, string> = { ...LOCALE, az: 'ru-RU' }
+const AZ_MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avqust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr']
+export const num = (lang: Lang, n: number, d = 0) => new Intl.NumberFormat(NUM_LOC[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).format(n)
 export const usd = (lang: Lang, n: number) => (n < 0 ? '−$' : '$') + num(lang, Math.round(Math.abs(n)))
 export const pct = (lang: Lang, n: number) => num(lang, n, Number(n) % 1 ? 1 : 0) + '%'
 export const m2u = (lang: Lang) => (lang === 'ru' ? 'м²' : lang === 'he' ? 'מ״ר' : 'm²') // М6: в английском была кириллическая «м²»
 export const m2 = (lang: Lang, a: number) => num(lang, Number(a), 2) + ' ' + m2u(lang)
 // М6: в английском «07/05/2027» непонятно — май или июль; пишем «7 May 2027»
-export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
+export const date = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], lang === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(d)) : '—')
 // О75 (обход 11.11): по-английски «04/11» читалось как 11 апреля — месяц словом, как в date()
-export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(LOCALE[lang], lang === 'en' ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
+export const dateTime = (lang: Lang, d: string | Date | null) => (d ? new Intl.DateTimeFormat(DATE_LOC[lang], lang === 'en' ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : '—')
 // Переменные шаблонов из базы: даты в ISO показываем в формате языка
 export const fmtVars = (lang: Lang, v: Record<string, string | number> | null | undefined) =>
   v ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fmtOne(lang, x)])) : undefined
@@ -77,6 +82,6 @@ const fmtOne = (lang: Lang, x: string | number) => {
 
 // «Сегодня» по Баку (YYYY-MM-DD): портал работает по времени офиса, сервер — в UTC
 // «ноябрь 2026» из «2026-11»
-export const monthName = (lang: Lang, ym: string) => new Intl.DateTimeFormat(LOCALE[lang], { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ym + '-01T00:00:00Z'))
+export const monthName = (lang: Lang, ym: string) => lang === 'az' ? `${AZ_MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}` : new Intl.DateTimeFormat(LOCALE[lang], { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ym + '-01T00:00:00Z'))
 export const bakuToday = (d: Date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku' }).format(d)
 export const bakuYear = () => Number(bakuToday().slice(0, 4))
