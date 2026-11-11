@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { genplanOf, viewIndex } from '@/lib/genplan'
+import { plural } from '@/lib/i18n'
 import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
@@ -60,7 +61,7 @@ export default async function ProjectPage(
         right={<>{site && <a className="btn" href={site} target="_blank" rel="noopener">{T('На сайте')} ↗</a>}<Link className="btn btn--p" href={`/projects/${p.slug}/chess`}>{T('Шахматка')}</Link></>} />
       <div className="page">
         <div className="grid g4" style={{ marginBottom: 16 }}>
-          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveryLabel || T('уточняется'), T('срок сдачи')], [String(p.buildings), T('корпусов')]].map(([a, b]) => (
+          {[[String(p.free), T('свободно из {n}', { n: p.units })], [p.min_usd ? usd(L, p.min_usd) : '—', T('цена от, по прайсу застройщика')], [deliveryLabel || T('уточняется'), T('срок сдачи')], [String(p.buildings), plural(L, p.buildings, 'корпусов')]].map(([a, b]) => (
             <div key={b} className="card card--tight kpi"><div className="v" style={{ fontSize: 22 }}>{a}</div><div className="small muted">{b}</div></div>
           ))}
         </div>

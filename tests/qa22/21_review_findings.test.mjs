@@ -52,3 +52,22 @@ test('292: карточка клиента со сделкой по плану �
   assert.ok(p.html.includes('Платежи клиента'), 'нет блока платежей клиента')
   await q(`update portal.deals set stage = 'cancelled' where client_id = $1`, [cl])
 })
+
+// Денис 11.11: ракурсы генплана — переключатель над картинкой (страница проекта и показ), ?v= выбирает вид; О85 — «N корпус/корпуса/корпусов»
+test('генплан: второй ракурс по ?v=1, переключатель на странице проекта; склонение «корпусов»', async () => {
+  const S = await user('seller')
+  const pr = await one(`select p.id from projects p where p.slug = 'test-marina'`)
+  const g = await one('select image, views from portal.genplans where project_id = $1', [pr.id])
+  assert.ok(g, 'у тестового проекта нет генплана')
+  try {
+    await q(`update portal.genplans set title = 'QA основной', views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify([{ title: 'QA второй ракурс', image: '/brand/favicon.svg', polygons: [] }])])
+    const v0 = await get(S, '/projects/test-marina')
+    assert.ok(v0.html.includes('?v=1') && v0.html.includes('QA второй ракурс'), 'нет переключателя ракурсов')
+    assert.ok(v0.html.includes(g.image), 'по умолчанию не основной вид')
+    const v1 = await get(S, '/projects/test-marina?v=1')
+    assert.ok(v1.html.includes('/brand/favicon.svg'), 'по ?v=1 не второй ракурс')
+    assert.ok(/[0-9]<\/div><div class="small muted">корпус(а|ов)?</.test(v0.html), 'плитка корпусов без числа или слова')
+  } finally {
+    await q(`update portal.genplans set title = null, views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify(g.views || [])])
+  }
+})
