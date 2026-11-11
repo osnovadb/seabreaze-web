@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { genplanOf, viewIndex } from '@/lib/genplan'
-import { preload } from 'react-dom'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
@@ -25,7 +24,6 @@ export default async function ShowProject(
   const g0 = await genplanOf(p.id)
   const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
   const gp = g0 ? g0.views[vi] : null // Денис 11.11: ракурсы генплана
-  g0?.views.forEach((v, i) => { if (i !== vi) preload(v.image, { as: 'image' }) }) // О89
   const byExt = Object.fromEntries(bs.map((x) => [x.external_id || x.name, x]))
   const units = b ? await unitsOfBuilding(b.id) : []
   const rooms = Number(searchParams.r) || undefined
@@ -44,6 +42,7 @@ export default async function ShowProject(
       {!b && gp && (
         <div className="gp mt16">
           <img src={gp.image} alt="" />
+          {g0!.views.map((v, i) => i !== vi && <img key={i} src={v.image} alt="" aria-hidden="true" className="gp__pre" />)}
           <svg viewBox="0 0 1 1" preserveAspectRatio="none">{gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}</svg>
           {gp.polygons.map((g) => byExt[g.block] && <div key={g.block} className="tag" style={{ left: `${g.label[0] * 100}%`, top: `${g.label[1] * 100}%` }}><b>{byExt[g.block].name}</b><span className="tag__s">{T('{n} доступно', { n: byExt[g.block].free })}{byExt[g.block].min_usd ? ' · ' + T('от {p}', { p: usd(L, byExt[g.block].min_usd!) }) : ''}</span>{/* обход 11.11: на картинке только название, цифры — в чипах над ней (как О58 на странице проекта) */}</div>)}
         </div>

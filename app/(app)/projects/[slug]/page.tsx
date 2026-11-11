@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { genplanOf, viewIndex } from '@/lib/genplan'
-import { preload } from 'react-dom'
 import { plural } from '@/lib/i18n'
 import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
@@ -82,7 +81,6 @@ export default async function ProjectPage(
     // Денис 11.11: ракурсы генплана — переключатель над картинкой; окружение (метки) — только на основном виде
     const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
     const gp = g0 ? { ...g0.views[vi], note: g0.note, marks: vi === 0 ? g0.marks : [] } : null
-    g0?.views.forEach((v, i) => { if (i !== vi) preload(v.image, { as: 'image' }) }) // О89: картинки других ракурсов — заранее, чтобы контуры не ложились на старую
     const byExt = Object.fromEntries(bs.map((b) => [b.external_id || b.name, b]))
     return (
       <div className="split">
@@ -93,6 +91,7 @@ export default async function ProjectPage(
             <div className="gp">
               {cleanMarks(gp.marks).map((m, i) => <span key={i} className="smark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}><i>{markIcon(m.kind)}</i><b>{markText(L, m)}</b></span>)}
               <img src={gp.image} alt="" />
+              {g0!.views.map((v, i) => i !== vi && <img key={i} src={v.image} alt="" aria-hidden="true" className="gp__pre" />)}{/* О89: другие ракурсы — заранее в кеш */}
               <svg viewBox="0 0 1 1" preserveAspectRatio="none">
                 {gp.polygons.map((g) => byExt[g.block] && <a key={g.block} href={`/projects/${p!.slug}/chess?b=${byExt[g.block].id}`}><polygon points={g.points.map((x) => x.join(',')).join(' ')} /></a>)}
               </svg>
