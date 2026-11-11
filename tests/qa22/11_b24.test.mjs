@@ -72,8 +72,12 @@ test('бронь → Reservation request → Reserved → KYC → SPA signed →
   assert.equal(await stageName(c.b24_deal_id), 'KYC')
   await act(OF, 'bookingAction', { id: b.id, act: 'spa_approval' }) // гл. 6: «Договор на согласовании» — после KYC Passed
   assert.equal(await stageName(c.b24_deal_id), 'SPA approval')
-  await act(OF, 'bookingAction', { id: b.id, act: 'contract' })
+  await act(OF, 'bookingAction', { id: b.id, act: 'contract', contract_date: '2026-11-02', contract_no: 'QA-SPA-B24' })
   assert.equal(await stageName(c.b24_deal_id), 'SPA signed')
+  // 380/341: дата и номер договора — в сделку (поля Contract date, Contract No.)
+  const dc = await b24('crm.deal.get', { id: c.b24_deal_id })
+  assert.equal(String(dc.UF_CRM_GE_CONTRACT_NO || ''), 'QA-SPA-B24', 'номер договора не дошёл до сделки')
+  assert.match(String(dc.UF_CRM_GE_CONTRACT_DATE || ''), /^2026-11-02|02\.11\.2026/, 'дата договора не дошла до сделки: ' + dc.UF_CRM_GE_CONTRACT_DATE)
   const d = await one('select id from portal.deals where client_id = $1', [sale])
   await act(FI, 'dealPaid', { id: d.id, paid: 30 })
   assert.equal(await stageName(c.b24_deal_id), 'Won')
