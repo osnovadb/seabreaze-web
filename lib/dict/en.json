@@ -2753,5 +2753,10 @@
 "График": "Schedule",
 "просрочен": "overdue",
 "Оплачено {p}%": "Paid {p}%",
-"график не задан: бронь без плана оплаты": "no schedule: the booking has no payment plan"
+"график не задан: бронь без плана оплаты": "no schedule: the booking has no payment plan",
+"Язык писем и уведомлений": "Language of e-mails and notifications",
+"Ещё {n} начислений пришли после утверждения: к выплате {p}, удержания (возвраты комиссии) {m}. Войдут в дополнительный реестр или в реестр следующего месяца.": "{n} more accruals arrived after approval: to pay {p}, withholdings (commission clawbacks) {m}. They go into an additional register or next month's register.",
+"{u} упёрся в лимит выгрузки контактов ({n} файлов за сутки)": "{u} hit the contact export limit ({n} files per 24 hours)",
+"Пересчитать доли": "Recalculate shares",
+"Корректировка долей по {u}": "Adjust shares for {u}"
 }

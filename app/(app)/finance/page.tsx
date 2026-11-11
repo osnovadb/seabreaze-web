@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { redirect } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { q } from '@/lib/db'
@@ -53,7 +54,8 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
      where l.register_id = $1 ${head ? `and l.market = '${(c.user.market || '').replace(/'/g, '')}'` : ''} ${entSql} order by l.carried, l.role, who`, [reg.id]) : []
   const markets = Array.from(new Set(lines.filter((l) => !l.carried && l.market).map((l) => l.market!)))
   // QA 09.11: реестр месяца оплачен, а начисления продолжают приходить — говорим, куда они пойдут
-  const after = tab === 'register' && reg && reg.status !== 'collected' ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
+  const after = tab === 'register' && reg && reg.status !== 'collected' ? (await q<{ n: number; s: number; plus: number; minus: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s, coalesce(sum(amount) filter (where amount > 0), 0)::float plus,
+      coalesce(sum(amount) filter (where amount < 0), 0)::float minus from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
   const nextMonth = (() => { const [y, m] = month.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` })()
   const pending = tab === 'register' && !reg ? (await q<{ n: number; s: number }>(`select count(*)::int n, coalesce(sum(amount), 0)::float s from portal.accruals where status = 'open' and month <= $1::date`, [month + '-01']))[0] : null
   const debts = tab === 'debts' ? await q<{ role: string; user_id: string | null; who: string; bal: number; since: string }>(
@@ -77,21 +79,25 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
         <Tabs />
         {tab === 'sales' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Продажа', 'Клиент', 'Цена договора', 'Комиссия застройщика', 'Доли', 'Оплачено клиентом', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
-          <tbody>{deals.length === 0 ? <tr><td colSpan={7} className="muted">{T('Сделок пока нет')}</td></tr> : deals.map((d) => (
-            <tr key={d.id}>
+          <tbody>{deals.length === 0 ? <tr><td colSpan={7} className="muted">{T('Сделок пока нет')}</td></tr> : deals.map((d) => (<Fragment key={d.id}>
+            <tr>
               <td><b>{d.unit}</b><div className="tiny muted">{d.project} · {date(L, d.created_at)}{d.stage === 'cancelled' ? ' · ' + T('расторгнута') : ''}</div></td>
               <td className="small">{d.client}</td><td>{usd(L, d.final_price)}</td><td><b>{usd(L, d.total)}</b>{d.fix != null && d.total > 0 && <div className="tiny muted">{T('фикс {f} · пул {p}', { f: usd(L, d.fix), p: usd(L, Math.max(0, d.total - d.fix)) })}</div>}{/* М11: комиссия и пул скидки — раздельно */}</td>
-              <td className="tiny">{(d.shares || []).filter((s) => !(head && s.role === 'caspian')).map((s) => <div key={s.role}>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' && s.who !== ROLE_LABEL[s.role] ? ` · ${T(s.who)}` : ''}: <b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</div>)}
+              <td className="tiny" style={{ minWidth: 260 }}>{d.shares && <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, auto) auto', gap: '2px 12px' }}>{/* В3: доли — две колонки «кто | сумма» */}
+                {d.shares.filter((s) => !(head && s.role === 'caspian')).map((s) => <Fragment key={s.role}><span>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' && s.who !== ROLE_LABEL[s.role] ? ` · ${T(s.who)}` : ''}</span>
+                  <span className="nowrap"><b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</span></Fragment>)}</div>}
                 {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}</td>
               <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><span className="small">%</span><button className="btn btn--sm">{T('Сохранить')}</button></form> : pct(L, d.paid_pct)}
                 {(() => { const sc = d.stage !== 'cancelled' ? scheduleOf(d) : null; return sc && sc.overdue.length > 0 ? <div className="tiny bad">{T('просрочка {a}', { a: usd(L, sc.overdueAmount) })}</div> : sc?.next ? <div className="tiny muted">{T('следующий платёж {a} до {d}', { a: usd(L, sc.next.amount), d: date(L, sc.next.due) })}</div> : null })()}{/* 292 */}</td>
-              <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻</button></form>}
-                {fin && d.shares && <details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка')}</summary>
-                  <form action={adjustment} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="deal" value={d.id} />
-                    <select className="in" name="role">{d.shares.filter((x) => x.role !== 'caspian').map((x) => <option key={x.role} value={x.role}>{T(ROLE_LABEL[x.role])}</option>)}</select>
-                    <input className="in" name="amount" placeholder={T('Сумма, USD (минус — удержание)')} /><input className="in" name="note" placeholder={T('Причина')} />
-                    <button className="btn btn--sm">{T('Добавить в следующий акт')}</button></form></details>}</td>
-            </tr>))}</tbody></table></div>}
+              <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost nowrap" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻ {T('Пересчитать доли')}</button></form>}</td>
+            </tr>
+            {fin && d.shares && <tr className="subrow"><td colSpan={7} style={{ paddingTop: 0 }}><details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка долей по {u}', { u: d.unit })}</summary>{/* В3: форма во всю ширину строкой под сделкой */}
+                  <form action={adjustment} className="row mt8" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}><input type="hidden" name="deal" value={d.id} />
+                    <label className="field"><span>{T('Кому')}</span><select className="in" name="role">{d.shares.filter((x) => x.role !== 'caspian').map((x) => <option key={x.role} value={x.role}>{T(ROLE_LABEL[x.role])}</option>)}</select></label>
+                    <label className="field"><span>{T('Сумма, USD (минус — удержание)')}</span><input className="in" name="amount" inputMode="decimal" style={{ width: 160 }} /></label>
+                    <label className="field" style={{ flex: 1, minWidth: 220 }}><span>{T('Причина')}</span><input className="in" name="note" /></label>
+                    <button className="btn btn--sm">{T('Добавить в следующий акт')}</button></form></details></td></tr>}
+          </Fragment>))}</tbody></table></div>}
         {tab === 'tranches' && <div className="tbl-wrap"><table className="tbl">
           <thead><tr>{['Продажа', 'Застройщик', 'Транш', 'Сумма', 'Статус', 'Ожидаем', ''].map((h, i) => <th key={i}>{h ? T(h) : ''}</th>)}</tr></thead>
           <tbody>{tranches.length === 0 ? <tr><td colSpan={7} className="muted">{T('Траншей пока нет — они появляются с «Договор подписан»')}</td></tr> : tranches.map((x) => (
@@ -130,8 +136,8 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
                 <tr key={i} style={{ opacity: l.carried ? 0.6 : 1 }}><td>{l.who ? T(l.who) : '—'}</td><td className="small">{T(ROLE_LABEL[l.role] || l.role)}</td><td className="small">{l.market || '—'}</td><td>{usd(L, l.gross)}</td><td>{l.withheld ? '−' + usd(L, l.withheld) : '—'}</td><td>{l.carried ? <s className="muted">{usd(L, l.net)}</s> : <b>{usd(L, l.net)}</b>}</td>
                   <td className="tiny">{l.act_no && <div><a href={`/commission/act/${l.id}`}>{l.act_no}</a> · {T(l.agreed ? 'согласован' : 'ждём согласия')}{l.needs_inv ? ' · ' + T(l.invoice ? 'счёт есть' : 'ждём счёт') : ''}</div>}{l.carried ? <span className="warnc">{T('перенос')}: {(l.note || '').split('; ').map((x) => (x.endsWith(' — перенос') ? T(x).replace(/\s—\s[^—]*$/, '') : T(x))).join('; ')}</span> : ''}</td></tr>))}</tbody></table></div>
             <div className="row" style={{ justifyContent: 'space-between' }}><div className="small muted">{T('Итого к выплате')}: <b>{usd(L, lines.filter((l) => !l.carried).reduce((a, l) => a + l.net, 0))}</b></div>
-              {after && after.n > 0 && <div className="small warnc">{T('Ещё {n} начислений на {s} пришли после утверждения — войдут в реестр следующего месяца.', { n: after.n, s: usd(L, after.s) })} <a href={`?tab=register&m=${nextMonth}`}>{T('Открыть {m}', { m: nextMonth })}</a></div>}
-              {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
+              {after && after.n > 0 && <div className="small warnc">{T('Ещё {n} начислений пришли после утверждения: к выплате {p}, удержания (возвраты комиссии) {m}. Войдут в дополнительный реестр или в реестр следующего месяца.', { n: after.n, p: usd(L, after.plus || 0), m: usd(L, after.minus || 0) })}{/* Л11 */} <a href={`?tab=register&m=${nextMonth}`}>{T('Открыть {m}', { m: nextMonth })}</a></div>}
+              {fin && <span className="row small" style={{ gap: 10 }}>{T('xlsx')}: <a className="btn btn--sm" href={`/api/money/register?month=${month}`}>{T('весь реестр и ведомость бонусов')}</a>{['DE', 'IL', 'GLOBAL'].map((m) => <a key={m} className="btn btn--sm" href={`/api/money/register?month=${month}&market=${m}`}>{T('приложение к счёту офиса {m}', { m })}</a>)}</span>}</div>
           </div>}
         </>}
         {tab === 'debts' && fin && claws.length > 0 && <div className="card mt8" style={{ marginBottom: 16 }}>

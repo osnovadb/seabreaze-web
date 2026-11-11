@@ -399,3 +399,27 @@ summary.btn::-webkit-details-marker { display: none; }
 
 /* 346: «Открыть на весь экран» во фрейме Bitrix24 */
 .embed-full { margin: 0 16px; padding: 6px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--paper); font-size: 13px; white-space: nowrap; }
+
+/* В3 (ревью 10.11): строка-продолжение под записью таблицы (корректировка долей) — без линии между ними */
+.nowrap { white-space: nowrap; }
+.tbl tr:has(+ tr.subrow) > td { border-bottom: 0; }
+/* В7: таблица шире рамки — тень у края, за которым есть колонки (components/TableCards) */
+.tbl-wrap { position: relative; }
+.tbl-wrap.is-wide:not(.at-end) { box-shadow: inset -14px 0 12px -12px rgba(15, 40, 38, .28); }
+[dir=rtl] .tbl-wrap.is-wide:not(.at-end) { box-shadow: inset 14px 0 12px -12px rgba(15, 40, 38, .28); }
+/* В7: телефон — карточки вместо таблицы; подпись колонки слева, значение справа; последняя колонка (действия) — первой */
+@media (max-width: 640px) {
+  .tbl.tbl--cards thead { display: none; }
+  .tbl.tbl--cards, .tbl.tbl--cards tbody { display: block; }
+  .tbl.tbl--cards tr { display: flex; flex-direction: column; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .tbl.tbl--cards tr.subrow { border-top: 0; padding-top: 0; }
+  .tbl.tbl--cards tr:has(+ tr.subrow) { border-bottom: 0; }
+  .tbl.tbl--cards td { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; padding: 4px 0; border: 0; text-align: end; min-width: 0 !important; }
+  .tbl.tbl--cards td > * { min-width: 0; }
+  .tbl.tbl--cards td[data-l]:not([data-l=""])::before { content: attr(data-l); flex: 0 0 38%; text-align: start; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .tbl.tbl--cards td:first-child { justify-content: flex-start; text-align: start; font-size: 15px; }
+  .tbl.tbl--cards td:first-child::before { display: none; }
+  .tbl.tbl--cards td[data-l=""]:last-child:not(:first-child) { order: -1; justify-content: flex-end; padding: 0 0 4px; }
+  .tbl.tbl--cards td:empty { display: none; }
+  .tbl.tbl--cards td[colspan] { display: block; text-align: start; }
+}

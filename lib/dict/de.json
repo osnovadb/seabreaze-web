@@ -2753,5 +2753,10 @@
 "График": "Zahlungsplan",
 "просрочен": "überfällig",
 "Оплачено {p}%": "Bezahlt {p}%",
-"график не задан: бронь без плана оплаты": "kein Zahlungsplan: Reservierung ohne Plan"
+"график не задан: бронь без плана оплаты": "kein Zahlungsplan: Reservierung ohne Plan",
+"Язык писем и уведомлений": "Sprache von E-Mails und Benachrichtigungen",
+"Ещё {n} начислений пришли после утверждения: к выплате {p}, удержания (возвраты комиссии) {m}. Войдут в дополнительный реестр или в реестр следующего месяца.": "Nach der Genehmigung kamen {n} weitere Buchungen: auszuzahlen {p}, Einbehalte (Provisionsrückforderungen) {m}. Sie kommen in ein zusätzliches Register oder in das des nächsten Monats.",
+"{u} упёрся в лимит выгрузки контактов ({n} файлов за сутки)": "{u} hat das Exportlimit für Kontakte erreicht ({n} Dateien in 24 Stunden)",
+"Пересчитать доли": "Anteile neu berechnen",
+"Корректировка долей по {u}": "Anteile für {u} korrigieren"
 }

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { requireCtx } from '@/lib/auth'
 import { q, one, audit } from '@/lib/db'
 import { makeXlsx } from '@/lib/xlsx'
+import { exportAllowed, EXPORTS_PER_DAY } from '@/lib/exportLimit'
 
 export const dynamic = 'force-dynamic'
 const fmt = (s: string | null) => (s ? String(s).slice(0, 10).split('-').reverse().join('.') : '')
@@ -11,6 +12,7 @@ const fmt = (s: string | null) => (s ? String(s).slice(0, 10).split('-').reverse
 export async function GET(req: Request) {
   const c = await requireCtx()
   if (!['owner', 'office', 'finance', 'market_head'].includes(c.user.role)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (!(await exportAllowed(c.real.id, c.real.role, c.real.name || c.real.email))) return NextResponse.json({ error: `export limit: ${EXPORTS_PER_DAY} files per 24 hours` }, { status: 429 })
   const u = new URL(req.url).searchParams
   const dev = u.get('dev') || ''
   if (!/^[0-9a-f-]{36}$/.test(dev)) return NextResponse.json({ error: 'developer required' }, { status: 400 })

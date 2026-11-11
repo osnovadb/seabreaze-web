@@ -4,6 +4,7 @@ import { getCtx } from '@/lib/auth'
 import { isRtl } from '@/lib/i18n'
 import { cookies, headers } from 'next/headers'
 import { one } from '@/lib/db'
+import { TableCards } from '@/components/TableCards'
 
 const serif = Source_Serif_4({ subsets: ['latin', 'cyrillic'], weight: ['500'], variable: '--font-serif' })
 const sans = IBM_Plex_Sans({ subsets: ['latin', 'cyrillic'], weight: ['400', '500', '600', '700'], variable: '--font-sans' })
@@ -20,7 +21,7 @@ export default async function Root({ children }: { children: React.ReactNode }) 
   const lang = (selLang as 'ru' | 'en' | 'de' | 'he' | null) || ctx?.lang || (lc as 'ru' | 'en' | 'de' | 'he') || 'ru'
   return (
     <html lang={lang} dir={isRtl(lang) ? 'rtl' : 'ltr'} className={`${serif.variable} ${sans.variable} ${hebrew.variable}`}>
-      <body>{children}</body>
+      <body>{children}<TableCards /></body>
     </html>
   )
 }

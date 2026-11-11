@@ -26,10 +26,11 @@ export default async function Profile() {
             <div className="kv"><span>E-mail</span><span className="small">{u.email}</span></div>
             {me?.agency && <div className="kv"><span>{T('Агентство')}</span><span>{me.agency}</span></div>}
             {me?.curator && <div className="kv"><span>{T('Куратор')}</span><span>{me.curator}</span></div>}
-            <div className="kv"><span>{T('Последний вход')}</span><span className="small">{dateTime(L, me?.last_login_at || null)}</span></div>
-            <form action={setOwnLocale} className="row mt8">
-              <select key={`locale:${String(u.locale)}`} className="in" name="locale" defaultValue={u.locale} style={{ flex: 1 }}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
-              <button className="btn">{T('Язык по умолчанию')}</button>
+            {/* Л5: «Последний вход —» не показываем; язык — подписанное поле с кнопкой «Сохранить» */}
+            {me?.last_login_at && <div className="kv"><span>{T('Последний вход')}</span><span className="small">{dateTime(L, me.last_login_at)}</span></div>}
+            <form action={setOwnLocale} className="row mt8" style={{ alignItems: 'flex-end' }}>
+              <label className="field" style={{ flex: 1 }}><span>{T('Язык писем и уведомлений')}</span><select key={`locale:${String(u.locale)}`} className="in" name="locale" defaultValue={u.locale}>{['ru', 'en', 'de', 'he'].map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select></label>
+              <button className="btn">{T('Сохранить')}</button>
             </form>
             <div className="tiny muted">{T('Сменить e-mail, роль или агентство может администратор.')}</div>
           </div>
@@ -40,8 +41,8 @@ export default async function Profile() {
           <form action={saveNotifyPrefs} className="card stack" style={{ gap: 8 }}>
             <div className="h3" style={{ margin: 0 }}>{T('Уведомления вне портала')}</div>
             <div className="tiny muted">{T('Срочные (брони, KYC, выплаты, доступ, споры, фиксация) — сразу. Остальные — сводкой раз в день в 9:00 по Баку.')}</div>
-            <label className="check"><input type="checkbox" name="email" value="1" defaultChecked={me?.notify_email} /> <span>{T('На e-mail')} {u.email}{!mail ? ' · ' + T('почта ещё не подключена') : ''}</span></label>
-            <label className="check"><input type="checkbox" name="telegram" value="1" defaultChecked={me?.notify_telegram} /> <span>{T('В Telegram')}{!me?.telegram_chat_id ? ' · ' + T('сначала подключите бота') : ''}</span></label>
+            <label className="check"><input type="checkbox" name="email" value="1" defaultChecked={me?.notify_email && mail} disabled={!mail} /> <span>{T('На e-mail')} {u.email}{!mail ? ' · ' + T('почта ещё не подключена') : ''}</span></label>
+            <label className="check"><input type="checkbox" name="telegram" value="1" defaultChecked={me?.notify_telegram && !!me?.telegram_chat_id} disabled={!me?.telegram_chat_id} /> <span>{T('В Telegram')}{!me?.telegram_chat_id ? ' · ' + T('сначала подключите бота') : ''}</span></label>
             <label className="check"><input type="checkbox" name="digest" value="1" defaultChecked={me?.notify_digest} /> <span>{T('Ежедневная сводка по остальным событиям')}</span></label>
             <div><button className="btn btn--sm">{T('Сохранить')}</button></div>
           </form>

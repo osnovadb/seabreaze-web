@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { requireCtx } from '@/lib/auth'
 import { audit } from '@/lib/db'
 import { makeXlsx } from '@/lib/xlsx'
+import { exportAllowed, EXPORTS_PER_DAY } from '@/lib/exportLimit'
 import { loadRegistrations, groupOf, type RegParams } from '@/lib/regFilter'
 import { REG_ST } from '@/lib/stages'
 import { t } from '@/lib/i18n'
@@ -21,6 +22,7 @@ const fmt = (s: string | null) => (s ? String(s).slice(0, 10).split('-').reverse
 export async function GET(req: Request) {
   const c = await requireCtx()
   if (!['owner', 'office', 'finance', 'market_head'].includes(c.user.role)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (!(await exportAllowed(c.real.id, c.real.role, c.real.name || c.real.email))) return NextResponse.json({ error: `export limit: ${EXPORTS_PER_DAY} files per 24 hours` }, { status: 429 })
   const u = new URL(req.url).searchParams
   const sp = Object.fromEntries(['f', 'd', 'p', 'm', 'src', 's', 'from', 'to', 'by', 'flag', 'cons', 'ids'].map((k) => [k, u.get(k) || undefined])) as RegParams
   const today = day(new Date())

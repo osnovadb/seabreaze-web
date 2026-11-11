@@ -99,4 +99,9 @@ test('выгрузка xlsx (09.11): файл застройщику без па
   assert.ok(only.includes(name) && !only.includes((await one('select name from portal.clients where id = $1', [cl])).name), 'поиск в выгрузке не сработал')
   assert.equal((await get(S, `f=all&kind=dev`)).status, 403, 'сейлз выгрузил регистрации')
   assert.ok(await one(`select 1 from portal.audit where action = 'registration.export' and user_id = $1`, [OF.id]), 'выгрузка не записана в журнал')
+  // Н2: не больше 20 файлов с контактами за сутки на человека — дальше 429 и уведомление владельцу
+  const O2 = await user('office')
+  await q(`insert into portal.audit (user_id, action, entity, data) select $1, 'registration.export', 'registration', '{"qa":1}'::jsonb from generate_series(1, 20)`, [O2.id])
+  assert.equal((await get(O2, `f=all&kind=dev&ids=${ids.join(',')}`)).status, 429, 'лимит выгрузки контактов не сработал')
+  assert.ok(await one(`select 1 from portal.notifications where dedup like $1`, [`exportlimit:${O2.id}:%`]), 'владельцу не пришло уведомление о лимите выгрузки')
 })
