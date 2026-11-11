@@ -3,16 +3,18 @@
 import { UNIT_TYPES } from './catalog'
 
 export const COLS: [key: string, ru: string, alias: string[]][] = [
-  ['block', 'Корпус', ['block', 'building', 'gebäude', 'бинйан']], ['floor', 'Этаж', ['floor', 'etage']], ['number', 'Номер', ['number', 'unit', 'nr', 'nummer', '№']],
-  ['type', 'Тип', ['type', 'typ']], ['bedrooms', 'Спальни', ['bedrooms', 'schlafzimmer']], ['area', 'Площадь', ['area', 'fläche', 'м²', 'm2']],
-  ['terrace', 'Терраса', ['terrace', 'terrasse', 'балкон']], ['garden', 'Сад', ['garden', 'garten', 'участок']], ['layout', 'Планировка', ['layout', 'grundriss', 'код планировки']],
-  ['price', 'Цена', ['price', 'preis']], ['currency', 'Валюта', ['currency', 'währung']], ['status', 'Статус', ['status']],
-  ['view', 'Вид', ['view', 'вид из окон', 'aussicht']], ['corner', 'Угловая', ['corner', 'eck']],
+  // иврит — как в подсказке экрана импорта на иврите (вычитка 11.11): заголовки на иврите тоже принимаются
+  ['block', 'Корпус', ['block', 'building', 'gebäude', 'בניין']], ['floor', 'Этаж', ['floor', 'etage', 'קומה']], ['number', 'Номер', ['number', 'unit', 'nr', 'nummer', '№', 'מספר']],
+  ['type', 'Тип', ['type', 'typ', 'סוג']], ['bedrooms', 'Спальни', ['bedrooms', 'schlafzimmer', 'חדרי שינה']], ['area', 'Площадь', ['area', 'fläche', 'м²', 'm2', 'שטח']],
+  ['terrace', 'Терраса', ['terrace', 'terrasse', 'балкон', 'טרסה', 'מרפסת']], ['garden', 'Сад', ['garden', 'garten', 'участок', 'גינה']], ['layout', 'Планировка', ['layout', 'grundriss', 'код планировки', 'דגם', 'תוכנית']],
+  ['price', 'Цена', ['price', 'preis', 'מחיר']], ['currency', 'Валюта', ['currency', 'währung', 'מטבע']], ['status', 'Статус', ['status', 'סטטוס']],
+  ['view', 'Вид', ['view', 'вид из окон', 'aussicht', 'נוף']], ['corner', 'Угловая', ['corner', 'eck', 'פינתית']],
 ]
 const TYPE_ALIAS: Record<string, string> = { 'студия': 'studio', '1 спальня': '1br', '2 спальни': '2br', '3 спальни': '3br', '4 спальни': '4br', 'дуплекс': 'duplex', 'пентхаус': 'penthouse',
   'таунхаус': 'townhouse', 'вилла': 'villa', 'коммерция': 'commercial', 'машиноместо': 'parking', 'паркинг': 'parking', 'кладовка': 'storage', 'parking': 'parking', 'storage': 'storage' }
 const STATUS_ALIAS: Record<string, string> = { available: 'available', free: 'available', 'свободна': 'available', 'свободно': 'available', reserved: 'reserved', booked: 'reserved', 'бронь': 'reserved',
-  sold: 'sold', 'продана': 'sold', 'продано': 'sold', unavailable: 'unavailable', 'не в продаже': 'unavailable', 'закрыта': 'unavailable' }
+  sold: 'sold', 'продана': 'sold', 'продано': 'sold', unavailable: 'unavailable', 'не в продаже': 'unavailable', 'закрыта': 'unavailable',
+  'פנויה': 'available', 'שמורה': 'reserved', 'נמכרה': 'sold', 'לא במכירה': 'unavailable' }
 const VIEW_ALIAS: Record<string, string> = { sea: 'sea', 'море': 'sea', 'на море': 'sea', marina: 'marina', 'марина': 'marina', park: 'park', 'парк': 'park', yard: 'yard', 'двор': 'yard', 'во двор': 'yard',
   city: 'city', 'улица': 'city', 'город': 'city', mixed: 'mixed', 'две стороны': 'mixed' }
 
@@ -20,7 +22,7 @@ export type Row = { line: number; block: string; number: string; bare: string; s
 // Номер без префикса корпуса: «A-0301» → «0301». Квартира ищется и по номеру как есть, и без префикса —
 // у Premium в базе «808», у BRABUS — «A-0301»
 export const bareNo = (n: string) => n.toUpperCase().replace(/^[A-ZА-Я]{1,3}-/, '')
-const yes = (v: string) => ['да', 'yes', 'ja', '1', 'true', 'x', '+'].includes(v.toLowerCase())
+const yes = (v: string) => ['да', 'yes', 'ja', '1', 'true', 'x', '+', 'כן'].includes(v.toLowerCase())
 
 // rows — первая строка заголовок; номер строки в ошибках — как в Excel
 export function parseChess(rows: string[][], ctx: { blocks: string[]; layouts: string[] }) {

@@ -1208,7 +1208,7 @@ export async function dealStage(f: FormData) {
 /* ── Импорт клиентов из xlsx (v2 · М13): первая строка — заголовки; согласие клиента подтверждает тот, кто загружает ── */
 // заголовки — RU / EN / DE / HE
 const IMPORT_COLS: Record<string, string[]> = {
-  name: ['имя', 'name', 'клиент', 'kunde', 'שם'], phone: ['телефон', 'phone', 'telefon', 'טלפון'], email: ['e-mail', 'email', 'почта', 'mail', 'דוא״ל', 'אימייל'],
+  name: ['имя', 'name', 'клиент', 'kunde', 'שם'], phone: ['телефон', 'phone', 'telefon', 'טלפון'], email: ['e-mail', 'email', 'почта', 'mail', 'דוא״ל', 'דוא"ל', 'אימייל'],
   country: ['страна', 'country', 'land', 'מדינה', 'ארץ'], language: ['язык', 'language', 'lang', 'sprache', 'שפה'],
   source: ['источник', 'source', 'quelle', 'מקור'], goal: ['цель', 'goal', 'ziel', 'מטרה'], budget: ['бюджет', 'budget', 'תקציב'], consent: ['согласие', 'consent', 'einwilligung', 'zustimmung', 'הסכמה'],
 }

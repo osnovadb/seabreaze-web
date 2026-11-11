@@ -23,8 +23,14 @@ export function t(lang: Lang, ru: string, vars?: Record<string, string | number>
     s = d?.[ru] ?? DICT.en[ru] ?? (dump(lang, ru), ru)
   }
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v))
+  if (lang === 'he' && vars) s = heOne(s)
   return s
 }
+// Вычитка иврита 11.11: при значении 1 — форма единственного числа («1 ימים» → «יום אחד»)
+const HE_ONE: [RegExp, string][] = [[/(^|[^\d.,])1 ימי עסקים/g, '$1יום עסקים אחד'], [/(^|[^\d.,])1 ימים/g, '$1יום אחד'], [/(^|[^\d.,])1 דירות/g, '$1דירה אחת'],
+  [/(^|[^\d.,])1 חודשים/g, '$1חודש אחד'], [/(^|[^\d.,])1 שעות/g, '$1שעה אחת'], [/(^|[^\d.,])1 לקוחות/g, '$1לקוח אחד'], [/(^|[^\d.,])1 הזמנות/g, '$1הזמנה אחת'],
+  [/(^|[^\d.,])1 קומות/g, '$1קומה אחת'], [/(^|[^\d.,])1 שבועות/g, '$1שבוע אחד'], [/(^|[^\d.,])1 פרויקטים/g, '$1פרויקט אחד'], [/(^|[^\d.,])1 עסקאות/g, '$1עסקה אחת']]
+const heOne = (s: string) => HE_ONE.reduce((a, [re, to]) => a.replace(re, to), s)
 export const tr = (lang: Lang) => (ru: string, vars?: Record<string, string | number>) => t(lang, ru, vars)
 
 function dump(lang: Lang, ru: string) {
