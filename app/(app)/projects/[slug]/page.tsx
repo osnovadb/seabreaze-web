@@ -3,7 +3,7 @@ import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
-import { t, usd, pct, date } from '@/lib/i18n'
+import { t, usd, pct, date, num, m2u } from '@/lib/i18n'
 import { projectBySlug, buildingsOf, conditionsFor, plansFor, roomsSql, toUsdSql, TYPE_NAME } from '@/lib/catalog'
 import { isFull, termUnknown, schedule, planBase, planLabel } from '@/lib/plans'
 import { isExternal, seesDeveloperTerms } from '@/lib/perm'
@@ -105,7 +105,7 @@ export default async function ProjectPage(
             <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Свободно сейчас')}</div><Link className="small bronze" href={`/catalog?p=${p!.slug}`}>{T('В каталог')} →</Link></div>
             <table className="tbl mt8" style={{ fontSize: 13 }}><tbody>{mix.map((m) => (
               <tr key={m.k}><td><Link href={`/catalog?p=${p!.slug}${/^\d$/.test(m.k) ? '&r=' + m.k : '&t=' + m.k}`}><b>{/^\d$/.test(m.k) ? (m.k === '4' ? '4+' : m.k) + ' ' + T('комн.') : T(TYPE_NAME[m.k] || m.k)}</b></Link></td>
-                <td className="num">{m.n}</td><td className="small muted">{m.amin === m.amax ? m.amin : `${m.amin}–${m.amax}`} м²</td><td className="num small">{m.pmin ? T('от {p}', { p: usd(L, m.pmin) }) : '—'}</td></tr>))}</tbody></table>
+                <td className="num">{m.n}</td><td className="small muted">{m.amin === m.amax ? num(L, m.amin, 2) : `${num(L, m.amin, 2)}–${num(L, m.amax, 2)}`} {m2u(L)}</td><td className="num small">{m.pmin ? T('от {p}', { p: usd(L, m.pmin) }) : '—'}</td></tr>))}</tbody></table>
           </div>}
           <TermsCard short />
           <div className="card">
@@ -125,10 +125,10 @@ export default async function ProjectPage(
         <div className="between"><div className="h3" style={{ margin: 0 }}>{ext ? T('Условия для агента') : T('Условия проекта')}</div>{short && <Link className="small bronze" href="?tab=terms">{T('Подробнее')} →</Link>}</div>
         <div className="mt8">
           {ext ? <>
-            <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(L, cond.agent_fix_pct)} {T('от итоговой цены')}</span></div>
+            <div className="kv"><span>{T('Ваш фикс')}</span><span>{pct(L, cond.agent_fix_pct)} {T(cond.fix_base === 'list' ? 'от прайса' : 'от итоговой цены')}</span></div>
             <div className="kv"><span>{T('Ваша часть пула скидки')}</span><span>{pct(L, cond.agent_pool_pct)} {T('от прайса')}</span></div>
           </> : <>
-            {seesDeveloperTerms(c.user.role) && <div className="kv"><span>{T('Фикс от застройщика')}</span><span>{pct(L, cond.fix_pct)} {T('от итоговой цены')}</span></div>}
+            {seesDeveloperTerms(c.user.role) && <div className="kv"><span>{T('Фикс от застройщика')}</span><span>{pct(L, cond.fix_pct)} {T(cond.fix_base === 'list' ? 'от прайса' : 'от итоговой цены')}</span></div>}
             {seesDeveloperTerms(c.user.role) && <div className="kv"><span>{T('Пул скидки')}</span><span>{pct(L, cond.pool_pct)} {T('от прайса')}</span></div>}
             <div className="kv"><span>{T('Скидка продавца сам / с согласованием')}</span><span>{pct(L, cond.seller_self_disc)} / {pct(L, cond.seller_max_disc)}</span></div>
             <div className="kv"><span>{T('Агенту: фикс + часть пула')}</span><span>{pct(L, cond.agent_fix_pct)} + {pct(L, cond.agent_pool_pct)}</span></div>
