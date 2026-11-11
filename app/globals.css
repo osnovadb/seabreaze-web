@@ -155,7 +155,9 @@ select.in[multiple] { background-image: none; padding-inline-end: 12px; height: 
 .upanel__calc .vcalc__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .upanel .planbox img { max-height: 220px; }
 .upanel .x { color: var(--muted); font-size: 18px; line-height: 1; }
-@media (max-width: 1100px) { .chess-wrap { grid-template-columns: 1fr; } .upanel { position: static; } }
+/* М3 (ревью 10.11): во фрейме Bitrix24 (900–1100 px) панель квартиры остаётся справа от сетки, под сетку — только на узком */
+@media (max-width: 1100px) { .chess-wrap { grid-template-columns: minmax(0, 1fr) 300px; } }
+@media (max-width: 860px) { .chess-wrap { grid-template-columns: 1fr; } .upanel { position: static; max-height: none; } }
 .chess td.fl { font-size: 12px; font-weight: 600; color: var(--muted); padding-inline-end: 8px; text-align: end; }
 .cell { display: block; width: 46px; height: 46px; border-radius: 5px; border: 1px solid; padding: 4px 5px; font-size: 10.5px; line-height: 1.25; overflow: hidden; position: relative; }
 .cell b { display: block; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -196,7 +198,9 @@ select.in[multiple] { background-image: none; padding-inline-end: 12px; height: 
 .step { text-align: start; padding: 0; background: none; border: 0; font: inherit; cursor: pointer; }
 .step:disabled { cursor: default; }
 .step--no { opacity: .5; cursor: not-allowed; }
-.step__l { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+/* В6 (ревью 10.11): подписи этапов не режем многоточием — до двух строк с переносом по слогам, у текущего — целиком; полное название в подсказке */
+.step__l { font-size: 11.5px; line-height: 1.25; min-height: 2.5em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; hyphens: auto; overflow-wrap: break-word; color: var(--muted); }
+.step--cur .step__l { -webkit-line-clamp: 4; }
 .step__bar { height: 6px; border-radius: 3px; margin-top: 4px; background: var(--line); }
 .step--done .step__l { color: var(--ink); } .step--done .step__bar { background: var(--ok-line); }
 .step--cur .step__l { color: var(--ink); font-weight: 700; } .step--cur .step__bar { background: var(--gold); }
@@ -310,7 +314,9 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 
 /* Каталог: фильтры слева, карточки квартир с планировкой */
 .cat { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
-.cat__f { position: sticky; top: 16px; }
+/* М10 (ревью 10.11): панель фильтров прилипает под шапкой страницы (.top тоже липкая), а не заезжает под неё */
+.cat__f { position: sticky; top: 100px; max-height: calc(100vh - 116px); overflow-y: auto; }
+.app--embed .cat__f { top: 16px; max-height: none; }
 .chip.chk { cursor: pointer; user-select: none; }
 .chip.chk input { display: none; }
 .chip.chk:has(input:checked) { background: var(--ink); color: var(--paper); border-color: var(--ink); }
@@ -320,7 +326,8 @@ input[type=range].disc { width: 100%; accent-color: var(--deep-3); }
 .ucard__img { position: relative; aspect-ratio: 4 / 3; background: #fff; display: grid; place-items: center; border-bottom: 1px solid var(--line); }
 .ucard__img img { max-width: 92%; max-height: 92%; object-fit: contain; }
 .ucard__promo { position: absolute; left: 8px; top: 8px; background: var(--bronze); color: #fff; font-size: 11px; font-weight: 600; border-radius: 10px; padding: 2px 8px; }
-.ucard__b { padding: 12px 14px 14px; }
+.ucard__b { padding: 12px 14px 14px; flex: 1; display: flex; flex-direction: column; }
+.ucard__b > .ucard__price { margin-top: auto; padding-top: 8px; } /* М10: цена — по низу карточки, карточки в ряду одной высоты */
 @media (max-width: 1100px) { .cat { grid-template-columns: 1fr; } .cat__f { position: static; } }
 .chess td.fl { position: sticky; left: 0; background: var(--paper); z-index: 1; }
 
@@ -414,12 +421,31 @@ summary.btn::-webkit-details-marker { display: none; }
   .tbl.tbl--cards tr { display: flex; flex-direction: column; padding: 10px 12px; border-bottom: 1px solid var(--line); }
   .tbl.tbl--cards tr.subrow { border-top: 0; padding-top: 0; }
   .tbl.tbl--cards tr:has(+ tr.subrow) { border-bottom: 0; }
-  .tbl.tbl--cards td { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; padding: 4px 0; border: 0; text-align: end; min-width: 0 !important; }
+  .tbl.tbl--cards td { display: block; padding: 4px 0; border: 0; text-align: start; min-width: 0 !important; }
+  /* подпись — левая колонка на всю высоту ячейки, всё содержимое — столбиком справа */
+  .tbl.tbl--cards td[data-l]:not([data-l=""]):not(:first-child) { display: grid; grid-template-columns: 36% minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  .tbl.tbl--cards td[data-l]:not([data-l=""]):not(:first-child)::before { content: attr(data-l); grid-column: 1; grid-row: 1 / span 12; padding-top: 2px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
   .tbl.tbl--cards td > * { min-width: 0; }
-  .tbl.tbl--cards td[data-l]:not([data-l=""])::before { content: attr(data-l); flex: 0 0 38%; text-align: start; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-  .tbl.tbl--cards td:first-child { justify-content: flex-start; text-align: start; font-size: 15px; }
-  .tbl.tbl--cards td:first-child::before { display: none; }
-  .tbl.tbl--cards td[data-l=""]:last-child:not(:first-child) { order: -1; justify-content: flex-end; padding: 0 0 4px; }
+  .tbl.tbl--cards td:first-child { font-size: 15px; }
+  .tbl.tbl--cards td[data-l=""]:last-child:not(:first-child) { order: -1; padding: 0 0 4px; text-align: end; }
   .tbl.tbl--cards td:empty { display: none; }
   .tbl.tbl--cards td[colspan] { display: block; text-align: start; }
 }
+.steps__now--all { display: block; } /* В6: у длинной воронки (13 шагов) текущий этап словами и на широком экране */
+/* В8 (ревью 10.11): телефон — верхнее меню не режется, а прячется за кнопку ☰; раскрытое — списком в две колонки */
+.navt, .navt__b { display: none; }
+@media (max-width: 700px) {
+  .navt__b { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 36px; margin-inline-start: auto; border: 1px solid #1F5D5B; border-radius: var(--r); cursor: pointer; }
+  .navt__b span, .navt__b span::before, .navt__b span::after { display: block; width: 18px; height: 2px; background: var(--mist); position: relative; content: ''; }
+  .navt__b span::before { position: absolute; top: -6px; } .navt__b span::after { position: absolute; top: 6px; }
+  .navt:checked + .navt__b span { background: transparent; }
+  .navt:checked + .navt__b span::before { top: 0; transform: rotate(45deg); } .navt:checked + .navt__b span::after { top: 0; transform: rotate(-45deg); }
+  .side .side__role { order: 2; width: 100%; }
+  .side .nav, .side .side__foot { display: none; }
+  .navt:checked ~ .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; -webkit-mask-image: none; mask-image: none; }
+  .navt:checked ~ .nav a { white-space: normal; }
+  .navt:checked ~ .side__foot { display: flex; }
+}
+/* В10 (ревью 10.11): поля в строке и в сетке сжимаются, а не наезжают друг на друга (контакты клиента, подключение источника, сопоставление статусов) */
+.row > .field, .row > .in, .grid > *, .field > .in { min-width: 0; }
+.row > .field > select.in { min-width: 0; width: 100%; }

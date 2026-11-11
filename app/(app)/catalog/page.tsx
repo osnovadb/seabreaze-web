@@ -58,7 +58,8 @@ export default async function Catalog(
         right={<>
           <div className="chips">{[['cards', 'Карточки'], ['table', 'Таблица']].map(([v, l]) => <Link key={v} href={qs({ view: v === 'cards' ? undefined : v })} className={'chip' + (view === v ? ' on' : '')}>{T(l)}</Link>)}</div>
           <form action={saveSearch}>{Object.entries({ p: p?.slug, b: sp.b, t: sp.t, r: sp.r, pmin: sp.pmin, pmax: sp.pmax ?? sp.max, amin: sp.amin, amax: sp.amax, fmin: sp.fmin, fmax: sp.fmax, v: sp.v, o: sp.o, c: sp.c, promo: sp.promo }).map(([n, v]) => v ? <input key={n} type="hidden" name={n} value={v} /> : null)}
-            <button className="btn" disabled={!p} title={p ? '' : T('Выберите проект, чтобы сохранить поиск')}>{T('Сохранить поиск')}</button></form>
+            <button className="btn" disabled={!p} title={p ? '' : T('Выберите проект, чтобы сохранить поиск')}>{T('Сохранить поиск')}</button>
+              {!p && <div className="tiny muted" style={{ maxWidth: 180 }}>{T('Выберите проект, чтобы сохранить поиск')}</div>}{/* М10 */}</form>
         </>} />
       <div className="page cat">
         <form className="card stack cat__f" style={{ gap: 12 }}>
@@ -102,7 +103,7 @@ export default async function Catalog(
                     <div className="tiny muted">{!p ? ps.find((x) => x.id === u.project_id)?.name + ' · ' : ''}{u.building} · {T('{f} этаж', { f: u.floor })}</div>
                     <div className="small mt8">{isLiving(u.unit_type) && u.rooms ? T('{r} комн.', { r: u.rooms }) + ' · ' : T(TYPE_NAME[u.unit_type] || u.unit_type) + ' · '}{m2(L, u.area)}{out(u) ? ` + ${u.plot_area ? T('сад') : T('терраса')} ${m2(L, out(u))}` : ''}</div>
                     {u.view_side && <div className="tiny muted">{T('Вид')} {T(VIEW_NAME[u.view_side] || u.view_side)}{u.is_corner ? ' · ' + T('угловая') : ''}</div>}
-                    <div className="between mt8"><span className="h3" style={{ margin: 0 }}>{u.usd ? usd(L, u.promo ? u.usd - u.promo.usd : u.usd) : '—'}</span><span className="tiny muted">{u.usd ? usd(L, per(u)) + '/' + m2u(L) : ''}</span></div>
+                    <div className="between mt8 ucard__price"><span className="h3" style={{ margin: 0 }}>{u.usd ? usd(L, u.promo ? u.usd - u.promo.usd : u.usd) : '—'}</span><span className="tiny muted">{u.usd ? usd(L, per(u)) + '/' + m2u(L) : ''}</span></div>
                     {u.promo && u.usd && <div className="tiny muted"><s>{usd(L, u.usd)}</s></div>}
                   </div>
                 </Link>

@@ -26,6 +26,10 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
   const [mode, setMode] = useState<Mode>('price')
   const [f, setF] = useState<Record<string, string>>(initial || {})
   const [hide, setHide] = useState<string[]>([])
+  // В9/М3 (ревью 10.11): в одну строку — комнаты, цена, площадь; остальное — под «Ещё фильтры» (раскрыто, если там что-то выбрано)
+  const EXTRA = ['t', 'fmin', 'fmax', 'v', 'l', 'promo', 'c']
+  const extraN = EXTRA.filter((k) => f[k]).length
+  const [more, setMore] = useState(extraN > 0)
   const [pick, setPick] = useState(false)
   const [picked, setPicked] = useState<string[]>([])
   const [hover, setHover] = useState<{ u: CU; x: number; y: number } | null>(null)
@@ -76,15 +80,20 @@ export function ChessBoard({ units, lang, team, selected, hrefFor, views, layout
         </div>
         <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
           <div className="chips">{[1, 2, 3, 4].map((r) => <button key={r} type="button" className={'chip' + (has('r', String(r)) ? ' on' : '')} onClick={() => toggle('r', String(r))}>{r === 4 ? '4+' : r}{T('к')}</button>)}</div>
-          {Array.from(new Set(units.map((u) => u.type))).length > 1 && <div className="chips">{Array.from(new Map(units.map((u) => [u.type, u.typeName])).entries()).map(([ty, n]) => <button key={ty} type="button" className={'chip' + (has('t', ty) ? ' on' : '')} onClick={() => toggle('t', ty)}>{T(n)}</button>)}</div>}
           <label className="field" style={{ width: 150 }}><span>{T('Цена, тыс. $')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="numeric" placeholder={T('от')} value={f.pmin || ''} onChange={(e) => set('pmin', e.target.value)} /><input className="in" inputMode="numeric" placeholder={T('до')} value={f.pmax || ''} onChange={(e) => set('pmax', e.target.value)} /></div></label>
           <label className="field" style={{ width: 130 }}><span>{T('Площадь, м²')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="decimal" placeholder={T('от')} value={f.amin || ''} onChange={(e) => set('amin', e.target.value)} /><input className="in" inputMode="decimal" placeholder={T('до')} value={f.amax || ''} onChange={(e) => set('amax', e.target.value)} /></div></label>
+          <button type="button" className={'chip' + (more ? ' on' : '')} aria-expanded={more} onClick={() => setMore(!more)}>{T('Ещё фильтры')}{extraN ? ` · ${extraN}` : ''} {more ? '▴' : '▾'}</button>
+        </div>
+        {more && <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
+          {Array.from(new Set(units.map((u) => u.type))).length > 1 && <div className="chips">{Array.from(new Map(units.map((u) => [u.type, u.typeName])).entries()).map(([ty, n]) => <button key={ty} type="button" className={'chip' + (has('t', ty) ? ' on' : '')} onClick={() => toggle('t', ty)}>{T(n)}</button>)}</div>}
           <label className="field" style={{ width: 110 }}><span>{T('Этаж')}</span><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><input className="in" inputMode="numeric" placeholder={T('от')} value={f.fmin || ''} onChange={(e) => set('fmin', e.target.value)} /><input className="in" inputMode="numeric" placeholder={T('до')} value={f.fmax || ''} onChange={(e) => set('fmax', e.target.value)} /></div></label>
           {views.length > 0 && <label className="field" style={{ width: 150 }}><span>{T('Вид из окон')}</span><select className="in" value={f.v || ''} onChange={(e) => set('v', e.target.value)}><option value="">{T('любой')}</option>{views.map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select></label>}
           {layouts.length > 1 && <label className="field" style={{ width: 130 }}><span>{T('Планировка')}</span><select className="in" value={f.l || ''} onChange={(e) => set('l', e.target.value)}><option value="">{T('любая')}</option>{layouts.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>}
-          <label className="check"><input type="checkbox" checked={!!f.promo} onChange={(e) => set('promo', e.target.checked ? '1' : '')} /> <span>{T('С акцией')}</span></label>
-          <label className="check"><input type="checkbox" checked={!!f.c} onChange={(e) => set('c', e.target.checked ? '1' : '')} /> <span>{T('Угловая')}</span></label>
-        </div>
+          <div className="row" style={{ gap: 14, flexWrap: 'nowrap' }}>
+            <label className="check"><input type="checkbox" checked={!!f.promo} onChange={(e) => set('promo', e.target.checked ? '1' : '')} /> <span>{T('С акцией')}</span></label>
+            <label className="check"><input type="checkbox" checked={!!f.c} onChange={(e) => set('c', e.target.checked ? '1' : '')} /> <span>{T('Угловая')}</span></label>
+          </div>
+        </div>}
         <div className="legend">{STATUS.filter(([c]) => counts[c]).map(([c, l0]) => { const l = !team && c === 'O' ? 'Бронь' : l0 /* 312: у партнёра — «Бронь» */; return (
           <button key={c} type="button" className="legend__b" style={{ opacity: hide.includes(c) ? 0.4 : 1 }} title={T('Скрыть или показать')} onClick={() => setHide((a) => (a.includes(c) ? a.filter((x) => x !== c) : [...a, c]))}><i className={`c-${c}`} />{T(l)} <b>{counts[c]}</b></button>) })}
           <span className="small muted" style={{ marginInlineStart: 'auto' }}>{active ? T('Под фильтр: {n} свободных', { n: shown.length }) : T('Свободно {f} из {n}', { f: counts.F || 0, n: units.length })}</span>

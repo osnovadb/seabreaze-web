@@ -19,9 +19,12 @@ import { calcViewProps } from '@/lib/calcView'
 import { VariantCalc } from '@/components/VariantCalc'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; escort_id?: string | null }
+type U = { unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; deal_stage?: string | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
+// М7 (ревью 10.11): метка квартиры после договора — по стадии сделки (один источник): расторгнута; «до …» у договора не показываем
+const DEAL_ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { cancelled: ['расторгнута', 'bad'] }
+const stOf = (u: { status: string | null; deal_stage?: string | null }) => (u.status === 'converted' && u.deal_stage && DEAL_ST[u.deal_stage]) || ST[u.status!]
 export default async function Units(
   props: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; created?: string; u?: string }> }
 ) {
@@ -44,7 +47,7 @@ export default async function Units(
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
       coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
-      d.id deal_id, d.paid_pct::float paid
+      d.id deal_id, d.paid_pct::float paid, (select dd.stage from portal.deals dd where dd.booking_id = b.id order by dd.created_at desc limit 1) deal_stage
     from units u join buildings bl on bl.id = u.building_id join projects p on p.id = u.project_id left join b on b.unit_id = u.id left join s on s.unit_id = u.id
       left join portal.deals d on d.booking_id = b.id and d.stage <> 'cancelled'
     where b.id is not null or s.unit_id is not null order by b.status is null, p.name, no`, [cl.id, c.user.id]).catch(async () =>
@@ -85,7 +88,7 @@ export default async function Units(
               <td><Link href={`/units/${u.unit_id}`}><b>{u.no}</b></Link></td>
               <td className="small">{u.project}</td>
               <td>{u.liked ? <Pill kind="ok">♥ {T('нравится')}</Pill> : u.in_sel ? <span className="small muted">{T('в подборке')}</span> : ''}</td>
-              <td>{u.status ? <><Pill kind={ST[u.status][1]}>{T(ST[u.status][0])}</Pill>{u.ends_at && <div className="tiny muted">{T('до {d}', { d: date(L, u.ends_at) })}</div>}</> : <span className="small muted">—</span>}</td>
+              <td>{u.status ? <><Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && u.status !== 'converted' && <div className="tiny muted">{T('до {d}', { d: date(L, u.ends_at) })}</div>}</> : <span className="small muted">—</span>}</td>
               <td className="num">{usd(L, u.final ?? u.usd ?? 0)}</td>
               <td className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
                 {(!u.status || (u.status === 'hold' && u.mine)) && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Условия покупки →')}</Link>}
@@ -109,7 +112,7 @@ export default async function Units(
             const office = canConfirmBooking(c.user.role)
             return <div key={u.unit_id} className="card stack" style={{ gap: 10 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span><b>{u.no}</b> · {u.project} · <Pill kind={ST[u.status!][1]}>{T(ST[u.status!][0])}</Pill>{u.ends_at && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}
+                <span><b>{u.no}</b> · {u.project} · <Pill kind={stOf(u)[1]}>{T(stOf(u)[0])}</Pill>{u.ends_at && u.status !== 'converted' && <span className="small muted"> · {T('до {d}', { d: date(L, u.ends_at) })}</span>}
                   {u.dev_no && <span className="small muted"> · {T('№ брони застройщика')} {u.dev_no}</span>}
                   {u.approval === 'pending' && <span className="small warnc"> · {T('скидка {p}% ждёт согласования', { p: u.disc || 0 })}</span>}</span>
                 <span className="row" style={{ gap: 8 }}><b>{usd(L, u.final ?? 0)}</b>{u.status === 'hold' && u.mine && <Link className="btn btn--sm btn--p" href={`/units/${u.unit_id}/book?client=${cl.id}`}>{T('Запросить бронь')}</Link>}</span>

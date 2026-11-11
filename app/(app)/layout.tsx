@@ -1,6 +1,7 @@
 import { embedClient } from '@/lib/embed'
 import { EmbedCl } from '@/components/EmbedCl'
 import { EmbedNav } from '@/components/EmbedNav'
+import { B24Frame } from '@/components/B24Frame'
 import { OpenFull } from '@/components/OpenFull'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <div className="app app--embed" style={{ display: "block" }}><div className="main" style={{ marginLeft: 0, width: "100%" }}>
         <EmbedCl cl={cur?.id || null} />
+        <B24Frame titles={em.map(([h, l]) => [h, T(l)] as [string, string])} />
         {/* QA 09.11: меню раздела во фрейме — крупнее и с подсветкой текущего раздела */}
         {/* М2: во вкладке карточки клиента — только клиентский режим (полоса клиента ниже); общее меню — в разделах левого меню */}
         {!cur && <div className="row" style={{ alignItems: 'center' }}><div style={{ flex: 1, minWidth: 0 }}><EmbedNav items={em.filter((x) => x[2]).map(([h, l]) => [h, T(l)] as [string, string])} /></div>
@@ -91,6 +93,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <FormBusy />
       <aside className="side">
         <div className="side__logo"><img src="/brand/wordmark-white.svg" alt="GetsEstate" /></div>
+        <input type="checkbox" id="navt" className="navt" aria-label={T('Меню')} />
+        <label htmlFor="navt" className="navt__b" aria-hidden="true"><span /></label>
         <div className="side__role">{T('Портал')} · {T(ROLE_NAMES[u.role])}{u.market && u.market !== 'GLOBAL' ? ' · ' + u.market : ''}</div>
         <Nav items={items} />
         <div className="side__foot">

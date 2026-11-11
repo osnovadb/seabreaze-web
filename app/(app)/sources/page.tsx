@@ -64,7 +64,7 @@ export default async function Sources() {
           <div className="h3" style={{ margin: 0 }}>{T('Статусы застройщика → наши')}</div>
           <div className="tiny muted">{T('Новый статус застройщика без сопоставления считается «не в продаже». Базовые статусы Profitbase сопоставлены сразу.')}</div>
           <input type="hidden" name="source" value={smap[0].source_id} />
-          <div className="grid g4">{smap.map((m) => <label key={m.source_id + m.external_status} className="field"><span>{m.source_id} · {m.external_status}</span>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>{smap.map((m) => <label key={m.source_id + m.external_status} className="field"><span>{m.source_id} · {m.external_status}</span>
             <select key={`st:${m.external_status}:${String(m.status)}`} className="in" name={'st:' + m.external_status} defaultValue={m.status} disabled={!owner}>{[['available', 'свободна'], ['reserved', 'бронь застройщика'], ['sold', 'продана'], ['unavailable', 'не в продаже']].map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select></label>)}</div>
           {owner && <div><button className="btn btn--sm">{T('Сохранить')}</button></div>}
         </form>}

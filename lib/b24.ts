@@ -44,6 +44,13 @@ export const MENU: Record<string, [string, string, string[]]> = {
   content: ['Content', '/news', ['owner', 'content']],
   settings: ['Settings', '/admin', ['owner', 'market_head', 'finance']],
 }
+// М5 (ревью 10.11): в левом меню Bitrix24 — три пункта, у каждого своё название; остальные разделы — в меню внутри окна.
+// Старые пункты (partners, reports, content, settings) снимаем; ?go= по ним продолжает работать для закладок.
+export const LEFT: Record<string, { en: string; ru: string; de: string }> = {
+  catalog: { en: 'GetsEstate: Catalog', ru: 'GetsEstate: каталог', de: 'GetsEstate: Katalog' },
+  backoffice: { en: 'GetsEstate: Back office', ru: 'GetsEstate: бэк-офис', de: 'GetsEstate: Backoffice' },
+  money: { en: 'GetsEstate: Money', ru: 'GetsEstate: деньги', de: 'GetsEstate: Finanzen' },
+}
 export async function ensurePlacements(domain: string, auth: string, handler: string) {
   const have = (await restApp<{ placement: string; handler: string }[]>(domain, auth, 'placement.get')) || []
   const done: string[] = []
@@ -52,11 +59,18 @@ export async function ensurePlacements(domain: string, auth: string, handler: st
     await restApp(domain, auth, 'placement.bind', { PLACEMENT: p, HANDLER: handler, TITLE: title, LANG_ALL: { en: { TITLE: title }, ru: { TITLE: title }, de: { TITLE: title } } })
     done.push(p)
   }
-  // левое меню: по пункту на раздел; Bitrix24 показывает их всем с доступом к приложению, раздел проверяет роль
-  for (const [k, [title]] of Object.entries(MENU)) {
+  // левое меню: три пункта (М5); пункт с другим названием перепривязываем, лишние — снимаем
+  for (const x of have.filter((x) => x.placement === 'LEFT_MENU' && x.handler.startsWith(handler + '?go='))) {
+    const k = x.handler.slice(handler.length + 4)
+    const tl = (x as { title?: string }).title
+    if (LEFT[k] && (tl === undefined || tl === LEFT[k].en)) continue // без названия в ответе — не дёргаем
+    try { await restApp(domain, auth, 'placement.unbind', { PLACEMENT: 'LEFT_MENU', HANDLER: x.handler }); done.push('LEFT_MENU-:' + k) } catch { /* уже снят */ }
+  }
+  const kept = have.filter((x) => { const k = x.handler.slice(handler.length + 4), tl = (x as { title?: string }).title; return x.placement === 'LEFT_MENU' && x.handler.startsWith(handler + '?go=') && LEFT[k] && (tl === undefined || tl === LEFT[k].en) }).map((x) => x.handler)
+  for (const [k, title] of Object.entries(LEFT)) {
     const h = `${handler}?go=${k}`
-    if (have.some((x) => x.placement === 'LEFT_MENU' && x.handler === h)) continue
-    try { await restApp(domain, auth, 'placement.bind', { PLACEMENT: 'LEFT_MENU', HANDLER: h, TITLE: title, LANG_ALL: { en: { TITLE: title }, ru: { TITLE: title }, de: { TITLE: title } } }); done.push('LEFT_MENU:' + k) } catch { /* встройка недоступна на тарифе */ }
+    if (kept.includes(h)) continue
+    try { await restApp(domain, auth, 'placement.bind', { PLACEMENT: 'LEFT_MENU', HANDLER: h, TITLE: title.en, LANG_ALL: { en: { TITLE: title.en }, ru: { TITLE: title.ru }, de: { TITLE: title.de } } }); done.push('LEFT_MENU:' + k) } catch { /* встройка недоступна на тарифе */ }
   }
   // роботы приложения (§12): «Запросить бронь», «Снять бронь», «Отправить подборку», «Проверить квартиру» — в сделках
   const bots = ((await restApp<{ [k: string]: string } | string[]>(domain, auth, 'bizproc.robot.list').catch(() => [])) as string[]) || []
