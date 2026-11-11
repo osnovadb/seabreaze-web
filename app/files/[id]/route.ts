@@ -35,6 +35,7 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
   // Картинки разметки (генплан, фасады, поэтажные планы) и обложка проекта — тем, кому виден проект
   if (!ok) {
     const img = await one<{ project_id: string }>(`select project_id from portal.genplans where file_id = $1
+      union all select g.project_id from portal.genplans g cross join jsonb_array_elements(g.views) v where v->>'file_id' = $1::text -- ракурсы генплана
       union all select b.project_id from portal.facades f join buildings b on b.id = f.building_id where f.file_id = $1
       union all select b.project_id from portal.floor_plans f join buildings b on b.id = f.building_id where f.file_id = $1
       union all select project_id from portal.project_settings where cover_file_id = $1 limit 1`, [params.id])

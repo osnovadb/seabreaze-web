@@ -60,14 +60,20 @@ test('генплан: второй ракурс по ?v=1, переключат�
   const g = await one('select image, views from portal.genplans where project_id = $1', [pr.id])
   assert.ok(g, 'у тестового проекта нет генплана')
   try {
-    await q(`update portal.genplans set title = 'QA основной', views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify([{ title: 'QA второй ракурс', image: '/brand/favicon.svg', polygons: [] }])])
+    // ракурс — файлом портала, как в жизни: права на картинку берутся из genplans.views[].file_id (ревью 11.11: второй ракурс BRABUS отдавал 404)
+    const f = await one(`select id from portal.files where id = (select file_id from portal.genplans where project_id = $1)`, [pr.id])
+    assert.ok(f, 'у основного вида тестового проекта нет файла портала')
+    const fid = (await one(`insert into portal.files (filename, mime, size, disk_name) select 'QA ракурс', mime, size, disk_name from portal.files where id = $1 returning id`, [f.id])).id
+    await q(`update portal.genplans set title = 'QA основной', views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify([{ title: 'QA второй ракурс', image: `/files/${fid}`, file_id: fid, polygons: [] }])])
     const v0 = await get(S, '/projects/test-marina')
     assert.ok(v0.html.includes('?v=1') && v0.html.includes('QA второй ракурс'), 'нет переключателя ракурсов')
     assert.ok(v0.html.includes(g.image), 'по умолчанию не основной вид')
     const v1 = await get(S, '/projects/test-marina?v=1')
-    assert.ok(v1.html.includes('/brand/favicon.svg'), 'по ?v=1 не второй ракурс')
+    assert.ok(v1.html.includes(`/files/${fid}`), 'по ?v=1 не второй ракурс')
+    for (const src of [g.image, `/files/${fid}`]) assert.equal((await get(S, src)).status, 200, 'картинка ракурса не отдаётся: ' + src)
     assert.ok(/[0-9]<\/div><div class="small muted">корпус(а|ов)?</.test(v0.html), 'плитка корпусов без числа или слова')
   } finally {
     await q(`update portal.genplans set title = null, views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify(g.views || [])])
+    await q(`delete from portal.files where filename = 'QA ракурс'`)
   }
 })

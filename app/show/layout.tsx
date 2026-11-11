@@ -17,11 +17,11 @@ export default async function ShowLayout({ children }: { children: React.ReactNo
         <img src="/brand/wordmark.svg" alt="GetsEstate" style={{ height: 22 }} />
         <span className="pill pill--ours">● {T('Презентация')}</span>
         {cl && <span className="small muted">{T('Для')} {cl.name.split(' · ').pop()}</span>}
-        <nav className="row" style={{ marginInlineStart: 'auto', gap: 6 }}>
+        <nav className="row show__nav" style={{ marginInlineStart: 'auto', gap: 6 }}>
           <Link className="chip" href="/show">{T('Проекты')}</Link>
           <Link className="chip" href="/show/premium-residence">Premium Residence</Link>
         </nav>
-        <Link className="btn btn--sm" href="/show/exit" title={T('Выход по PIN')}>🔒</Link>
+        <Link className="btn btn--sm show__lock" href="/show/exit" title={T('Выход по PIN')}>🔒</Link>
       </div>
       {children}
     </div>
