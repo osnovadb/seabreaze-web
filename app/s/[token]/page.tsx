@@ -1,7 +1,7 @@
 import { PrintButton } from '@/components/PrintButton'
 import { notFound } from 'next/navigation'
 import { q, one } from '@/lib/db'
-import { t, usd, m2, date, pct, isRtl, type Lang } from '@/lib/i18n'
+import { t, usd, m2, date, pct, num, isRtl, type Lang } from '@/lib/i18n'
 import { unitsByIds, planUrl, unitNo, codeFor, plansFor } from '@/lib/catalog'
 import { priceChain, planLabel } from '@/lib/plans'
 import { offersFor, promoOf, promoMode } from '@/lib/promo'
@@ -30,6 +30,8 @@ export default async function PublicSelection(
   const items = await q<{ unit_id: string; note: string | null; plan_id: string | null }>('select unit_id, note, plan_id from portal.selection_items where selection_id = $1 order by sort', [s.id])
   const units = new Map((await unitsByIds(items.map((i) => i.unit_id))).map((u) => [u.id, u]))
   const fx = await fxFor(s.market, L)
+  // О34 (обход 11.11): взнос и платёж — с пересчётом в валюту клиента, как цена (пометка о курсе — в сноске под вариантами)
+  const fxLine = (a: number) => (fx ? <div className="tiny muted">≈ {(fx.cur === 'EUR' ? '€' : '₪') + num(L, Math.round(a * fx.perUsd))}</div> : null)
   // Акции и правило сложения — по проектам квартир подборки
   const projIds = Array.from(new Set(Array.from(units.values()).map((u) => u.project_id)))
   const offers = new Map(await Promise.all(projIds.map(async (p) => [p, { offers: await offersFor(p), mode: await promoMode(p) }] as const)))
@@ -78,14 +80,15 @@ export default async function PublicSelection(
                       return <div key={v.variant_id} className="card card--tight stack" style={{ gap: 4 }}>
                         <b className="small">{T('Вариант {n}', { n: vi + 1 })}</b>{/* QA 10.11: внутреннее название варианта клиенту не показываем */}
                         <div className="kv small"><span>{T('Цена')}</span><PriceDual amount={r.total} fx={fx} lang={L} className="" note={false} /></div>
-                        <div className="kv small"><span>{T('Первый взнос')}</span><span>{usd(L, r.down)} · {pct(L, r.downPct)}</span></div>
-                        <div className="kv small"><span>{T('Платёж в месяц')}</span><span>{r.monthly ? `${usd(L, r.monthly)} × ${r.months}` : '—'}</span></div>
+                        <div className="kv small"><span>{T('Первый взнос')}</span><span style={{ textAlign: 'end' }}>{usd(L, r.down)} · {pct(L, r.downPct)}{fxLine(r.down)}</span></div>
+                        <div className="kv small"><span>{T('Платёж в месяц')}</span><span style={{ textAlign: 'end' }}>{r.monthly ? <>{`${usd(L, r.monthly)} × ${r.months}`}{fxLine(r.monthly)}</> : '—'}</span></div>
                         <div className="kv small"><span>{T('Последний платёж')}</span><span>{r.last ? date(L, r.last) : '—'}</span></div>
                         {r.disc > 0 && <div className="kv small"><span>{T('Скидка')}</span><span>{pct(L, r.disc)}</span></div>}
                         {r.optionTitles.length > 0 && <div className="tiny muted">{T('Опции')}: {r.optionTitles.join(', ')}</div>}
                         {r.approx && <span className="tiny muted">{T('ориентировочно')}</span>}
                         <form action={likeSelVariant} className="noprint"><input type="hidden" name="token" value={params.token} /><input type="hidden" name="variant" value={v.variant_id} />
                           <button className={'btn btn--sm' + (v.liked_at ? ' btn--p' : '')} disabled={!!searchParams.preview}>{v.liked_at ? '♥ ' + T('Подходит') : T('Мне подходит')}</button></form>
+                        {v.liked_at && <div className="small okc" role="status">{T('Спасибо! Консультант свяжется с вами.')}</div>}{/* О34: ответ клиенту после «Мне подходит» */}
                       </div> })}</div>
                     <div className="tiny muted mt8">{T('Расчёт предварительный: даты — ориентир от первого взноса; точный график и суммы — в договоре с застройщиком.')}{fx ? ' ' + T('{c} — справочно, по курсу ЦБ Азербайджана на {d}.', { c: fx.cur, d: date(L, fx.date) }) : ''}</div>
                   </div>)}
