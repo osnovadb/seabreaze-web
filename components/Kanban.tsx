@@ -12,7 +12,7 @@ export type KCard = { id: string; name: string; sub: string; owner?: string; sig
 
 // Канбан воронки: карточку тянем мышью или долгим нажатием на планшете; недоступные колонки гаснут.
 // Клик без перетаскивания открывает карточку клиента. Отказ и пауза спрашивают причину или дату.
-export function Kanban({ cols, cards, role, lang }: { cols: KCol[]; cards: KCard[]; role: Role; lang: Lang }) {
+export function Kanban({ cols, cards, role, lang, readOnly = false }: { cols: KCol[]; cards: KCard[]; role: Role; lang: Lang; readOnly?: boolean }) {
   const T = (s: string, v?: Record<string, string | number>) => t(lang, s, v)
   const [local, setLocal] = useState<Record<string, string>>({})
   const [drag, setDrag] = useState<{ id: string; x: number; y: number; dx: number; dy: number; w: number } | null>(null)
@@ -127,7 +127,7 @@ export function Kanban({ cols, cards, role, lang }: { cols: KCol[]; cards: KCard
         {who && <div className="col__who">{who}</div>}
         {list.map((c) => (
           <Link key={c.id} href={`/clients/${c.id}`} className={'kcard' + (drag?.id === c.id ? ' kcard--drag' : '')} draggable={false}
-            onPointerDown={(e) => onDown(e, c.id)} onClick={(e) => { if (moved.current) e.preventDefault() }} onContextMenu={(e) => { if (drag) e.preventDefault() }}>
+            onPointerDown={(e) => { if (!readOnly) onDown(e, c.id) }} /* 288: у команды стадии — из Bitrix24, руками не двигаются */ onClick={(e) => { if (moved.current) e.preventDefault() }} onContextMenu={(e) => { if (drag) e.preventDefault() }}>
             {body(c)}
           </Link>
         ))}

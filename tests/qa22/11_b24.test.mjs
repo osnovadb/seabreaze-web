@@ -88,7 +88,9 @@ test('согласие клиента → поля контакта; Do not cont
   const c = await client(sale)
   await act(null, 'answerConsent', { token: c.consent_token, act: 'give', data: 'on', marketing: 'on' })
   const ct = await b24('crm.contact.get', { id: c.b24_contact_id })
-  assert.ok(ct.UF_CRM_GE_DATA_CONSENT && ct.UF_CRM_GE_MKT_CONSENT, 'согласия не в контакте')
+  assert.ok(ct.UF_CRM_GE_DATA_CONSENT, 'согласие на данные не в контакте')
+  // 363: клиент партнёра — не в рекламе: рекламного согласия и сегмента в Bitrix24 у него нет, даже если галочку прислали
+  if (c.owner_type === 'partner') assert.ok(!ct.UF_CRM_GE_MKT_CONSENT && !ct.UF_CRM_GE_SEGMENT, 'клиент партнёра попал в рекламу'); else assert.ok(ct.UF_CRM_GE_MKT_CONSENT, 'рекламное согласие не в контакте')
 })
 test('заявка с сайта → лид New с метками (сейлзов нет — назначение вручную)', { skip }, async () => {
   const sec = process.env.LEADS_SECRET

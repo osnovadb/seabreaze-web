@@ -57,15 +57,13 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
         {/* импорт — отдельной формой вне поиска (вложенные формы ломают гидратацию) */}
         {['owner', 'market_head', 'seller', 'agency_head', 'agent'].includes(c.user.role) && <div style={{ marginBottom: 16 }}><ImportExport lang={L} /></div>}
         {view === 'kanban' ? (
-          <Kanban role={c.user.role} lang={L}
-            cols={ext
-              ? PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: T(l), who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))
-              : STAGES.map(([k, l]): KCol => ({ key: k, label: T(l), target: k }))}
+          <Kanban role={c.user.role} lang={L} readOnly={!ext}
+            cols={PARTNER_STAGES.map(([k, l, target]): KCol => ({ key: k, label: T(l), who: k === 'selection' || k === 'request' ? T('партнёр') : k === 'candidate' ? T('квалификация') : T('офис'), target }))}
             cards={rows.map((r): KCard => ({
               id: r.id, name: r.name,
               sub: r.pause_until ? T('вернуться') + ' ' + date(L, r.pause_until) : r.stage === 'lost' ? (r.lost_reason ? T(r.lost_reason) : '') : [r.country, r.budget, r.booking].filter(Boolean).join(' · '),
               owner: ext ? undefined : r.owner, signal: r.pause_until || r.stage === 'lost' ? null : signal(r),
-              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : ext ? partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent }) : r.stage,
+              col: r.pause_until ? 'pause' : r.stage === 'lost' ? 'lost' : partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent }), // 288: и у команды — стадии Bitrix24
               ctx: { stage: r.stage, paused: !!r.pause_until, hasBooking: !!r.booking, hasDeal: r.has_deal, qualified: r.qualified },
             }))} />
         ) : (
@@ -77,7 +75,7 @@ export default async function Clients(props: { searchParams: Promise<{ v?: strin
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/clients/${r.id}`}><b>{r.name}</b></Link><div className="tiny muted">{r.reg_no}</div></td>
-                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : ext ? (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] && T((PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1]) : stageName(L, r.stage)}</td>
+                    <td>{r.pause_until ? T('Пауза') : r.stage === 'lost' ? T('Отказ') : (PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1] && T((PARTNER_STAGES.find(([k]) => k === partnerCol({ b24_stage: r.b24_stage, attach_status: r.attach_status, booking: r.bstatus, paid: r.paid, regs_sent: r.regs_sent })) || ['', r.stage])[1])}</td>
                     <td>{ext ? r.country : r.owner}</td><td className="small">{r.budget || '—'}</td><td>{r.booking || '—'}</td>
                     <td className="small">{date(L, r.protected_until)}</td><td className="small muted">{date(L, r.last_activity_at)}</td>
                     <td className="small">{sg && <span className={sg[0]}>{sg[1]}</span>}</td>

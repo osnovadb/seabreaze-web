@@ -7,6 +7,7 @@ import { priceChain, planLabel } from '@/lib/plans'
 import { offersFor, promoOf, promoMode } from '@/lib/promo'
 import { fxFor } from '@/lib/fx'
 import { ScheduleTable } from '@/components/Calculator'
+import { PriceDual } from '@/components/PriceDual'
 import { openedSelection, likeSelVariant } from '@/lib/actions'
 import { getCtx } from '@/lib/auth'
 import { selectionVariants, clientVisible, clientCalc } from '@/lib/selVariants'
@@ -63,7 +64,8 @@ export default async function PublicSelection(
                     <div className="h2">{T('Квартира {n}', { n: unitNo(u) })}</div>
                     <div className="muted">{pr?.name} · {u.building} · {T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
                     {free && promoBy(u).promo && <div className="mt16"><span className="pill pill--ok">{promoBy(u).promo!.badge || T('Акция')}</span> <span className="small muted">{promoBy(u).promo!.name}</span></div>}
-                    <div className="big mt16">{free && u.usd ? (promoBy(u).promo ? <>{usd(L, priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T(u.status === 'sold' || u.deal_id ? 'Уже продана' : 'Уже забронирована')}</div>
+                    {/* 317: крупно — валюта по рынку клиента (DE — евро, IL — доллары), рядом вторая и курс */}
+                    <div className="mt16">{free && u.usd ? <>{promoBy(u).promo && <s className="muted small">{usd(L, u.usd)}</s>}<PriceDual amount={promoBy(u).promo ? priceChain(u.usd, null, promoBy(u).promo, promoBy(u).mode).base : u.usd} fx={fx} lang={L} /></> : <div className="big">{T(u.status === 'sold' || u.deal_id ? 'Уже продана' : 'Уже забронирована')}</div>}</div>
                     {i.note && <div className="bronze mt8">„{i.note}“ — {T('ваш консультант')}</div>}
                     {(u.finish === 'shell' || img) && <div className="small muted mt8">{[u.finish === 'shell' ? T('Сдаётся без ремонта') : '', img ? T('на фото — пример дизайна застройщика') : ''].filter(Boolean).join('; ')}.</div>}
                   </div>
@@ -75,7 +77,7 @@ export default async function PublicSelection(
                     <div className="vcalc__cmp mt8">{(sv.get(u.id) || []).filter((v) => calcs.has(v.variant_id)).map((v, vi) => { const r = calcs.get(v.variant_id)!
                       return <div key={v.variant_id} className="card card--tight stack" style={{ gap: 4 }}>
                         <b className="small">{T('Вариант {n}', { n: vi + 1 })}</b>{/* QA 10.11: внутреннее название варианта клиенту не показываем */}
-                        <div className="kv small"><span>{T('Цена')}</span><b>{usd(L, r.total)}</b></div>
+                        <div className="kv small"><span>{T('Цена')}</span><PriceDual amount={r.total} fx={fx} lang={L} className="" note={false} /></div>
                         <div className="kv small"><span>{T('Первый взнос')}</span><span>{usd(L, r.down)} · {pct(L, r.downPct)}</span></div>
                         <div className="kv small"><span>{T('Платёж в месяц')}</span><span>{r.monthly ? `${usd(L, r.monthly)} × ${r.months}` : '—'}</span></div>
                         <div className="kv small"><span>{T('Последний платёж')}</span><span>{r.last ? date(L, r.last) : '—'}</span></div>

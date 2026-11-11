@@ -2740,5 +2740,16 @@
 "Нужна бронь до (если дольше обычного)": "Reservation needed until (if longer than usual)",
 "По условиям проекта бронь — до {d} (срок и одно продление). Дольше — запрос, бэк-офис согласует с застройщиком.": "Under the project terms the reservation lasts until {d} (term plus one extension). Longer — on request; the back office agrees it with the developer.",
 "Даты контактов за прошлый месяц для застройщика (xlsx)": "Contact dates for last month for the developer (xlsx)",
-"Начало месяца: выгрузите застройщикам даты контактов с клиентами за прошлый месяц": "Start of month: export last month's client contact dates for the developers"
+"Начало месяца: выгрузите застройщикам даты контактов с клиентами за прошлый месяц": "Start of month: export last month's client contact dates for the developers",
+"Открыть на весь экран": "Open full screen",
+"договор в долларах, курс на {d}": "the contract is in US dollars, rate as of {d}",
+"справочно, курс на {d}": "for reference, rate as of {d}",
+"Стадия — из Bitrix24, здесь только для чтения. Шаги после подбора ставит портал кнопками во вкладке Units сделки.": "The stage comes from Bitrix24 and is read-only here. Steps after selection are set by the portal with the buttons in the deal's Units tab.",
+"Платежи клиента · {u}": "Client payments · {u}",
+"просрочка {a}": "overdue {a}",
+"по графику": "on schedule",
+"Оплачено {p}% из {t}": "Paid {p}% of {t}",
+"следующий платёж {a} до {d}": "next payment {a} by {d}",
+"График": "Schedule",
+"просрочен": "overdue"
 }

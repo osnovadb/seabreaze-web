@@ -169,3 +169,14 @@ test('калькулятор: введённая сумма взноса сох�
   const r = calcVariant({ list: total, plans: [], downPct: (v / total) * 100, months: 24, disc: 0 })
   assert.equal(r.down, 80000)
 })
+
+// 292 (Денис 11.11): график платежей клиента, следующий платёж и просрочка
+test('график платежей клиента: оплачено, следующий, просрочка', async () => {
+  const { scheduleOf } = await import('../../lib/paySchedule.ts')
+  const d = { final_price: 100000, options_usd: 0, paid_pct: 30, created_at: '2026-01-15', snapshot: { variant: { downPct: 30, months: 10, start: '2026-01-15' } } }
+  const s = scheduleOf(d, '2026-04-20')
+  assert.equal(s.rows.length, 11); assert.equal(s.rows[0].paid, true); assert.equal(s.next.n, 2)
+  assert.equal(s.overdue.length, 3, 'февраль, март, апрель (15-е) — просрочены'); assert.equal(s.overdueAmount, 21000)
+  assert.equal(scheduleOf({ ...d, paid_pct: 100 }, '2026-04-20').overdue.length, 0)
+  assert.equal(scheduleOf({ ...d, snapshot: null }), null, 'без плана — графика нет')
+})

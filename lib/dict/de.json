@@ -2740,5 +2740,16 @@
 "Нужна бронь до (если дольше обычного)": "Reservierung benötigt bis (falls länger als üblich)",
 "По условиям проекта бронь — до {d} (срок и одно продление). Дольше — запрос, бэк-офис согласует с застройщиком.": "Laut Projektkonditionen gilt die Reservierung bis {d} (Frist plus eine Verlängerung). Länger — auf Anfrage, das Backoffice stimmt es mit dem Bauträger ab.",
 "Даты контактов за прошлый месяц для застройщика (xlsx)": "Kontaktdaten des Vormonats für den Bauträger (xlsx)",
-"Начало месяца: выгрузите застройщикам даты контактов с клиентами за прошлый месяц": "Monatsanfang: Kontaktdaten des Vormonats für die Bauträger exportieren"
+"Начало месяца: выгрузите застройщикам даты контактов с клиентами за прошлый месяц": "Monatsanfang: Kontaktdaten des Vormonats für die Bauträger exportieren",
+"Открыть на весь экран": "Im Vollbild öffnen",
+"договор в долларах, курс на {d}": "Vertrag in US-Dollar, Kurs vom {d}",
+"справочно, курс на {d}": "zur Information, Kurs vom {d}",
+"Стадия — из Bitrix24, здесь только для чтения. Шаги после подбора ставит портал кнопками во вкладке Units сделки.": "Die Phase kommt aus Bitrix24 und ist hier schreibgeschützt. Schritte nach der Auswahl setzt das Portal über die Schaltflächen im Reiter Units des Deals.",
+"Платежи клиента · {u}": "Zahlungen des Kunden · {u}",
+"просрочка {a}": "überfällig {a}",
+"по графику": "im Plan",
+"Оплачено {p}% из {t}": "Bezahlt {p}% von {t}",
+"следующий платёж {a} до {d}": "nächste Zahlung {a} bis {d}",
+"График": "Zahlungsplan",
+"просрочен": "überfällig"
 }

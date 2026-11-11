@@ -19,5 +19,7 @@ export async function GET(req: Request, props: { params: Promise<{ token: string
   await signSession(t.user_id)
   await q('update portal.users set prev_login_at = last_login_at, last_login_at = now() where id = $1', [t.user_id])
   await audit(t.user_id, 'login.link')
-  return NextResponse.redirect(`${base(req)}/refer`, 303)
+  // 346: вход из фрейма Bitrix24 в отдельную вкладку — сразу в нужный раздел
+  const to = new URL(req.url).searchParams.get('to') || ''
+  return NextResponse.redirect(`${base(req)}${to.startsWith('/') && !to.startsWith('//') ? to : '/refer'}`, 303)
 }

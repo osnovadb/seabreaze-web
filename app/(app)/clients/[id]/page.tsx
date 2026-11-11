@@ -19,6 +19,7 @@ import { BuyersBox } from '@/components/BuyersBox'
 const DOC_KINDS: Record<string, string> = { passport: 'паспорт', address: 'подтверждение адреса', funds: 'происхождение средств', kyc: 'KYC', booking: 'бронь', contract: 'договор', payment: 'платёж', other: 'другое' }
 import { addActivity, saveQualification, addTask, toggleTask, saveKycData, submitKyc, reviewKyc, transferClient, startShow, deleteClientDoc } from '@/lib/actions'
 import { needUuid } from '@/lib/ids'
+import { dealSchedules } from '@/lib/clientPayments'
 
 const SRC_NAME: Record<string, string> = { agent: 'Агент', office: 'Офис / звонок', site: 'Сайт', website: 'Сайт', referral: 'Рекомендация', quiz: 'Квиз на сайте', landing: 'Посадочная страница', smart_catalog: 'Смарт-каталог', import: 'Импорт' }
 const DEAL_ST: Record<string, string> = { contract: 'договор', fee_received: 'вознаграждение получено', paid_out: 'выплачено', cancelled: 'отменена' }
@@ -47,6 +48,7 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
   const owners = c.user.role === 'owner' || c.user.role === 'market_head' ? await q<{ id: string; name: string }>(`select id, name from portal.users where active and role in ('seller','agent','agency_head','market_head') order by name`) : []
   // 2.2: у партнёра стадии — как в Bitrix24 (сделка есть — её стадия; иначе по фактам портала)
   const bst = books.find((b) => b.status === 'converted') || books.find((b) => ['confirmed', 'release_pending'].includes(b.status)) || books.find((b) => ['requested', 'queued'].includes(b.status))
+  const pays = await dealSchedules(cl.id)
   const regs = await q<{ dev: string; project: string; status: string }>(`select d.name dev, p.name project, r.status from portal.registrations r join portal.developers d on d.id = r.developer_id
     join public.projects p on p.id = r.project_id where r.client_id = $1 order by d.name, p.name`, [cl.id])
   const pcol = partnerCol({ b24_stage: cl.b24_stage, attach_status: cl.attach_status, booking: bst?.status, paid: deals.some((d) => d.paid_pct > 0 && d.stage !== 'cancelled'), regs_sent: regs.some((r) => r.status !== 'to_send') })
@@ -84,10 +86,13 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
           <form action={startShow}><input type="hidden" name="client" value={cl.id} /><input type="hidden" name="lang" value={['de', 'en', 'ru', 'he'].includes(cl.language) ? cl.language : L} /><button className="btn btn--b">{T('Показ клиенту')}</button></form>
         </>} />
       <div className="page">
-        <StageStepper clientId={cl.id} name={cl.name} role={c.user.role} lang={L}
-          steps={ext ? PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: T(l), target })) : STAGES.map(([k, l]) => ({ key: k, label: T(l), target: k }))}
-          current={ext ? agentIdx : teamIdx}
+        {/* 288 (Денис 11.11): у команды стадия — из Bitrix24, только для чтения; воронки v2 из 13 этапов больше нет. Партнёр двигает свои шаги, как раньше */}
+        {ext ? <StageStepper clientId={cl.id} name={cl.name} role={c.user.role} lang={L}
+          steps={PARTNER_STAGES.map(([k, l, target]) => ({ key: k, label: T(l), target }))}
+          current={agentIdx}
           ctx={{ stage: cl.stage, paused: !!cl.pause_until, hasBooking: books.some((b) => ['requested', 'confirmed'].includes(b.status)), hasDeal: !!hasDeal, qualified: !!(cl.goal && cl.budget && cl.timeline && cl.country && cl.language) }} />
+          : <div className="card card--tight"><div className="steps" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{PARTNER_STAGES.map(([k, l], i) => <span key={k} className={'pill ' + (i === agentIdx ? 'pill--ink' : i < agentIdx ? 'pill--ok' : 'pill--off')} title={T(l)}>{T(l)}</span>)}</div>
+            <div className="tiny muted mt8">{T('Стадия — из Bitrix24, здесь только для чтения. Шаги после подбора ставит портал кнопками во вкладке Units сделки.')}</div></div>}
         <div className="cgrid mt16">
           <div className="stack">
             <div className="card">
@@ -116,6 +121,14 @@ export default async function ClientCard(props: { params: Promise<{ id: string }
               {ext ? Array.from(new Set(regs.map((r) => r.dev))).map((dv) => { const rs = regs.filter((r) => r.dev === dv); const ok = rs.every((r) => ['confirmed', 'confirmed_silence'].includes(r.status)); return <div key={dv} className="kv"><span>{dv}</span><Pill kind={ok ? 'ok' : 'warn'}>{T(ok ? 'готово' : 'в работе')}</Pill></div> })
                 : regs.map((r) => <div key={r.dev + r.project} className="kv"><span>{r.dev} · {r.project}</span><span className="small">{T(REG_ST[r.status]?.[0] || r.status)}</span></div>)}
             </div>}
+            {/* 292: платежи клиента по рассрочке — график, следующий платёж, просрочка */}
+            {pays.map((x) => <div key={x.id} className="card">
+              <div className="between"><div className="h3" style={{ margin: 0 }}>{T('Платежи клиента · {u}', { u: x.unit })}</div>
+                {x.s!.overdue.length > 0 ? <Pill kind="bad">{T('просрочка {a}', { a: usd(L, x.s!.overdueAmount) })}</Pill> : <Pill kind="ok">{T('по графику')}</Pill>}</div>
+              <div className="small muted mt8">{T('Оплачено {p}% из {t}', { p: Math.round(x.s!.paidPct * 10) / 10, t: usd(L, x.s!.total) })}{x.s!.next ? ' · ' + T('следующий платёж {a} до {d}', { a: usd(L, x.s!.next.amount), d: date(L, x.s!.next.due) }) : ''}</div>
+              <details className="mt8"><summary className="small bronze" style={{ cursor: 'pointer' }}>{T('График')} · {x.s!.rows.length}</summary>
+                {x.s!.rows.map((r) => <div key={r.n} className="kv small"><span>{r.n}. {date(L, r.due)}</span><span className={r.paid ? 'okc' : r.overdue ? 'bad' : ''}>{usd(L, r.amount)}{r.paid ? ' ✓' : r.overdue ? ' · ' + T('просрочен') : ''}</span></div>)}</details>
+            </div>)}
             <div className="card">
               <div className="h3">{T('Задачи')}</div>
               {tasks.map((x) => <form key={x.id} action={toggleTask.bind(null, x.id)} className="kv"><button className="check" style={{ textAlign: 'start' }}><input type="checkbox" readOnly checked={x.done} /> <span style={{ textDecoration: x.done ? 'line-through' : 'none' }}>{T(x.title, fmtVars(L, x.vars))}</span></button><span className="small muted">{date(L, x.due)}</span></form>)}

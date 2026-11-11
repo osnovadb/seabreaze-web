@@ -1,6 +1,8 @@
 import { embedClient } from '@/lib/embed'
 import { EmbedCl } from '@/components/EmbedCl'
 import { EmbedNav } from '@/components/EmbedNav'
+import { OpenFull } from '@/components/OpenFull'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { requireCtx } from '@/lib/auth'
 import { q, one } from '@/lib/db'
@@ -71,7 +73,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <EmbedCl cl={cur?.id || null} />
         {/* QA 09.11: меню раздела во фрейме — крупнее и с подсветкой текущего раздела */}
         {/* М2: во вкладке карточки клиента — только клиентский режим (полоса клиента ниже); общее меню — в разделах левого меню */}
-        {!cur && <EmbedNav items={em.filter((x) => x[2]).map(([h, l]) => [h, T(l)] as [string, string])} />}
+        {!cur && <div className="row" style={{ alignItems: 'center' }}><div style={{ flex: 1, minWidth: 0 }}><EmbedNav items={em.filter((x) => x[2]).map(([h, l]) => [h, T(l)] as [string, string])} /></div>
+          {!isExternal(u.role) && <Suspense><OpenFull label={T('Открыть на весь экран')} /></Suspense>}</div>}
         {cur && <div className="banner" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 24px', background: 'var(--deep-3)', color: '#fff' }}>
           <span className="small">{T('Клиент')}: <b>{cur.name}</b></span>
           <Link href={`/b24/units/${cur.id}`} className="small" style={{ color: '#fff', textDecoration: 'underline' }}>{T('← Units')}</Link>

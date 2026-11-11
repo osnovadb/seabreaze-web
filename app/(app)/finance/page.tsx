@@ -6,6 +6,7 @@ import { canSeeFinance } from '@/lib/perm'
 import { Top, Pill } from '@/components/ui'
 import { dealPaid } from '@/lib/actions'
 import { ROLE_LABEL } from '@/lib/money22'
+import { scheduleOf } from '@/lib/paySchedule'
 import { trancheReceived, recomputeShares, registerCollect, registerConfirm, registerApprove, registerPaid, saveWithholding, adjustment, writeOff, clawbackDecision } from '@/lib/moneyActions'
 
 // 2.2 · §8 Деньги. Админ — весь путь денег; руководитель рынка — свой рынок без доли Caspian; финансы — суммы к получению и выплате.
@@ -29,9 +30,10 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
   const EntChips = () => <div className="chips mt8"><span className="small muted" style={{ alignSelf: 'center' }}>{T('Юрлицо')}:</span>{[['', T('все')], ...ENT.map(([k]) => [k, k])].map(([k, l]) => <a key={k} href={`?tab=${tab}&m=${month}${k ? '&e=' + encodeURIComponent(k) : ''}`} className={'chip' + ((searchParams.e || '') === k ? ' on' : '')}>{l}</a>)}</div>
   const Tabs = () => <div className="tabs">{TABS.filter(([k]) => fin || ['sales', 'tranches', 'register', 'debts'].includes(k)).map(([k, l]) => <a key={k} href={`?tab=${k}`} className={tab === k ? 'on' : ''}>{T(l)}</a>)}</div>
 
-  const deals = tab === 'sales' ? await q<{ id: string; unit: string; project: string; client: string; stage: string; final_price: number; total: number; fix: number | null; paid_pct: number; created_at: string; market: string | null; shares: { role: string; who: string | null; amount: number; got: number }[] | null }>(
+  const deals = tab === 'sales' ? await q<{ id: string; unit: string; project: string; client: string; stage: string; final_price: number; total: number; fix: number | null; snapshot: any; options_usd: number | null; paid_pct: number; created_at: string; market: string | null; shares: { role: string; who: string | null; amount: number; got: number }[] | null }>(
     `select d.id, portal.unit_no(bl.external_id, un.number) unit, p.name project, cl.name client, d.stage, d.final_price::float, d.commission_total::float total, d.paid_pct::float, d.created_at, cl.market,
        (select (b.snapshot->'split'->>'fix')::float from portal.bookings b where b.id = d.booking_id) fix,
+       (select b.snapshot from portal.bookings b where b.id = d.booking_id) snapshot, (select b.options_usd::float from portal.bookings b where b.id = d.booking_id) options_usd,
        (select json_agg(json_build_object('role', s.role, 'who', coalesce(u.name, s.recipient), 'amount', s.amount::float,
           'got', coalesce((select sum(a.amount) from portal.accruals a where a.deal_id = d.id and a.role = s.role and a.status <> 'void'), 0)::float) order by array_position(array['partner','referrer','consultant','escort','seller','market_head','caspian'], s.role))
         from portal.deal_shares s left join portal.users u on u.id = s.user_id where s.deal_id = d.id) shares
@@ -81,7 +83,8 @@ export default async function Finance(props: { searchParams: Promise<{ tab?: str
               <td className="small">{d.client}</td><td>{usd(L, d.final_price)}</td><td><b>{usd(L, d.total)}</b>{d.fix != null && d.total > 0 && <div className="tiny muted">{T('фикс {f} · пул {p}', { f: usd(L, d.fix), p: usd(L, Math.max(0, d.total - d.fix)) })}</div>}{/* М11: комиссия и пул скидки — раздельно */}</td>
               <td className="tiny">{(d.shares || []).filter((s) => !(head && s.role === 'caspian')).map((s) => <div key={s.role}>{T(ROLE_LABEL[s.role])}{s.who && s.role !== 'caspian' && s.who !== ROLE_LABEL[s.role] ? ` · ${T(s.who)}` : ''}: <b>{usd(L, s.amount)}</b>{s.role !== 'caspian' && s.got ? <span className="muted"> ({T('начислено')} {usd(L, s.got)})</span> : ''}</div>)}
                 {!d.shares && <span className="muted">{T('доли не рассчитаны')}</span>}</td>
-              <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><span className="small">%</span><button className="btn btn--sm">{T('Сохранить')}</button></form> : pct(L, d.paid_pct)}</td>
+              <td>{fin ? <form action={dealPaid} className="row" style={{ flexWrap: 'nowrap', gap: 4 }}><input type="hidden" name="id" value={d.id} /><input className="in" name="paid" type="number" min={0} max={100} step="0.01" defaultValue={d.paid_pct} style={{ height: 30, width: 70 }} /><span className="small">%</span><button className="btn btn--sm">{T('Сохранить')}</button></form> : pct(L, d.paid_pct)}
+                {(() => { const sc = d.stage !== 'cancelled' ? scheduleOf(d) : null; return sc && sc.overdue.length > 0 ? <div className="tiny bad">{T('просрочка {a}', { a: usd(L, sc.overdueAmount) })}</div> : sc?.next ? <div className="tiny muted">{T('следующий платёж {a} до {d}', { a: usd(L, sc.next.amount), d: date(L, sc.next.due) })}</div> : null })()}{/* 292 */}</td>
               <td>{fin && d.stage !== 'cancelled' && <form action={recomputeShares}><input type="hidden" name="deal" value={d.id} /><button className="btn btn--sm btn--ghost" title={T('Пересчитать доли по условиям (до первого поступления)')}>↻</button></form>}
                 {fin && d.shares && <details><summary className="tiny bronze" style={{ cursor: 'pointer' }}>{T('Корректировка')}</summary>
                   <form action={adjustment} className="stack mt8" style={{ gap: 4 }}><input type="hidden" name="deal" value={d.id} />

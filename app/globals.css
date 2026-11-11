@@ -396,3 +396,6 @@ summary.btn::-webkit-details-marker { display: none; }
 /* Сравнение сохранённых вариантов — колонками */
 .vcalc__cmp { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .vcalc__cmp .kv > :last-child { white-space: nowrap; }
+
+/* 346: «Открыть на весь экран» во фрейме Bitrix24 */
+.embed-full { margin: 0 16px; padding: 6px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--paper); font-size: 13px; white-space: nowrap; }

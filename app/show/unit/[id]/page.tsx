@@ -8,6 +8,7 @@ import { t, usd, m2 } from '@/lib/i18n'
 import { unitById, codeFor, planUrl, unitNo, projectVisible, plansFor, downGridFor } from '@/lib/catalog'
 import { Calculator } from '@/components/Calculator'
 import { fxFor } from '@/lib/fx'
+import { PriceDual } from '@/components/PriceDual'
 import { promoForUnit } from '@/lib/promo'
 import { priceChain } from '@/lib/plans'
 import { DESIGN, LOBBY } from '@/components/ui'
@@ -45,7 +46,8 @@ export default async function ShowUnit(
         <div className="muted">{T('{r} комн.', { r: u.rooms ?? '' })} · {m2(L, u.area)} · {T('{f} этаж', { f: u.floor })}</div>
         {u.plot_area ? <div className="small mt8">{T('Свой сад')} {m2(L, u.plot_area)}</div> : u.ext_area ? <div className="small mt8">{T('Терраса')} {m2(L, u.ext_area)}</div> : null}
         {free && promo && <div className="mt16"><span className="pill pill--ok">{promo.badge || T('Акция')}</span> <span className="small muted">{promo.name}</span></div>}
-        <div className="big mt16" style={{ fontSize: 32 }}>{free && u.usd ? (promoPrice ? <>{usd(L, promoPrice)} <s className="muted small">{usd(L, u.usd)}</s></> : usd(L, u.usd)) : T('Недоступна')}</div>
+        {/* 317: валюта по рынку клиента */}
+        <div className="mt16">{free && u.usd ? <>{promoPrice && <s className="muted small">{usd(L, u.usd)}</s>}<PriceDual amount={promoPrice || u.usd} fx={fx} lang={L} /></> : <div className="big" style={{ fontSize: 32 }}>{T('Недоступна')}</div>}</div>
         {free && u.usd && <div className="small muted">{usd(L, u.usd / (u.area + (u.plot_area || u.ext_area || 0)))}/m² · {T('расходы на сделку отдельно')}</div>}
         {searchParams.booked && <div className="okbox mt16">{T('Квартира забронирована на 14 дней. Консультант подтвердит бронь у застройщика.')}</div>}
         {free && u.sales_status === 'sales' && c.show?.clientId && (
