@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { genplanOf, viewIndex } from '@/lib/genplan'
+import { preload } from 'react-dom'
 import { plural } from '@/lib/i18n'
 import { deliveryRange, fmtDelivery } from '@/lib/delivery'
 import { notFound } from 'next/navigation'
@@ -81,6 +82,7 @@ export default async function ProjectPage(
     // Денис 11.11: ракурсы генплана — переключатель над картинкой; окружение (метки) — только на основном виде
     const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
     const gp = g0 ? { ...g0.views[vi], note: g0.note, marks: vi === 0 ? g0.marks : [] } : null
+    g0?.views.forEach((v, i) => { if (i !== vi) preload(v.image, { as: 'image' }) }) // О89: картинки других ракурсов — заранее, чтобы контуры не ложились на старую
     const byExt = Object.fromEntries(bs.map((b) => [b.external_id || b.name, b]))
     return (
       <div className="split">

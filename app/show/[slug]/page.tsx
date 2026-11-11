@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { genplanOf, viewIndex } from '@/lib/genplan'
+import { preload } from 'react-dom'
 import { notFound } from 'next/navigation'
 import { requireCtx } from '@/lib/auth'
 import { one, q } from '@/lib/db'
@@ -24,6 +25,7 @@ export default async function ShowProject(
   const g0 = await genplanOf(p.id)
   const vi = g0 ? viewIndex(searchParams.v, g0.views.length) : 0
   const gp = g0 ? g0.views[vi] : null // Денис 11.11: ракурсы генплана
+  g0?.views.forEach((v, i) => { if (i !== vi) preload(v.image, { as: 'image' }) }) // О89
   const byExt = Object.fromEntries(bs.map((x) => [x.external_id || x.name, x]))
   const units = b ? await unitsOfBuilding(b.id) : []
   const rooms = Number(searchParams.r) || undefined
