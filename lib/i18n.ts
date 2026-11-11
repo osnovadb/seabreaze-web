@@ -2,11 +2,16 @@ import en from './dict/en.json'
 import de from './dict/de.json'
 import he from './dict/he.json'
 import ru from './dict/ru.json'
+import az from './dict/az.json'
 
-export type Lang = 'ru' | 'en' | 'de' | 'he'
+export type Lang = 'ru' | 'en' | 'de' | 'he' | 'az'
+// LANGS — языки, которые можно выбрать (переключатель, профиль, письма). az — черновик до вычитки Фуадом (ревью 11.11):
+// в переключателе его нет, включается только cookie ge_lang=az через /dev/lang?l=az (QA) — см. DRAFT_LANGS
 export const LANGS: Lang[] = ['ru', 'en', 'de', 'he']
+export const DRAFT_LANGS: Lang[] = ['az']
+export const isLang = (x: unknown): x is Lang => typeof x === 'string' && ([...LANGS, ...DRAFT_LANGS] as string[]).includes(x)
 export const isRtl = (l: Lang) => l === 'he'
-const DICT: Record<Exclude<Lang, 'ru'>, Record<string, string>> = { en, de, he }
+const DICT: Record<Exclude<Lang, 'ru'>, Record<string, string>> = { en, de, he, az }
 // Русские переопределения: ключ остаётся прежним, показ меняется (например, «Продавец» → «Менеджер по продажам»)
 const RU: Record<string, string> = ru
 
@@ -39,7 +44,7 @@ function dump(lang: Lang, ru: string) {
   try { eval('require')('fs').appendFileSync(process.env.I18N_DUMP, JSON.stringify({ lang, ru }) + '\n') } catch { /* ignore */ }
 }
 
-const LOCALE: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', de: 'de-DE', he: 'he-IL' }
+const LOCALE: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', de: 'de-DE', he: 'he-IL', az: 'az-AZ' }
 export const num = (lang: Lang, n: number, d = 0) => new Intl.NumberFormat(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).format(n)
 export const usd = (lang: Lang, n: number) => (n < 0 ? '−$' : '$') + num(lang, Math.round(Math.abs(n)))
 export const pct = (lang: Lang, n: number) => num(lang, n, Number(n) % 1 ? 1 : 0) + '%'

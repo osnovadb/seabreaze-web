@@ -2,7 +2,7 @@
 // Хранение — в том же текстовом столбце, год впереди: «2027-Q4», «2027», «2025-done» (сдан), чтобы сайты с slice(0, 4) брали год.
 // Без зависимостей — общий для форм, страниц и юнит-тестов.
 export type Delivery = { year: number | null; q: 1 | 2 | 3 | 4 | null; done: boolean }
-type L4 = 'ru' | 'en' | 'de' | 'he'
+type L4 = 'ru' | 'en' | 'de' | 'he' | 'az'
 
 const ROMAN: Record<string, 1 | 2 | 3 | 4> = { i: 1, ii: 2, iii: 3, iv: 4 }
 const asQ = (x: string | undefined): 1 | 2 | 3 | 4 | null => { if (!x) return null; const r = ROMAN[x.toLowerCase()]; if (r) return r; const n = Number(x); return n >= 1 && n <= 4 ? (n as 1 | 2 | 3 | 4) : null }
@@ -37,15 +37,15 @@ export function deliveryFromForm(quarter: string, year: string): string | null {
 }
 
 const RQ = ['', 'I', 'II', 'III', 'IV']
-const DONE: Record<L4, string> = { ru: 'сдан', en: 'completed', de: 'fertiggestellt', he: 'הושלם' }
+const DONE: Record<L4, string> = { ru: 'сдан', en: 'completed', de: 'fertiggestellt', he: 'הושלם', az: 'təhvil verilib' }
 export function fmtDelivery(lang: string, raw: string | null | undefined): string {
   const d = parseDelivery(raw)
   if (!d) return String(raw ?? '').trim() // нераспознанное прежнее значение — как есть
-  const L = (['ru', 'en', 'de', 'he'].includes(lang) ? lang : 'en') as L4
+  const L = (['ru', 'en', 'de', 'he', 'az'].includes(lang) ? lang : 'en') as L4
   if (d.done) return d.year ? `${DONE[L]} · ${d.year}` : DONE[L]
   if (!d.year) return ''
   if (!d.q) return String(d.year)
-  return L === 'ru' ? `${RQ[d.q]} кв. ${d.year}` : L === 'he' ? `רבעון ${d.q} ${d.year}` : `Q${d.q} ${d.year}`
+  return L === 'ru' ? `${RQ[d.q]} кв. ${d.year}` : L === 'he' ? `רבעון ${d.q} ${d.year}` : L === 'az' ? `${d.year}, ${RQ[d.q]} rüb` : `Q${d.q} ${d.year}`
 }
 
 // Ключ сортировки: сданные — раньше всех, затем по году и кварталу; без квартала — в конце года

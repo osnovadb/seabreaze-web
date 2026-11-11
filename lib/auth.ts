@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { SignJWT, jwtVerify } from 'jose'
 import { one } from './db'
 import type { Role } from './perm'
-import type { Lang } from './i18n'
+import { isLang, type Lang } from './i18n'
 
 const KEY = () => new TextEncoder().encode(process.env.SESSION_SECRET || 'dev-secret')
 const COOKIE = 'ge_s'
@@ -59,7 +59,7 @@ export async function getCtx(): Promise<Ctx | null> {
   if (!real || real.session_ver !== s.ver) return null
   const user = (s.as && real.role === 'owner' ? await userById(s.as) : null) || real
   const lc = (await cookies()).get('ge_lang')?.value as Lang | undefined
-  const lang: Lang = lc && ['ru', 'en', 'de', 'he'].includes(lc) ? lc : user.locale
+  const lang: Lang = isLang(lc) ? lc : user.locale
   let show: Ctx['show'] = null
   const sc = (await cookies()).get(SHOW)?.value
   if (sc) {

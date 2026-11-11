@@ -1,7 +1,7 @@
 import './globals.css'
 import { Source_Serif_4, IBM_Plex_Sans, IBM_Plex_Sans_Hebrew } from 'next/font/google'
 import { getCtx } from '@/lib/auth'
-import { isRtl } from '@/lib/i18n'
+import { isRtl, isLang, type Lang } from '@/lib/i18n'
 import { cookies, headers } from 'next/headers'
 import { one } from '@/lib/db'
 import { TableCards } from '@/components/TableCards'
@@ -18,7 +18,7 @@ export default async function Root({ children }: { children: React.ReactNode }) 
   const path = (await headers()).get('x-path') || ''
   // страница подборки — на языке клиента, а не того, кто её открыл
   const selLang = path.startsWith('/s/') ? (await one<{ lang: string }>('select lang from portal.selections where token = $1', [path.slice(3).split('/')[0]]))?.lang : null
-  const lang = (selLang as 'ru' | 'en' | 'de' | 'he' | null) || ctx?.lang || (lc as 'ru' | 'en' | 'de' | 'he') || 'ru'
+  const lang = (selLang as Lang | null) || ctx?.lang || (isLang(lc) ? lc : null) || 'ru'
   return (
     <html lang={lang} dir={isRtl(lang) ? 'rtl' : 'ltr'} className={`${serif.variable} ${sans.variable} ${hebrew.variable}`}>
       <body>{children}<TableCards /></body>
