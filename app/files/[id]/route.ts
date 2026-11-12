@@ -47,13 +47,17 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
     if (img) ok = !ext || (await projectVisible(img.project_id, c.user))
   }
   if (!ok) return new Response('forbidden', { status: 404 })
+  const pub = !!pf || !!(await one(`select 1 from portal.genplans where file_id = $1
+      union all select 1 from portal.genplans g cross join jsonb_array_elements(g.views) v where v->>'file_id' = $1::text
+      union all select 1 from portal.facades where file_id = $1 union all select 1 from portal.floor_plans where file_id = $1
+      union all select 1 from portal.project_settings where cover_file_id = $1 limit 1`, [params.id]))
   // План этажа из Profitbase (/floor): храним ссылку на картинку застройщика, отдаём перенаправлением
   if (f.mime === 'image/url' && /^https:\/\/pb\d+\.profitbase\.ru\//.test(f.disk_name)) return Response.redirect(f.disk_name, 302)
   const p = path.join(process.env.FILES_DIR || './dev-files', path.basename(f.disk_name))
   if (!fs.existsSync(p)) return new Response('missing', { status: 404 })
   const inline = /^(image\/|application\/pdf|video\/)/.test(f.mime)
   return new Response(fs.readFileSync(p), { headers: {
-    'Content-Type': f.mime, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff',
+    'Content-Type': f.mime, 'Cache-Control': pub ? 'private, max-age=3600' : 'no-store', // О102: документы клиента и договор не остаются в кеше общего компьютера 'X-Content-Type-Options': 'nosniff',
     'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.filename)}`,
   } })
 }

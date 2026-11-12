@@ -7,7 +7,7 @@ import { user, agency, register, q, one, close, act, cookie, BASE, uniq, freeUni
 after(close)
 const get = async (u, path, extra = '') => {
   const r = await fetch(BASE + path, { headers: { host: 'portal.pdna.pro', cookie: `ge_s=${await cookie(u)}${extra}` }, redirect: 'manual' })
-  return { status: r.status, html: r.status === 200 ? await r.text() : '' }
+  return { status: r.status, cc: r.headers.get('cache-control') || '', html: r.status === 200 ? await r.text() : '' }
 }
 test('Б9: клиент вкладки Bitrix24 — из адреса (?cl=), без него — без клиента; общей cookie больше нет', async () => {
   const S = await user('seller')
@@ -71,6 +71,7 @@ test('генплан: второй ракурс по ?v=1, переключат�
     const v1 = await get(S, '/projects/test-marina?v=1')
     assert.ok(v1.html.includes(`/files/${fid}`), 'по ?v=1 не второй ракурс')
     for (const src of [g.image, `/files/${fid}`]) assert.equal((await get(S, src)).status, 200, 'картинка ракурса не отдаётся: ' + src)
+    assert.match((await get(S, `/files/${fid}`)).cc, /max-age/, 'О102: картинка разметки потеряла кеш')
     assert.ok(/[0-9]<\/div><div class="small muted">корпус(а|ов)?</.test(v0.html), 'плитка корпусов без числа или слова')
   } finally {
     await q(`update portal.genplans set title = null, views = $2::jsonb where project_id = $1`, [pr.id, JSON.stringify(g.views || [])])
@@ -116,7 +117,9 @@ test('380: «Договор подписан» — только с датой и
   if (src) {
     const fid = (await one(`insert into portal.files (filename, mime, size, disk_name) select 'QA договор', mime, size, disk_name from portal.files where id = $1 returning id`, [src.id])).id
     await q('update portal.deals set contract_file_id = $2 where booking_id = $1', [b.id, fid])
-    assert.equal((await get(OF, `/files/${fid}`)).status, 200, 'файл договора не отдаётся офису')
+    const fo = await get(OF, `/files/${fid}`)
+    assert.equal(fo.status, 200, 'файл договора не отдаётся офису')
+    assert.equal(fo.cc, 'no-store', 'О102: файл договора кешируется браузером: ' + fo.cc)
     assert.equal((await get(S, `/files/${fid}`)).status, 200, 'файл договора не отдаётся сейлзу клиента')
     const ag = await agency('DE'), P = await user('agency_head', { agency_id: ag.id })
     assert.equal((await get(P, `/files/${fid}`)).status, 404, 'файл договора отдан партнёру')
