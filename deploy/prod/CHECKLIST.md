@@ -25,6 +25,13 @@
 - [ ] Денис — владелец, финансы; Филип — владелец, рынок IL; Динара — бэк-офис, финансы (пока dinara@getsmine.io); Константин — руководитель рынка DE; Сарит — сейлз IL; Фуад — бэк-офис, консультант. Алекса не заводим.
 - [ ] Приглашения в Bitrix24 — только после подтверждения списка Денисом.
 
+## Bitrix24 на бою — строго по порядку
+1. Со стенда portal.pdna.pro снять B24_WEBHOOK (сигнал координатора), в v22 и qa22 обнулить b24_deal_id / b24_lead_id / b24_contact_id.
+2. Чистка Bitrix24 — координатор, после «да» Дениса на список.
+3. На бою: B24_WEBHOOK (новый ключ) в portal22.env; курсоры b24:cur:* в базе portal — на момент подключения, чтобы бой не подтянул остатки.
+4. Включить deploy/prod/systemd/getsestate-portal22-b24.{service,timer}.
+5. X-Frame-Options SAMEORIGIN рядом с CSP frame-ancestors: современные браузеры берут frame-ancestors, но проверить фрейм приложения в Bitrix24 руками.
+
 ## Переключение
 - [ ] nginx portal.getsestate.com → служба 2.2; Cloudflare Flexible — без редиректа 80→https.
 - [ ] /dev/login и /dev/lang отвечают 404.

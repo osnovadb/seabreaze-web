@@ -1,0 +1,13 @@
+# Портал 2.2 на бою: обмен с Bitrix24 (очередь и входящие изменения). Включать ПОСЛЕ чистки Bitrix24 и после того, как в
+# /opt/getsestate/env/portal22.env появится B24_WEBHOOK (новый ключ). Пользователь и группа — как у getsestate-portal22.
+[Unit]
+Description=GetsEstate portal 2.2: обмен с Bitrix24
+After=network.target
+[Service]
+Type=oneshot
+User=<пользователь службы getsestate-portal22>
+Group=getsestate
+WorkingDirectory=/opt/getsestate/portal22
+EnvironmentFile=/opt/getsestate/env/portal22.env
+ExecStart=/usr/bin/node scripts/b24worker.mjs
+TimeoutStartSec=120
