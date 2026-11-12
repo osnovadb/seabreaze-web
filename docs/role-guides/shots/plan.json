@@ -1,0 +1,798 @@
+{
+ "users": {
+  "owner": "denis@demo.getsestate",
+  "market_head": "anna.becker@demo.getsestate",
+  "seller": "martin.schulz@demo.getsestate",
+  "office": "leyla.baku@demo.getsestate",
+  "finance": "irina.finance@demo.getsestate",
+  "content": "olga.content@demo.getsestate",
+  "agency_head": "lukas.weber@demo.getsestate",
+  "agent": "sophie.lang@demo.getsestate",
+  "referrer": "mia.roth.test@example.com"
+ },
+ "shots": [
+  {
+   "id": "own-cond",
+   "role": "owner",
+   "path": "/admin/conditions",
+   "cap": {
+    "ru": "Условия проекта",
+    "en": "Project terms",
+    "de": "Projektkonditionen",
+    "he": "תנאי פרויקט"
+   },
+   "t": [
+    {
+     "key": "Объекты и условия",
+     "h": {
+      "ru": "раздел условий в Админке",
+      "en": "terms section in Admin",
+      "de": "Konditionen in der Verwaltung",
+      "he": "אזור התנאים בניהול"
+     }
+    },
+    {
+     "key": "Коммерческие условия",
+     "h": {
+      "ru": "ставки, пул, сроки брони",
+      "en": "rates, pool, reservation periods",
+      "de": "Sätze, Pool, Reservierungsfristen",
+      "he": "שיעורים, מאגר, תקופות הזמנה"
+     }
+    },
+    {
+     "key": "Premium Residence",
+     "within": "main",
+     "h": {
+      "ru": "выберите проект",
+      "en": "choose the project",
+      "de": "Projekt wählen",
+      "he": "בחרו פרויקט"
+     }
+    }
+   ]
+  },
+  {
+   "id": "own-users",
+   "role": "owner",
+   "path": "/admin",
+   "cap": {
+    "ru": "Пользователи и роли",
+    "en": "Users and roles",
+    "de": "Benutzer und Rollen",
+    "he": "משתמשים ותפקידים"
+   },
+   "t": [
+    {
+     "key": "Новый пользователь",
+     "h": {
+      "ru": "пригласить человека",
+      "en": "invite a person",
+      "de": "Person einladen",
+      "he": "הזמנת משתמש"
+     }
+    },
+    {
+     "key": "Изменить",
+     "h": {
+      "ru": "роль, рынок, отключение",
+      "en": "role, market, deactivate",
+      "de": "Rolle, Markt, deaktivieren",
+      "he": "תפקיד, שוק, השבתה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "own-fin",
+   "role": "owner",
+   "path": "/finance",
+   "click": "Реестр выплат",
+   "cap": {
+    "ru": "Реестр выплат за месяц",
+    "en": "Monthly payout register",
+    "de": "Monatliches Auszahlungsregister",
+    "he": "רשימת תשלומים חודשית"
+   },
+   "t": [
+    {
+     "key": "Реестр выплат",
+     "within": "main",
+     "h": {
+      "ru": "проверить и утвердить",
+      "en": "check and approve",
+      "de": "prüfen und genehmigen",
+      "he": "לבדוק ולאשר"
+     }
+    }
+   ]
+  },
+  {
+   "id": "mh-leads",
+   "role": "market_head",
+   "path": "/admin/leads",
+   "cap": {
+    "ru": "Заявки с сайтов",
+    "en": "Website leads",
+    "de": "Website-Anfragen",
+    "he": "פניות מהאתרים"
+   },
+   "t": [
+    {
+     "key": "Заявки с сайтов",
+     "within": "nav",
+     "h": {
+      "ru": "все заявки рынка",
+      "en": "all market leads",
+      "de": "alle Anfragen des Marktes",
+      "he": "כל פניות השוק"
+     }
+    },
+    {
+     "sel": "table tbody tr td:nth-last-child(2)",
+     "h": {
+      "ru": "результат: новый клиент или клиент партнёра",
+      "en": "result: new client or partner’s client",
+      "de": "Ergebnis: neuer Kunde oder Partnerkunde",
+      "he": "תוצאה: לקוח חדש או לקוח של שותף"
+     }
+    }
+   ]
+  },
+  {
+   "id": "mh-agents",
+   "role": "market_head",
+   "path": "/admin/agents",
+   "cap": {
+    "ru": "Заявки партнёров",
+    "en": "Partner applications",
+    "de": "Partneranträge",
+    "he": "בקשות שותפים"
+   },
+   "t": [
+    {
+     "key": "Агенты",
+     "within": "nav",
+     "h": {
+      "ru": "новые заявки агентств и агентов",
+      "en": "new agency and agent applications",
+      "de": "neue Anträge von Agenturen und Partnern",
+      "he": "בקשות חדשות של סוכנויות וסוכנים"
+     }
+    }
+   ]
+  },
+  {
+   "id": "mh-fin",
+   "role": "market_head",
+   "path": "/finance",
+   "click": "Реестр выплат",
+   "cap": {
+    "ru": "Деньги рынка",
+    "en": "Market money",
+    "de": "Geld des Marktes",
+    "he": "כספי השוק"
+   },
+   "t": [
+    {
+     "key": "Реестр выплат",
+     "within": "main",
+     "h": {
+      "ru": "подтвердить начисления рынка",
+      "en": "confirm the market’s accruals",
+      "de": "Abrechnungen des Marktes bestätigen",
+      "he": "לאשר את זיכויי השוק"
+     }
+    }
+   ]
+  },
+  {
+   "id": "sel-clients",
+   "role": "seller",
+   "path": "/clients",
+   "cap": {
+    "ru": "Клиенты",
+    "en": "Clients",
+    "de": "Kunden",
+    "he": "לקוחות"
+   },
+   "t": [
+    {
+     "h": {
+      "ru": "новый клиент",
+      "en": "new client",
+      "de": "neuer Kunde",
+      "he": "לקוח חדש"
+     },
+     "sel": "a[href=\"/clients/new\"]"
+    },
+    {
+     "key": "Воронка",
+     "within": "main",
+     "h": {
+      "ru": "клиенты по стадиям",
+      "en": "clients by stage",
+      "de": "Kunden nach Phase",
+      "he": "לקוחות לפי שלב"
+     }
+    }
+   ]
+  },
+  {
+   "id": "sel-new",
+   "role": "seller",
+   "path": "/clients/new",
+   "cap": {
+    "ru": "Новый клиент и согласие",
+    "en": "New client and consent",
+    "de": "Neuer Kunde und Einwilligung",
+    "he": "לקוח חדש והסכמה"
+   },
+   "t": [
+    {
+     "sel": "input[name=consent], form input[type=checkbox]",
+     "h": {
+      "ru": "клиент знает — ссылку согласия он подтвердит сам",
+      "en": "the client knows — they confirm the consent link themselves",
+      "de": "der Kunde weiß Bescheid — er bestätigt den Einwilligungslink selbst",
+      "he": "הלקוח יודע — הוא מאשר בעצמו את קישור ההסכמה"
+     }
+    },
+    {
+     "key": "Зарегистрировать клиента",
+     "h": {
+      "ru": "сохранить клиента",
+      "en": "save the client",
+      "de": "Kunden speichern",
+      "he": "שמירת הלקוח"
+     }
+    }
+   ]
+  },
+  {
+   "id": "sel-unit",
+   "role": "seller",
+   "path": "UNIT",
+   "cap": {
+    "ru": "Карточка квартиры",
+    "en": "Unit card",
+    "de": "Wohnungskarte",
+    "he": "כרטיס דירה"
+   },
+   "t": [
+    {
+     "key": "Придержать 24 ч",
+     "h": {
+      "ru": "холд на сутки",
+      "en": "24-hour hold",
+      "de": "Hold für 24 Stunden",
+      "he": "החזקה ל־24 שעות"
+     }
+    },
+    {
+     "key": "В подборку",
+     "h": {
+      "ru": "добавить клиенту в подборку",
+      "en": "add to the client’s selection",
+      "de": "zur Auswahl des Kunden",
+      "he": "הוספה למבחר של הלקוח"
+     }
+    },
+    {
+     "key": "Запросить бронь",
+     "h": {
+      "ru": "бронь — подтвердит офис в Баку",
+      "en": "reservation — the Baku office confirms",
+      "de": "Reservierung — das Büro Baku bestätigt",
+      "he": "הזמנה — משרד באקו מאשר"
+     }
+    },
+    {
+     "key": "Показать клиенту",
+     "h": {
+      "ru": "режим показа без внутренних данных",
+      "en": "client view without internal data",
+      "de": "Kundenansicht ohne interne Daten",
+      "he": "תצוגת לקוח בלי נתונים פנימיים"
+     }
+    }
+   ]
+  },
+  {
+   "id": "off-book",
+   "role": "office",
+   "path": "/bookings",
+   "cap": {
+    "ru": "Подтверждение броней",
+    "en": "Confirming reservations",
+    "de": "Reservierungen bestätigen",
+    "he": "אישור הזמנות"
+   },
+   "t": [
+    {
+     "key": "Ждут подтверждения",
+     "within": "main",
+     "h": {
+      "ru": "брони, которые ждут вас",
+      "en": "reservations waiting for you",
+      "de": "Reservierungen, die auf Sie warten",
+      "he": "הזמנות שממתינות לכם"
+     }
+    },
+    {
+     "h": {
+      "ru": "№ брони застройщика",
+      "en": "developer’s reservation no.",
+      "de": "Reservierungsnr. des Bauträgers",
+      "he": "מספר ההזמנה של היזם"
+     },
+     "key": "№ брони застройщика",
+     "within": "main"
+    },
+    {
+     "key": "Подтвердить",
+     "within": "main",
+     "h": {
+      "ru": "подтвердить бронь",
+      "en": "confirm the reservation",
+      "de": "Reservierung bestätigen",
+      "he": "אישור ההזמנה"
+     }
+    },
+    {
+     "key": "Отклонить",
+     "within": "main",
+     "h": {
+      "ru": "отказ с причиной",
+      "en": "reject with a reason",
+      "de": "mit Grund ablehnen",
+      "he": "דחייה עם סיבה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "off-regs",
+   "role": "office",
+   "path": "/registrations",
+   "cap": {
+    "ru": "Регистрации у застройщиков",
+    "en": "Developer registrations",
+    "de": "Registrierungen beim Bauträger",
+    "he": "רישומים אצל היזמים"
+   },
+   "t": [
+    {
+     "key": "Файл застройщику (xlsx)",
+     "h": {
+      "ru": "пакет на день",
+      "en": "daily batch",
+      "de": "Tagespaket",
+      "he": "חבילה יומית"
+     }
+    },
+    {
+     "key": "Отметить отправленными",
+     "h": {
+      "ru": "после отправки",
+      "en": "after sending",
+      "de": "nach dem Senden",
+      "he": "אחרי השליחה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "off-src",
+   "role": "office",
+   "path": "/sources",
+   "cap": {
+    "ru": "Источники данных",
+    "en": "Data sources",
+    "de": "Datenquellen",
+    "he": "מקורות נתונים"
+   },
+   "t": [
+    {
+     "key": "Источники",
+     "within": "nav",
+     "h": {
+      "ru": "статусы и цены из Profitbase",
+      "en": "statuses and prices from Profitbase",
+      "de": "Status und Preise aus Profitbase",
+      "he": "סטטוסים ומחירים מ־Profitbase"
+     }
+    }
+   ]
+  },
+  {
+   "id": "fin-tr",
+   "role": "finance",
+   "path": "/finance",
+   "click": "Транши от застройщиков",
+   "cap": {
+    "ru": "Поступления от застройщиков",
+    "en": "Developer payments",
+    "de": "Zahlungen der Bauträger",
+    "he": "תקבולים מהיזמים"
+   },
+   "t": [
+    {
+     "key": "Транши от застройщиков",
+     "within": "main",
+     "h": {
+      "ru": "отметить поступление",
+      "en": "record the payment",
+      "de": "Eingang erfassen",
+      "he": "רישום התקבול"
+     }
+    }
+   ]
+  },
+  {
+   "id": "fin-reg",
+   "role": "finance",
+   "path": "/finance",
+   "click": "Реестр выплат",
+   "cap": {
+    "ru": "Реестр выплат",
+    "en": "Payout register",
+    "de": "Auszahlungsregister",
+    "he": "רשימת תשלומים"
+   },
+   "t": [
+    {
+     "key": "Реестр выплат",
+     "within": "main",
+     "h": {
+      "ru": "собрать реестр месяца",
+      "en": "build the month’s register",
+      "de": "Monatsregister erstellen",
+      "he": "בניית רשימת החודש"
+     }
+    }
+   ]
+  },
+  {
+   "id": "con-news",
+   "role": "content",
+   "path": "/news",
+   "cap": {
+    "ru": "Новость для партнёров",
+    "en": "News for partners",
+    "de": "Neuigkeit für Partner",
+    "he": "חדשה לשותפים"
+   },
+   "t": [
+    {
+     "key": "Новая запись",
+     "h": {
+      "ru": "тип, язык, текст, рынки",
+      "en": "type, language, text, markets",
+      "de": "Typ, Sprache, Text, Märkte",
+      "he": "סוג, שפה, טקסט, שווקים"
+     }
+    },
+    {
+     "key": "Опубликовать",
+     "h": {
+      "ru": "портал проверит запрещённые слова",
+      "en": "the portal checks forbidden words",
+      "de": "das Portal prüft verbotene Wörter",
+      "he": "הפורטל בודק מילים אסורות"
+     }
+    }
+   ]
+  },
+  {
+   "id": "con-tpl",
+   "role": "content",
+   "path": "/admin/templates",
+   "cap": {
+    "ru": "Шаблоны документов",
+    "en": "Document templates",
+    "de": "Dokumentvorlagen",
+    "he": "תבניות מסמכים"
+   },
+   "t": [
+    {
+     "key": "Сделать активным",
+     "h": {
+      "ru": "включить новую версию",
+      "en": "activate the new version",
+      "de": "neue Version aktivieren",
+      "he": "הפעלת הגרסה החדשה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ah-team",
+   "role": "agency_head",
+   "path": "/team",
+   "cap": {
+    "ru": "Сотрудники агентства",
+    "en": "Agency staff",
+    "de": "Mitarbeiter der Agentur",
+    "he": "עובדי הסוכנות"
+   },
+   "t": [
+    {
+     "key": "Добавить сотрудника",
+     "h": {
+      "ru": "имя, e-mail, язык",
+      "en": "name, email, language",
+      "de": "Name, E-Mail, Sprache",
+      "he": "שם, מייל, שפה"
+     }
+    },
+    {
+     "key": "Создать",
+     "within": "main",
+     "h": {
+      "ru": "сотрудник получит приглашение",
+      "en": "the colleague gets an invitation",
+      "de": "Mitarbeiter erhält eine Einladung",
+      "he": "העובד מקבל הזמנה"
+     }
+    },
+    {
+     "key": "Ссылка для входа",
+     "within": "main",
+     "h": {
+      "ru": "отправить ссылку повторно",
+      "en": "resend the sign-in link",
+      "de": "Anmeldelink erneut senden",
+      "he": "שליחה חוזרת של קישור הכניסה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ah-comm",
+   "role": "agency_head",
+   "path": "/commission",
+   "cap": {
+    "ru": "Комиссия и акты",
+    "en": "Commission and statements",
+    "de": "Provision und Abrechnungen",
+    "he": "עמלה ודוחות"
+   },
+   "t": [
+    {
+     "key": "Акты за месяц",
+     "h": {
+      "ru": "акт месяца",
+      "en": "month’s statement",
+      "de": "Monatsabrechnung",
+      "he": "דוח החודש"
+     }
+    },
+    {
+     "key": "Открыть",
+     "within": "main",
+     "h": {
+      "ru": "«Согласен с актом» и счёт",
+      "en": "“I agree” and invoice",
+      "de": "„Einverstanden“ und Rechnung",
+      "he": "\"מאשר/ת\" וחשבונית"
+     }
+    },
+    {
+     "key": "Данные для выплат",
+     "h": {
+      "ru": "реквизиты для выплат",
+      "en": "payout details",
+      "de": "Auszahlungsdaten",
+      "he": "פרטים לתשלום"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ah-clients",
+   "role": "agency_head",
+   "path": "/clients",
+   "cap": {
+    "ru": "Клиенты агентства",
+    "en": "Agency clients",
+    "de": "Kunden der Agentur",
+    "he": "לקוחות הסוכנות"
+   },
+   "t": [
+    {
+     "h": {
+      "ru": "новый клиент",
+      "en": "new client",
+      "de": "neuer Kunde",
+      "he": "לקוח חדש"
+     },
+     "sel": "a[href=\"/clients/new\"]"
+    },
+    {
+     "key": "Воронка",
+     "within": "main",
+     "h": {
+      "ru": "клиенты сотрудников по стадиям",
+      "en": "staff clients by stage",
+      "de": "Kunden der Mitarbeiter nach Phase",
+      "he": "לקוחות העובדים לפי שלב"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ag-new",
+   "role": "agent",
+   "path": "/clients/new",
+   "cap": {
+    "ru": "Новый клиент и согласие",
+    "en": "New client and consent",
+    "de": "Neuer Kunde und Einwilligung",
+    "he": "לקוח חדש והסכמה"
+   },
+   "t": [
+    {
+     "sel": "input[name=consent], form input[type=checkbox]",
+     "h": {
+      "ru": "клиент знает — ссылку согласия он подтвердит сам",
+      "en": "the client knows — they confirm the consent link themselves",
+      "de": "der Kunde weiß Bescheid — er bestätigt den Einwilligungslink selbst",
+      "he": "הלקוח יודע — הוא מאשר בעצמו את קישור ההסכמה"
+     }
+    },
+    {
+     "key": "Зарегистрировать клиента",
+     "h": {
+      "ru": "сохранить клиента",
+      "en": "save the client",
+      "de": "Kunden speichern",
+      "he": "שמירת הלקוח"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ag-unit",
+   "role": "agent",
+   "path": "UNIT",
+   "cap": {
+    "ru": "Карточка квартиры",
+    "en": "Unit card",
+    "de": "Wohnungskarte",
+    "he": "כרטיס דירה"
+   },
+   "t": [
+    {
+     "key": "Придержать 24 ч",
+     "h": {
+      "ru": "холд на сутки",
+      "en": "24-hour hold",
+      "de": "Hold für 24 Stunden",
+      "he": "החזקה ל־24 שעות"
+     }
+    },
+    {
+     "key": "В подборку",
+     "h": {
+      "ru": "добавить клиенту в подборку",
+      "en": "add to the client’s selection",
+      "de": "zur Auswahl des Kunden",
+      "he": "הוספה למבחר של הלקוח"
+     }
+    },
+    {
+     "key": "Запросить бронь",
+     "h": {
+      "ru": "бронь — подтвердит офис в Баку",
+      "en": "reservation — the Baku office confirms",
+      "de": "Reservierung — das Büro Baku bestätigt",
+      "he": "הזמנה — משרד באקו מאשר"
+     }
+    },
+    {
+     "key": "Показать клиенту",
+     "h": {
+      "ru": "показ клиенту на встрече",
+      "en": "show to the client at a meeting",
+      "de": "dem Kunden beim Termin zeigen",
+      "he": "הצגה ללקוח בפגישה"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ag-sel",
+   "role": "agent",
+   "path": "/selections",
+   "cap": {
+    "ru": "Подборки",
+    "en": "Selections",
+    "de": "Auswahllisten",
+    "he": "מבחרים"
+   },
+   "t": [
+    {
+     "key": "Добавить из каталога",
+     "h": {
+      "ru": "добавить квартиры",
+      "en": "add units",
+      "de": "Wohnungen hinzufügen",
+      "he": "הוספת דירות"
+     }
+    },
+    {
+     "sel": "table tbody tr td:first-child",
+     "h": {
+      "ru": "открыть: ссылка клиенту, WhatsApp",
+      "en": "open: client link, WhatsApp",
+      "de": "öffnen: Kundenlink, WhatsApp",
+      "he": "פתיחה: קישור ללקוח, וואטסאפ"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ag-links",
+   "role": "agent",
+   "path": "/links",
+   "cap": {
+    "ru": "Мои ссылки",
+    "en": "My links",
+    "de": "Meine Links",
+    "he": "הקישורים שלי"
+   },
+   "t": [
+    {
+     "key": "Создать ссылку",
+     "h": {
+      "ru": "страница с квартирами под вашим брендом",
+      "en": "a page of units under your brand",
+      "de": "Seite mit Wohnungen unter Ihrer Marke",
+      "he": "עמוד דירות תחת המותג שלכם"
+     }
+    }
+   ]
+  },
+  {
+   "id": "ref",
+   "role": "referrer",
+   "path": "/refer",
+   "cap": {
+    "ru": "Порекомендовать человека",
+    "en": "Refer someone",
+    "de": "Jemanden empfehlen",
+    "he": "המליצו על מישהו"
+   },
+   "t": [
+    {
+     "key": "Порекомендовать человека",
+     "h": {
+      "ru": "имя, телефон, страна",
+      "en": "name, phone, country",
+      "de": "Name, Telefon, Land",
+      "he": "שם, טלפון, מדינה"
+     }
+    },
+    {
+     "sel": "input[name=consent], form input[type=checkbox]",
+     "h": {
+      "ru": "человек согласен на звонок",
+      "en": "the person agrees to a call",
+      "de": "Person ist mit Anruf einverstanden",
+      "he": "האדם מסכים לשיחה"
+     }
+    },
+    {
+     "key": "Передать контакт",
+     "h": {
+      "ru": "отправить команде",
+      "en": "send to the team",
+      "de": "an das Team senden",
+      "he": "שליחה לצוות"
+     }
+    }
+   ]
+  }
+ ]
+}
