@@ -2835,5 +2835,8 @@
 "от {d}": "dated {d}",
 "возврат комиссии при расторжении — до {d}": "commission clawback on termination — until {d}",
 "договор {n} от {d}": "contract {n} dated {d}",
-"Файл договора": "Contract file"
+"Файл договора": "Contract file",
+"согласие отозвано {d}": "consent withdrawn {d}",
+"Это заявка партнёра — квартиры здесь не ведутся.": "This is a partner application — units are not managed here.",
+"Заявка в «Агенты и заявки»": "Application in “Agents & applications”"
 }

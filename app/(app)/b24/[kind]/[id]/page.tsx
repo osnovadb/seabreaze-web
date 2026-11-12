@@ -4,7 +4,9 @@ import { requireCtx } from '@/lib/auth'
 import { t } from '@/lib/i18n'
 import { hookOn } from '@/lib/b24'
 import { createFromB24 } from '@/lib/b24Actions'
-import { resolveClient, type Kind } from '@/lib/b24link'
+import { resolveClient, dealPipeline, isPartnerPipeline, type Kind } from '@/lib/b24link'
+import { one } from '@/lib/db'
+import Link from 'next/link'
 import { Top } from '@/components/ui'
 
 // 2.2 · Вкладка Units (сделка, контакт) и Selection (лид) в Bitrix24: клиент портала → его карточка с квартирами, подбором и условиями
@@ -18,6 +20,20 @@ export default async function B24Tab(
   if (!['deal', 'contact', 'lead'].includes(kind) || !/^\d+$/.test(params.id)) notFound()
   if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) notFound() // вкладка Bitrix24 — только команде (QA 09.11)
   const L = c.lang, T = (s: string, v?: Record<string, string | number>) => t(L, s, v)
+  // О101: сделка воронки заявок партнёров — заявитель, а не клиент: квартиры здесь не ведутся
+  const pipe = kind === 'deal' ? await dealPipeline(Number(params.id)) : ''
+  if (isPartnerPipeline(pipe)) {
+    const app = await one<{ id: string; name: string }>('select id, coalesce(company, name) as name from portal.agent_applications where b24_deal_id = $1 limit 1', [Number(params.id)]).catch(() => null)
+    return (
+      <>
+        <Top title={T('Units')} sub={pipe} />
+        <div className="page"><div className="card stack" style={{ maxWidth: 640 }}>
+          <div>{T('Это заявка партнёра — квартиры здесь не ведутся.')}</div>
+          {app ? <Link className="bronze" href={`/admin/agents/app/${app.id}`} target="_blank">{T('Заявка в «Агенты и заявки»')}: {app.name}</Link> : <Link className="bronze" href="/admin/agents" target="_blank">{T('Агенты и заявки')}</Link>}
+        </div></div>
+      </>
+    )
+  }
   const r = await resolveClient(kind, Number(params.id))
   if (r.id) redirect(`/b24/ctx?client=${r.id}`) // запомнить клиента вкладки и открыть Units
   // Б9: клиента вкладки больше нет в общей cookie — сбрасывать нечего; без клиента портала адрес вкладки без ?cl=

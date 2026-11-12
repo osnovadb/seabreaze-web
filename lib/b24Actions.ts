@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { q, one, audit } from './db'
 import { requireCtx } from './auth'
-import { b24Person, COL, type Kind } from './b24link'
+import { b24Person, COL, dealPipeline, isPartnerPipeline, type Kind } from './b24link'
 import { pushDeal } from './b24sync'
 import { requestConsent } from './consent'
 import { processJob, pull, runQueue } from './b24x.mjs'
@@ -16,6 +16,7 @@ export async function createFromB24(f: FormData) {
   if (!['owner', 'market_head', 'seller', 'office', 'finance'].includes(c.user.role)) throw new Error('forbidden')
   const kind = String(f.get('kind')) as Kind, id = Number(f.get('id'))
   if (!COL[kind] || !id) throw new Error('bad')
+  if (kind === 'deal' && isPartnerPipeline(await dealPipeline(id))) throw new Error('partner application') // О101: заявителя клиентом не заводим
   const p = await b24Person(kind, id)
   if (!p || (!p.phoneNorm && !p.emailNorm)) redirect(`/b24/${kind}/${id}?embed=1&err=nophone`)
   const n = await one<{ n: number }>(`select nextval('portal.client_reg_seq')::int n`)

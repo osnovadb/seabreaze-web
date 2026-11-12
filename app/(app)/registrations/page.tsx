@@ -72,15 +72,17 @@ export default async function Registrations(props: { searchParams: Promise<RegPa
               {shown.map((r) => {
                 // О23 (обход 11.11): до согласия клиента строка не «к отправке», а «ждёт согласия» — без срока
                 const noConsent = r.status === 'to_send' && r.consent_status !== 'given'
-                const [lab, kind] = noConsent ? ['ждёт согласия клиента', 'off'] as [string, 'off'] : ST[r.status]
+                const wd = r.consent_status === 'withdrawn' // О100: согласие отозвано — ссылку заново не просим
+                const [lab, kind] = noConsent ? [wd ? 'согласие отозвано' : 'ждёт согласия клиента', wd ? 'bad' : 'off'] as [string, 'off' | 'bad'] : ST[r.status]
                 const late = r.status === 'to_send' && !noConsent && !!r.due_send && r.due_send.slice(0, 10) < today // О26: просрочено
                 const term = noConsent ? '' : r.status === 'to_send' ? (r.due_send ? T('передать до {d}', { d: date(L, r.due_send) }) : '') : r.status === 'sent' ? T('ответ до {d}', { d: date(L, r.answer_due!) }) + (r.answer_due! < today ? ' · ' + T(r.silence_rule === 'confirm' ? 'молчание = да' : 'напомнить') : '') : r.valid_until ? T('до {d}', { d: date(L, r.valid_until) }) : ''
                 return (
                   <tr key={r.id}>
                     {/* 313 (Денис 11.11): застройщику — только после согласия клиента; без согласия строку не отметить; по умолчанию не отмечены */}
-                    <td><input type="checkbox" name="rid" value={r.id} disabled={r.consent_status !== 'given'} aria-label={r.client} title={r.consent_status !== 'given' ? T('Нет согласия клиента — отправьте ссылку согласия') : undefined} /></td>
+                    <td><input type="checkbox" name="rid" value={r.id} disabled={r.consent_status !== 'given'} aria-label={r.client} title={r.consent_status === 'withdrawn' ? T('согласие отозвано') : r.consent_status !== 'given' ? T('Нет согласия клиента — отправьте ссылку согласия') : undefined} /></td>
                     <td><Link href={`/clients/${r.client_id}`}>{r.client}</Link><div className="tiny muted">{r.reg_no}{r.country ? ' · ' + r.country : ''}</div>
-                      {r.consent_status !== 'given' && <div className="tiny warnc row" style={{ gap: 6, alignItems: 'center' }}>{T('нет согласия — отправьте ссылку согласия')}
+                      {wd && <div className="tiny badc">{r.withdrawn_at ? T('согласие отозвано {d}', { d: date(L, r.withdrawn_at) }) : T('согласие отозвано')}</div>}
+                      {r.consent_status !== 'given' && !wd && <div className="tiny warnc row" style={{ gap: 6, alignItems: 'center' }}>{T('нет согласия — отправьте ссылку согласия')}
                         {edit && !r.anonymized && <form action={sendConsentLink}><input type="hidden" name="client" value={r.client_id} /><button className="btn btn--sm">{T('Отправить ссылку')}</button></form>}</div>}
                       {r.priority && <div className="tiny bronze">{T('вне очереди — выбрал квартиру')}</div>}{r.mass && <div className="tiny muted">{T('массовая регистрация')}</div>}</td>
                     <td>{r.developer} · {r.project}</td>

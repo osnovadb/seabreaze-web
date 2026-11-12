@@ -5,6 +5,16 @@ import { restHook, hookOn, contactKeys } from './b24'
 export type Kind = 'deal' | 'contact' | 'lead'
 export const COL: Record<Kind, string> = { deal: 'b24_deal_id', contact: 'b24_contact_id', lead: 'b24_lead_id' }
 
+// О101 (12.11): воронки заявок партнёров (Partners DE/IL/Global и прежние Agencies/Sub-agents) — там не клиенты, а заявители;
+// вкладка Units не предлагает завести их клиентом, createFromB24 отказывает
+export const isPartnerPipeline = (name: string) => /^(Partners|Agencies|Sub-agents) /.test(name)
+export async function dealPipeline(id: number): Promise<string> {
+  if (!hookOn()) return ''
+  const d = await restHook('crm.deal.get', { id }).catch(() => null)
+  if (!d) return ''
+  const cats = (await restHook('crm.category.list', { entityTypeId: 2 })).categories as { id: number; name: string }[]
+  return cats.find((x) => String(x.id) === String(d.CATEGORY_ID))?.name || (Number(d.CATEGORY_ID) === 0 ? 'Sales DE' : '')
+}
 // Данные человека из Bitrix24: для сделки — её контакт; рынок — по воронке (Sales DE → DE)
 export async function b24Person(kind: Kind, id: number) {
   if (!hookOn()) return null

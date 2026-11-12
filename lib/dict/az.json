@@ -2835,5 +2835,8 @@
 "от {d}": "{d} tarixli",
 "возврат комиссии при расторжении — до {d}": "ləğv zamanı komissiyanın qaytarılması — {d} tarixinədək",
 "договор {n} от {d}": "{d} tarixli {n} müqavilə",
-"Файл договора": "Müqavilə faylı"
+"Файл договора": "Müqavilə faylı",
+"согласие отозвано {d}": "razılıq {d} geri götürülüb",
+"Это заявка партнёра — квартиры здесь не ведутся.": "Bu tərəfdaş müraciətidir — mənzillər burada aparılmır.",
+"Заявка в «Агенты и заявки»": "«Agentlər və müraciətlər» bölməsində müraciət"
 }
