@@ -1,15 +1,15 @@
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { t, isRtl, type Lang } from '@/lib/i18n'
 import { ApplyForm } from './form'
 import { formToken } from '@/lib/formGuard'
 import { LangSwitch } from '@/components/LangSwitch'
+import { authLang } from '@/components/AuthLayout'
 
 // Ссылки с сайтов рынков: ?lang=de&market=DE — язык и рынок выбраны заранее
 export default async function Apply(props: { searchParams: Promise<{ lang?: string; market?: string }> }) {
   const searchParams = await props.searchParams;
-  const ql = ['ru', 'en', 'de', 'he'].includes(searchParams.lang || '') ? searchParams.lang : null
-  const lang = (ql || (await cookies()).get('ge_lang')?.value || 'de') as Lang
+  // О97: как на /login — ссылка, затем выбранный ранее, затем язык браузера (раньше без параметра всегда немецкий)
+  const lang = authLang(searchParams.lang)
   const T = (s: string) => t(lang, s)
   return (
     <div className="auth" dir={isRtl(lang) ? 'rtl' : 'ltr'}>
