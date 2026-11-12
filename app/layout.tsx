@@ -47,6 +47,7 @@ async function publicLang(path: string, ql: string, lc: string | undefined): Pro
   // остаток ревью 11.11: вход и пароль — тот же язык, что у текста страницы (ссылка → cookie → язык браузера)
   if (path.startsWith('/set-password/')) return (await tokenUser(seg))?.locale || authLang(ql) // как на странице: язык пользователя из ссылки
   if (['/login', '/forgot'].some((x) => path.startsWith(x))) return authLang(ql)
+  if (path === '/apply' || path === '/apply/') return authLang(ql) // О97: как на странице заявки — ссылка → cookie → язык браузера
   if (path.startsWith('/apply')) return four.includes(ql) ? ql : isLang(lc) ? lc : 'de'
   return null
 }
