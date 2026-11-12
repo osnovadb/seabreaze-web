@@ -1,0 +1,1019 @@
+{
+ "vars": {
+  "U": "/units/f47f037a-1b3d-443a-99cc-87aae906ed31",
+  "UNO": "C-303",
+  "CID": "ec66eef8-6162-491a-9ec4-c4af4dd26a38",
+  "SID": "f349334e-c2f4-48f9-bf90-55085496f935",
+  "CNAME": "Laura Fischer",
+  "U2": "/units/25d92571-74a8-4ebf-bef6-3520f7277b78",
+  "UNO2": "D-808"
+ },
+ "users": {
+  "agent": "sophie.lang@demo.getsestate",
+  "office": "leyla.baku@demo.getsestate"
+ },
+ "scen": [
+  {
+   "id": "client",
+   "role": "agent",
+   "title": {
+    "ru": "Как завести клиента",
+    "en": "How to add a client",
+    "de": "Kunden anlegen",
+    "he": "איך מוסיפים לקוח"
+   },
+   "who": {
+    "ru": "Партнёр, руководитель агентства, менеджер по продажам",
+    "en": "Partner, agency head, sales manager",
+    "de": "Partner, Agenturleitung, Vertriebsmanager",
+    "he": "שותף, מנהל סוכנות, נציג מכירות"
+   },
+   "steps": [
+    {
+     "go": "/clients",
+     "txt": {
+      "ru": "Откройте «Клиенты» и нажмите «+ Клиент».",
+      "en": "Open “Clients” and click “+ Client”.",
+      "de": "Öffnen Sie „Kunden“ und klicken Sie auf „+ Kunde“.",
+      "he": "פתחו את \"לקוחות\" ולחצו \"+ לקוח\"."
+     },
+     "t": [
+      {
+       "key": "Клиенты",
+       "within": "nav",
+       "h": {
+        "ru": "раздел клиентов",
+        "en": "clients section",
+        "de": "Kundenbereich",
+        "he": "אזור הלקוחות"
+       }
+      },
+      {
+       "sel": "a[href=\"/clients/new\"]",
+       "h": {
+        "ru": "новый клиент",
+        "en": "new client",
+        "de": "neuer Kunde",
+        "he": "לקוח חדש"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/clients/new",
+     "prep": [
+      {
+       "fill": "input[name=name]",
+       "v": "Max Becker"
+      },
+      {
+       "select": "select[name=country]",
+       "v": "DE"
+      },
+      {
+       "fill": "input[name=phone]",
+       "v": "+49 1500 0000102"
+      },
+      {
+       "fill": "input[name=goal]",
+       "v": {
+        "ru": "отдых",
+        "en": "holiday",
+        "de": "Urlaub",
+        "he": "נופש"
+       }
+      },
+      {
+       "fill": "input[name=budget]",
+       "v": "$200k"
+      },
+      {
+       "fill": "input[name=timeline]",
+       "v": {
+        "ru": "3 месяца",
+        "en": "3 months",
+        "de": "3 Monate",
+        "he": "3 חודשים"
+       }
+      },
+      {
+       "check": "input[name=consent]"
+      }
+     ],
+     "txt": {
+      "ru": "Заполните анкету. Если указать цель, бюджет, срок, страну и язык, клиент сразу закрепится за вами на 6 месяцев. Отметьте, что клиент знает о передаче контактов, и нажмите «Зарегистрировать клиента».",
+      "en": "Fill in the form. With goal, budget, timing, country and language the client is attached to you for 6 months straight away. Tick that the client knows about it and click “Register a client”.",
+      "de": "Füllen Sie das Formular aus. Mit Ziel, Budget, Zeitrahmen, Land und Sprache wird der Kunde sofort für 6 Monate Ihnen zugeordnet. Bestätigen Sie, dass der Kunde Bescheid weiß, und klicken Sie auf „Kunden registrieren“.",
+      "he": "מלאו את הטופס. עם מטרה, תקציב, לוח זמנים, מדינה ושפה הלקוח משויך אליכם מיד ל־6 חודשים. סמנו שהלקוח יודע ולחצו \"רישום לקוח\"."
+     },
+     "t": [
+      {
+       "sel": "input[name=name]",
+       "h": {
+        "ru": "имя и фамилия",
+        "en": "full name",
+        "de": "Vor- und Nachname",
+        "he": "שם מלא"
+       }
+      },
+      {
+       "sel": "input[name=goal]",
+       "h": {
+        "ru": "квалификация: цель, бюджет, срок",
+        "en": "qualification: goal, budget, timing",
+        "de": "Qualifizierung: Ziel, Budget, Zeitrahmen",
+        "he": "אפיון: מטרה, תקציב, לוח זמנים"
+       }
+      },
+      {
+       "sel": "input[name=consent]",
+       "h": {
+        "ru": "клиент знает",
+        "en": "the client knows",
+        "de": "Kunde weiß Bescheid",
+        "he": "הלקוח יודע"
+       }
+      },
+      {
+       "key": "Зарегистрировать клиента",
+       "h": {
+        "ru": "сохранить",
+        "en": "save",
+        "de": "speichern",
+        "he": "שמירה"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/clients/{CID}",
+     "txt": {
+      "ru": "В карточке клиента видно, за кем он закреплён и до какого числа. Ссылку на согласие портал уже отправил клиенту на e-mail. Можно отправить её ещё раз в WhatsApp или скопировать.",
+      "en": "The client card shows who the client is attached to and until when. The portal has already emailed the consent link; you can also send it via WhatsApp or copy it.",
+      "de": "Die Kundenkarte zeigt, wem der Kunde bis wann zugeordnet ist. Den Einwilligungslink hat das Portal schon per E-Mail geschickt – Sie können ihn auch per WhatsApp senden oder kopieren.",
+      "he": "בכרטיס הלקוח רואים למי הוא משויך ועד מתי. הפורטל כבר שלח את קישור ההסכמה במייל; אפשר לשלוח גם בוואטסאפ או להעתיק."
+     },
+     "t": [
+      {
+       "key": "Закреплён до",
+       "within": "main",
+       "h": {
+        "ru": "срок закрепления",
+        "en": "attachment period",
+        "de": "Zuordnungsfrist",
+        "he": "תקופת השיוך"
+       }
+      },
+      {
+       "key": "ждём согласие клиента",
+       "h": {
+        "ru": "статус согласия",
+        "en": "consent status",
+        "de": "Status der Einwilligung",
+        "he": "סטטוס ההסכמה"
+       }
+      },
+      {
+       "sel": "a[href*=\"wa.me\"][href*=\"text=\"]",
+       "h": {
+        "ru": "ссылка согласия в WhatsApp",
+        "en": "consent link via WhatsApp",
+        "de": "Einwilligungslink per WhatsApp",
+        "he": "קישור הסכמה בוואטסאפ"
+       }
+      },
+      {
+       "key": "Скопировать ссылку",
+       "h": {
+        "ru": "скопировать ссылку",
+        "en": "copy the link",
+        "de": "Link kopieren",
+        "he": "העתקת הקישור"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{CTOKEN}",
+     "client": true,
+     "txt": {
+      "ru": "Так ссылку видит клиент: он сам ставит галочки согласия. После этого клиента можно регистрировать у застройщиков и бронировать для него квартиры.",
+      "en": "This is what the client sees: they tick the consent boxes themselves. After that the client can be registered with developers and units reserved for them.",
+      "de": "So sieht der Kunde den Link: Er setzt die Häkchen selbst. Danach kann der Kunde bei Bauträgern registriert und Wohnungen für ihn reserviert werden.",
+      "he": "כך הלקוח רואה את הקישור: הוא מסמן בעצמו את ההסכמות. אחרי זה אפשר לרשום אותו אצל היזמים ולהזמין עבורו דירות."
+     },
+     "t": [
+      {
+       "sel": "form input[type=checkbox]",
+       "h": {
+        "ru": "галочки ставит клиент",
+        "en": "the client ticks",
+        "de": "der Kunde setzt die Häkchen",
+        "he": "הלקוח מסמן"
+       }
+      },
+      {
+       "sel": "form button[type=submit], form button",
+       "h": {
+        "ru": "клиент подтверждает",
+        "en": "the client confirms",
+        "de": "der Kunde bestätigt",
+        "he": "הלקוח מאשר"
+       }
+      }
+     ],
+     "prep": [
+      {
+       "clicklang": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "selection",
+   "role": "agent",
+   "title": {
+    "ru": "Как подобрать квартиры и отправить подборку",
+    "en": "How to pick units and send a selection",
+    "de": "Wohnungen auswählen und Auswahl senden",
+    "he": "איך בוחרים דירות ושולחים מבחר"
+   },
+   "who": {
+    "ru": "Партнёр, менеджер по продажам",
+    "en": "Partner, sales manager",
+    "de": "Partner, Vertriebsmanager",
+    "he": "שותף, נציג מכירות"
+   },
+   "steps": [
+    {
+     "go": "/clients/{CID}",
+     "txt": {
+      "ru": "В карточке клиента нажмите «Подобрать квартиру»: каталог откроется уже для этого клиента.",
+      "en": "In the client card click “Find an apartment”: the catalogue opens for this client.",
+      "de": "Klicken Sie in der Kundenkarte auf „Wohnung finden“ – der Katalog öffnet sich für diesen Kunden.",
+      "he": "בכרטיס הלקוח לחצו \"בחירת דירה\": הקטלוג נפתח עבור הלקוח הזה."
+     },
+     "t": [
+      {
+       "key": "Подобрать квартиру",
+       "h": {
+        "ru": "подбор для клиента",
+        "en": "selection for the client",
+        "de": "Auswahl für den Kunden",
+        "he": "בחירה עבור הלקוח"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/catalog",
+     "txt": {
+      "ru": "Сузьте каталог фильтрами: проект, тип, комнаты, цена, этаж, вид. Откройте подходящую квартиру.",
+      "en": "Narrow the catalogue with filters: project, type, rooms, price, floor, view. Open a suitable unit.",
+      "de": "Grenzen Sie den Katalog mit Filtern ein: Projekt, Typ, Zimmer, Preis, Etage, Ausblick. Öffnen Sie eine passende Wohnung.",
+      "he": "צמצמו את הקטלוג במסננים: פרויקט, סוג, חדרים, מחיר, קומה, נוף. פתחו דירה מתאימה."
+     },
+     "t": [
+      {
+       "sel": "select",
+       "h": {
+        "ru": "проект",
+        "en": "project",
+        "de": "Projekt",
+        "he": "פרויקט"
+       }
+      },
+      {
+       "key": "Студия",
+       "h": {
+        "ru": "тип и комнаты",
+        "en": "type and rooms",
+        "de": "Typ und Zimmer",
+        "he": "סוג וחדרים"
+       }
+      },
+      {
+       "sel": "a[href^=\"/units/\"]",
+       "h": {
+        "ru": "открыть квартиру",
+        "en": "open the unit",
+        "de": "Wohnung öffnen",
+        "he": "פתיחת הדירה"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{U}",
+     "txt": {
+      "ru": "В карточке квартиры выберите клиента и нажмите «В подборку». Квартира добавится в подборку этого клиента.",
+      "en": "In the unit card pick the client and click “Add to selection”. The unit is added to that client’s selection.",
+      "de": "Wählen Sie in der Wohnungskarte den Kunden und klicken Sie auf „Zur Auswahl“. Die Wohnung kommt in seine Auswahl.",
+      "he": "בכרטיס הדירה בחרו את הלקוח ולחצו \"הוספה למבחר\". הדירה נוספת למבחר של הלקוח."
+     },
+     "t": [
+      {
+       "sel": "select[name=client]",
+       "nth": 1,
+       "h": {
+        "ru": "клиент",
+        "en": "client",
+        "de": "Kunde",
+        "he": "לקוח"
+       }
+      },
+      {
+       "key": "В подборку",
+       "h": {
+        "ru": "добавить в подборку",
+        "en": "add to the selection",
+        "de": "zur Auswahl",
+        "he": "הוספה למבחר"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/selections/{SID}",
+     "txt": {
+      "ru": "В подборке выберите язык для клиента и отправьте ссылку в WhatsApp. В подборке нет контактов застройщика. Когда клиент откроет ссылку, вам придёт уведомление.",
+      "en": "In the selection choose the client’s language and send the link via WhatsApp. It has no developer contacts; you are notified when the client opens it.",
+      "de": "Wählen Sie in der Auswahl die Sprache des Kunden und senden Sie den Link per WhatsApp. Keine Kontakte des Bauträgers; Sie werden benachrichtigt, wenn der Kunde öffnet.",
+      "he": "במבחר בחרו את שפת הלקוח ושלחו את הקישור בוואטסאפ. אין בו פרטי היזם; תקבלו התראה כשהלקוח יפתח."
+     },
+     "t": [
+      {
+       "key": "Язык для клиента",
+       "h": {
+        "ru": "язык подборки",
+        "en": "selection language",
+        "de": "Sprache der Auswahl",
+        "he": "שפת המבחר"
+       }
+      },
+      {
+       "key": "Отправить в WhatsApp",
+       "h": {
+        "ru": "отправить клиенту",
+        "en": "send to the client",
+        "de": "an den Kunden senden",
+        "he": "שליחה ללקוח"
+       }
+      },
+      {
+       "key": "Как видит клиент",
+       "h": {
+        "ru": "проверить, как видит клиент",
+        "en": "check the client view",
+        "de": "Kundenansicht prüfen",
+        "he": "בדיקת תצוגת הלקוח"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{SVIEW}",
+     "client": true,
+     "txt": {
+      "ru": "Так подборку видит клиент: квартиры, цены и варианты оплаты, которые вы для него сохранили.",
+      "en": "This is the client’s view: units, prices and the payment options you saved for them.",
+      "de": "So sieht der Kunde die Auswahl: Wohnungen, Preise und die für ihn gespeicherten Zahlungsvarianten.",
+      "he": "כך הלקוח רואה את המבחר: דירות, מחירים וחלופות התשלום ששמרתם עבורו."
+     },
+     "t": []
+    }
+   ]
+  },
+  {
+   "id": "calc",
+   "role": "agent",
+   "title": {
+    "ru": "Как рассчитать варианты оплаты в калькуляторе",
+    "en": "How to calculate payment options",
+    "de": "Zahlungsvarianten berechnen",
+    "he": "איך מחשבים חלופות תשלום"
+   },
+   "who": {
+    "ru": "Партнёр, менеджер по продажам",
+    "en": "Partner, sales manager",
+    "de": "Partner, Vertriebsmanager",
+    "he": "שותף, נציג מכירות"
+   },
+   "steps": [
+    {
+     "go": "{U}",
+     "scroll": "Калькулятор вариантов",
+     "txt": {
+      "ru": "В карточке квартиры откройте «Калькулятор вариантов» и выберите полную оплату или рассрочку.",
+      "en": "In the unit card open the payment options calculator and choose full payment or instalments.",
+      "de": "Öffnen Sie in der Wohnungskarte den Finanzierungsrechner und wählen Sie Vollzahlung oder Ratenzahlung.",
+      "he": "בכרטיס הדירה פתחו את מחשבון החלופות ובחרו תשלום מלא או תשלומים."
+     },
+     "t": [
+      {
+       "key": "Полная оплата",
+       "h": {
+        "ru": "оплата сразу",
+        "en": "pay in full",
+        "de": "Vollzahlung",
+        "he": "תשלום מלא"
+       }
+      },
+      {
+       "key": "Рассрочка до",
+       "h": {
+        "ru": "рассрочка",
+        "en": "instalments",
+        "de": "Ratenzahlung",
+        "he": "תשלומים"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{U}",
+     "scroll": "Калькулятор вариантов",
+     "prep": [
+      {
+       "fill": "input:not([type])",
+       "v": "30"
+      },
+      {
+       "fill": "input[type=number]",
+       "v": "36"
+      },
+      {
+       "fill": "input[type=number]",
+       "i": 1,
+       "v": "3"
+      },
+      {
+       "fill": "input[name=name]",
+       "v": "30% · 36"
+      },
+      {
+       "select": "select[name=client]",
+       "v": "{CID}"
+      }
+     ],
+     "txt": {
+      "ru": "Задайте первый взнос, срок рассрочки и скидку клиенту из вашей части. Цена, платёж в месяц и весь график пересчитаются сразу.",
+      "en": "Set the down payment, the term and the client discount from your share. The price, monthly payment and full schedule update at once.",
+      "de": "Legen Sie Anzahlung, Laufzeit und Kundenrabatt aus Ihrem Anteil fest. Preis, Monatsrate und Zahlungsplan werden sofort neu berechnet.",
+      "he": "קבעו מקדמה, תקופת תשלומים והנחה ללקוח מהחלק שלכם. המחיר, התשלום החודשי והלוח מתעדכנים מיד."
+     },
+     "t": [
+      {
+       "sel": "input:not([type])",
+       "h": {
+        "ru": "первый взнос, %",
+        "en": "down payment, %",
+        "de": "Anzahlung, %",
+        "he": "מקדמה, %"
+       }
+      },
+      {
+       "sel": "input[type=number]",
+       "h": {
+        "ru": "срок, мес.",
+        "en": "term, months",
+        "de": "Laufzeit, Monate",
+        "he": "תקופה, חודשים"
+       }
+      },
+      {
+       "sel": "input[type=number]",
+       "nth": 1,
+       "h": {
+        "ru": "скидка клиенту, %",
+        "en": "client discount, %",
+        "de": "Kundenrabatt, %",
+        "he": "הנחה ללקוח, %"
+       }
+      },
+      {
+       "key": "Платёж в месяц",
+       "h": {
+        "ru": "итог для клиента",
+        "en": "result for the client",
+        "de": "Ergebnis für den Kunden",
+        "he": "התוצאה ללקוח"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{U}",
+     "scroll": "Сохранить вариант",
+     "prep": [
+      {
+       "fill": "input:not([type])",
+       "v": "30"
+      },
+      {
+       "fill": "input[type=number]",
+       "v": "36"
+      },
+      {
+       "fill": "input[type=number]",
+       "i": 1,
+       "v": "3"
+      },
+      {
+       "fill": "input[name=name]",
+       "v": "30% · 36"
+      },
+      {
+       "select": "select[name=client]",
+       "v": "{CID}"
+      }
+     ],
+     "txt": {
+      "ru": "Назовите вариант для себя, выберите клиента и нажмите «Сохранить вариант». Для клиента можно сохранить до 3 вариантов, он увидит их как «Вариант 1–3».",
+      "en": "Name the option for yourself, pick the client and click “Save option”. Up to 3 options per client; the client sees them as “Option 1–3”.",
+      "de": "Benennen Sie die Variante für sich, wählen Sie den Kunden und klicken Sie auf „Variante speichern“. Bis zu 3 Varianten pro Kunde; er sieht sie als „Variante 1–3“.",
+      "he": "תנו לחלופה שם לשימושכם, בחרו לקוח ולחצו \"שמירת חלופה\". עד 3 חלופות ללקוח; הוא רואה אותן כ\"חלופה 1–3\"."
+     },
+     "t": [
+      {
+       "sel": "input[name=name]",
+       "h": {
+        "ru": "название — только для вас",
+        "en": "name — only for you",
+        "de": "Name – nur für Sie",
+        "he": "שם — רק עבורכם"
+       }
+      },
+      {
+       "sel": "select[name=client]",
+       "h": {
+        "ru": "клиент",
+        "en": "client",
+        "de": "Kunde",
+        "he": "לקוח"
+       }
+      },
+      {
+       "key": "Сохранить вариант",
+       "h": {
+        "ru": "сохранить",
+        "en": "save",
+        "de": "speichern",
+        "he": "שמירה"
+       }
+      }
+     ],
+     "do": []
+    },
+    {
+     "go": "/selections/{SID}",
+     "txt": {
+      "ru": "Сохранённые варианты видны в подборке клиента. Лишний вариант можно скрыть, а график платежей приложить к подборке.",
+      "en": "Saved options appear in the client’s selection. Hide an option you don’t need or attach the payment schedule.",
+      "de": "Gespeicherte Varianten erscheinen in der Auswahl des Kunden. Blenden Sie überflüssige aus oder hängen Sie den Zahlungsplan an.",
+      "he": "החלופות השמורות מופיעות במבחר של הלקוח. אפשר להסתיר חלופה או לצרף לוח תשלומים."
+     },
+     "t": [
+      {
+       "key": "Варианты расчёта для клиента",
+       "h": {
+        "ru": "варианты для клиента",
+        "en": "options for the client",
+        "de": "Varianten für den Kunden",
+        "he": "חלופות ללקוח"
+       }
+      },
+      {
+       "key": "График платежей для клиента",
+       "h": {
+        "ru": "приложить график",
+        "en": "attach the schedule",
+        "de": "Zahlungsplan anhängen",
+        "he": "צירוף לוח התשלומים"
+       }
+      },
+      {
+       "key": "Сохранить заметки, графики и варианты",
+       "h": {
+        "ru": "сохранить подборку",
+        "en": "save the selection",
+        "de": "Auswahl speichern",
+        "he": "שמירת המבחר"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "show",
+   "role": "agent",
+   "title": {
+    "ru": "Как показать квартиру клиенту на встрече",
+    "en": "How to show a unit to a client at a meeting",
+    "de": "Wohnung beim Termin zeigen",
+    "he": "איך מציגים דירה ללקוח בפגישה"
+   },
+   "who": {
+    "ru": "Партнёр, менеджер по продажам",
+    "en": "Partner, sales manager",
+    "de": "Partner, Vertriebsmanager",
+    "he": "שותף, נציג מכירות"
+   },
+   "steps": [
+    {
+     "go": "{U2}",
+     "txt": {
+      "ru": "В карточке квартиры нажмите «Показать клиенту». Портал перейдёт в режим показа.",
+      "en": "In the unit card click “Show to client”. The portal switches to presentation mode.",
+      "de": "Klicken Sie in der Wohnungskarte auf „Dem Kunden zeigen“. Das Portal wechselt in den Präsentationsmodus.",
+      "he": "בכרטיס הדירה לחצו \"הצגה ללקוח\". הפורטל עובר למצב הצגה."
+     },
+     "t": [
+      {
+       "key": "Показать клиенту",
+       "h": {
+        "ru": "режим показа",
+        "en": "presentation mode",
+        "de": "Präsentationsmodus",
+        "he": "מצב הצגה"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/show/unit/25d92571-74a8-4ebf-bef6-3520f7277b78",
+     "txt": {
+      "ru": "В режиме показа клиент видит квартиру, цену и рассрочку без ваших доходов, условий застройщика и других клиентов. Экран можно спокойно повернуть к клиенту.",
+      "en": "In presentation mode the client sees the unit, price and instalments — without your earnings, developer terms or other clients. You can safely turn the screen to the client.",
+      "de": "Im Präsentationsmodus sieht der Kunde Wohnung, Preis und Raten – ohne Ihre Einnahmen, Bauträgerkonditionen oder andere Kunden. Sie können den Bildschirm ruhig zum Kunden drehen.",
+      "he": "במצב הצגה הלקוח רואה את הדירה, המחיר והתשלומים — בלי ההכנסות שלכם, תנאי היזם או לקוחות אחרים. אפשר להפנות את המסך ללקוח."
+     },
+     "t": [
+      {
+       "key": "Рассрочка и платежи",
+       "h": {
+        "ru": "рассрочка для клиента",
+        "en": "instalments for the client",
+        "de": "Raten für den Kunden",
+        "he": "תשלומים ללקוח"
+       }
+      },
+      {
+       "sel": "a[href=\"/show/exit\"]",
+       "h": {
+        "ru": "выход из показа — по PIN",
+        "en": "exit presentation — with PIN",
+        "de": "Präsentation beenden – mit PIN",
+        "he": "יציאה מההצגה — עם PIN"
+       }
+      }
+     ],
+     "after": "relogin",
+     "perLang": [
+      {
+       "go": "{U2}"
+      },
+      {
+       "click": "Показать клиенту"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "booking",
+   "role": "agent",
+   "title": {
+    "ru": "Как поставить холд и запросить бронь",
+    "en": "How to hold a unit and request a reservation",
+    "de": "Hold setzen und Reservierung anfragen",
+    "he": "איך מחזיקים דירה ומבקשים הזמנה"
+   },
+   "who": {
+    "ru": "Партнёр, руководитель агентства, менеджер по продажам",
+    "en": "Partner, agency head, sales manager",
+    "de": "Partner, Agenturleitung, Vertriebsmanager",
+    "he": "שותף, מנהל סוכנות, נציג מכירות"
+   },
+   "steps": [
+    {
+     "go": "{U2}",
+     "txt": {
+      "ru": "Выберите клиента и нажмите «Придержать 24 ч». Квартира будет за вами сутки, пока вы согласуете бронь с клиентом.",
+      "en": "Pick the client and click “Hold 24 h”. The unit is yours for a day while you agree the reservation with the client.",
+      "de": "Wählen Sie den Kunden und klicken Sie auf „24 h vormerken“. Die Wohnung ist einen Tag für Sie reserviert, während Sie mit dem Kunden sprechen.",
+      "he": "בחרו לקוח ולחצו \"החזקה ל־24 שעות\". הדירה שמורה לכם ליממה בזמן שאתם מתאמים עם הלקוח."
+     },
+     "t": [
+      {
+       "sel": "select[name=client]",
+       "nth": 1,
+       "h": {
+        "ru": "клиент",
+        "en": "client",
+        "de": "Kunde",
+        "he": "לקוח"
+       }
+      },
+      {
+       "key": "Придержать 24 ч",
+       "h": {
+        "ru": "холд на сутки",
+        "en": "24-hour hold",
+        "de": "Hold für 24 Stunden",
+        "he": "החזקה ליממה"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{U}/book",
+     "scroll": "План оплаты",
+     "txt": {
+      "ru": "Откроется форма брони. Выберите план оплаты и скидку клиенту из вашей части. Справа видно, сколько заплатит клиент и сколько получите вы.",
+      "en": "The reservation form opens. Choose the payment plan and the client discount from your share; you see what the client pays and what you earn.",
+      "de": "Das Reservierungsformular öffnet sich. Wählen Sie Zahlungsplan und Kundenrabatt aus Ihrem Anteil; Sie sehen, was der Kunde zahlt und was Sie verdienen.",
+      "he": "נפתח טופס ההזמנה. בחרו מסלול תשלום והנחה ללקוח מהחלק שלכם; רואים כמה הלקוח משלם וכמה תרוויחו."
+     },
+     "t": [
+      {
+       "key": "Полная оплата",
+       "h": {
+        "ru": "полная оплата",
+        "en": "full payment",
+        "de": "Vollzahlung",
+        "he": "תשלום מלא"
+       }
+      },
+      {
+       "key": "Рассрочка до",
+       "h": {
+        "ru": "рассрочка",
+        "en": "instalments",
+        "de": "Ratenzahlung",
+        "he": "תשלומים"
+       }
+      },
+      {
+       "sel": "input[type=range]",
+       "h": {
+        "ru": "скидка клиенту из вашей части",
+        "en": "client discount from your share",
+        "de": "Kundenrabatt aus Ihrem Anteil",
+        "he": "הנחה ללקוח מהחלק שלכם"
+       }
+      },
+      {
+       "key": "Ваш доход по сделке",
+       "h": {
+        "ru": "ваш доход",
+        "en": "your earnings",
+        "de": "Ihre Einnahmen",
+        "he": "ההכנסה שלכם"
+       }
+      }
+     ]
+    },
+    {
+     "go": "{U}/book",
+     "scroll": "Клиент (закреплённый за вами)",
+     "txt": {
+      "ru": "Ниже выберите клиента и способ подписания и нажмите «Запросить бронь по …». Цена и условия зафиксируются в брони.",
+      "en": "Below, pick the client and how the contract is signed, then click “Request reservation at …”. Price and terms are fixed in the reservation.",
+      "de": "Wählen Sie unten den Kunden und die Art der Unterzeichnung und klicken Sie auf „Reservierung zu … anfragen“. Preis und Konditionen werden festgehalten.",
+      "he": "למטה בחרו לקוח ואופן חתימה ולחצו \"בקשת הזמנה ב־…\". המחיר והתנאים מקובעים בהזמנה."
+     },
+     "prep": [
+      {
+       "select": "select[name=client]",
+       "v": "{CID}"
+      },
+      {
+       "select": "select[name=signing]",
+       "v": "remote"
+      }
+     ],
+     "t": [
+      {
+       "sel": "select[name=client]",
+       "h": {
+        "ru": "клиент",
+        "en": "client",
+        "de": "Kunde",
+        "he": "לקוח"
+       }
+      },
+      {
+       "sel": "select[name=signing]",
+       "h": {
+        "ru": "подписание",
+        "en": "signing",
+        "de": "Unterzeichnung",
+        "he": "חתימה"
+       }
+      },
+      {
+       "key": "Запросить бронь по",
+       "h": {
+        "ru": "запросить бронь",
+        "en": "request the reservation",
+        "de": "Reservierung anfragen",
+        "he": "בקשת ההזמנה"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/bookings",
+     "txt": {
+      "ru": "Бронь появится в «Бронях» со статусом «ждёт офис в Баку». Офис подтвердит её у застройщика, вам придёт уведомление.",
+      "en": "The reservation appears in “Bookings” with the status “awaiting Baku office”. The office confirms it with the developer and you get a notification.",
+      "de": "Die Reservierung erscheint unter „Reservierungen“ mit dem Status „wartet auf Büro Baku“. Das Büro bestätigt beim Bauträger, Sie werden benachrichtigt.",
+      "he": "ההזמנה מופיעה ב\"הזמנות\" בסטטוס \"ממתינה למשרד בבאקו\". המשרד מאשר מול היזם ותקבלו התראה."
+     },
+     "t": [
+      {
+       "near": "{UNO2}",
+       "sel": "td",
+       "h": {
+        "ru": "ваша бронь",
+        "en": "your reservation",
+        "de": "Ihre Reservierung",
+        "he": "ההזמנה שלכם"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "sel": "span, .pill",
+       "pick": "last",
+       "h": {
+        "ru": "статус",
+        "en": "status",
+        "de": "Status",
+        "he": "סטטוס"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "confirm",
+   "role": "office",
+   "title": {
+    "ru": "Как офис подтверждает бронь",
+    "en": "How the office confirms a reservation",
+    "de": "Reservierung bestätigen (Büro)",
+    "he": "איך המשרד מאשר הזמנה"
+   },
+   "who": {
+    "ru": "Офис в Баку, владелец",
+    "en": "Baku office, owner",
+    "de": "Büro Baku, Inhaber",
+    "he": "משרד באקו, בעלים"
+   },
+   "steps": [
+    {
+     "go": "/bookings",
+     "click": "Ждут подтверждения",
+     "txt": {
+      "ru": "Откройте «Брони» → «Ждут подтверждения». Поставьте бронь у застройщика в его системе.",
+      "en": "Open “Bookings” → “Awaiting confirmation”. Reserve the unit in the developer’s system.",
+      "de": "Öffnen Sie „Reservierungen“ → „Warten auf Bestätigung“. Reservieren Sie die Wohnung im System des Bauträgers.",
+      "he": "פתחו \"הזמנות\" ← \"ממתינות לאישור\". הזמינו את הדירה במערכת של היזם."
+     },
+     "t": [
+      {
+       "key": "Ждут подтверждения",
+       "within": "main",
+       "h": {
+        "ru": "брони на подтверждение",
+        "en": "reservations to confirm",
+        "de": "zu bestätigende Reservierungen",
+        "he": "הזמנות לאישור"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "sel": "td",
+       "h": {
+        "ru": "бронь партнёра",
+        "en": "partner’s reservation",
+        "de": "Reservierung des Partners",
+        "he": "הזמנת השותף"
+       }
+      }
+     ]
+    },
+    {
+     "go": "/bookings",
+     "click": "Ждут подтверждения",
+     "prep": [
+      {
+       "nearfill": "{UNO2}",
+       "sel": "input:not([type=hidden]):not([type=checkbox]):not([type=date])",
+       "v": "PR-2026-4471"
+      }
+     ],
+     "txt": {
+      "ru": "Впишите номер брони застройщика и дату, до которой он держит квартиру, и нажмите «Подтвердить». Если бронь невозможна, выберите причину и нажмите «Отклонить».",
+      "en": "Enter the developer’s reservation number and the date it holds the unit until, then click “Confirm”. If it is not possible, choose a reason and click “Reject”.",
+      "de": "Tragen Sie die Reservierungsnummer des Bauträgers und das Datum ein und klicken Sie auf „Bestätigen“. Geht es nicht, Grund wählen und „Ablehnen“.",
+      "he": "הזינו את מספר ההזמנה של היזם ואת התאריך ולחצו \"אישור\". אם לא אפשרי — בחרו סיבה ולחצו \"דחייה\"."
+     },
+     "t": [
+      {
+       "near": "{UNO2}",
+       "sel": "input:not([type=hidden]):not([type=checkbox]):not([type=date])",
+       "h": {
+        "ru": "№ брони застройщика",
+        "en": "developer’s reservation no.",
+        "de": "Reservierungsnr. des Bauträgers",
+        "he": "מספר ההזמנה של היזם"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "sel": "input[type=date]",
+       "h": {
+        "ru": "до какого числа",
+        "en": "valid until",
+        "de": "gültig bis",
+        "he": "בתוקף עד"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "key": "Подтвердить",
+       "h": {
+        "ru": "подтвердить",
+        "en": "confirm",
+        "de": "bestätigen",
+        "he": "אישור"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "key": "Отклонить",
+       "h": {
+        "ru": "отказ с причиной",
+        "en": "reject with a reason",
+        "de": "mit Grund ablehnen",
+        "he": "דחייה עם סיבה"
+       }
+      }
+     ],
+     "do": [
+      {
+       "nearfill": "{UNO2}",
+       "sel": "input:not([type=hidden]):not([type=checkbox]):not([type=date])",
+       "v": "PR-2026-4471"
+      },
+      {
+       "neardate": "{UNO2}",
+       "v": "10122026"
+      },
+      {
+       "nearclick": "{UNO2}",
+       "key": "Подтвердить"
+      }
+     ]
+    },
+    {
+     "go": "/bookings",
+     "click": "Активные",
+     "txt": {
+      "ru": "Бронь стала «подтверждена». Партнёр получил уведомление. За 3 дня до конца брони и в последний день вам придёт задача: продлить или снять.",
+      "en": "The reservation is now “confirmed” and the partner is notified. 3 days before it ends and on the last day you get a task: extend or release.",
+      "de": "Die Reservierung ist „bestätigt“, der Partner wird benachrichtigt. 3 Tage vor Ablauf und am letzten Tag kommt eine Aufgabe: verlängern oder aufheben.",
+      "he": "ההזמנה \"אושרה\" והשותף קיבל התראה. 3 ימים לפני הסוף וביום האחרון תקבלו משימה: להאריך או לשחרר."
+     },
+     "t": [
+      {
+       "near": "{UNO2}",
+       "sel": "td",
+       "h": {
+        "ru": "подтверждённая бронь",
+        "en": "confirmed reservation",
+        "de": "bestätigte Reservierung",
+        "he": "הזמנה מאושרת"
+       }
+      },
+      {
+       "near": "{UNO2}",
+       "key": "Снять",
+       "h": {
+        "ru": "снять бронь",
+        "en": "release",
+        "de": "aufheben",
+        "he": "שחרור"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
