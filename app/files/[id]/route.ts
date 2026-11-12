@@ -25,6 +25,11 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
   }
   // Акт вознаграждения — финансам, владельцу и партнёру этого акта
   if (!ok) { const ad = await one<{ agent_id: string }>(`select ca.agent_id from portal.documents d join portal.commission_acts ca on ca.document_id = d.id where d.kind = 'commission_act' and $1 in (d.docx_file_id, d.pdf_file_id)`, [params.id]); if (ad) ok = ['owner', 'finance'].includes(c.user.role) || ad.agent_id === c.user.id }
+  // О99: файл договора по сделке — команде, которой виден клиент (партнёру не отдаём)
+  if (!ok && !ext) {
+    const dl = await one<{ client_id: string }>('select client_id from portal.deals where contract_file_id = $1 limit 1', [params.id])
+    if (dl) { const cs = clientScope(c.user); ok = !!(await one(`select 1 from portal.clients cl where cl.id = $${cs.params.length + 1} and ${cs.sql}`, [...cs.params, dl.client_id])) }
+  }
   // Шаблоны документов (М8) — тем, кто их ведёт
   if (!ok && (c.user.role === 'owner' || c.user.role === 'content')) ok = !!(await one('select 1 from portal.doc_templates where file_id = $1', [params.id]))
   // Документы к заявке партнёра — владельцу и проверяющим её рынка (руководитель рынка, менеджер)

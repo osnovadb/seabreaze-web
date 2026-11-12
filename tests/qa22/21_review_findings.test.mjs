@@ -2,7 +2,7 @@
 // Б12 обезличенный клиент — карточка закрыта
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { user, register, q, one, close, act, cookie, BASE, uniq, freeUnit, lastBooking } from './h.mjs'
+import { user, agency, register, q, one, close, act, cookie, BASE, uniq, freeUnit, lastBooking } from './h.mjs'
 
 after(close)
 const get = async (u, path, extra = '') => {
@@ -111,5 +111,16 @@ test('380: «Договор подписан» — только с датой и
   await act(OF, 'bookingAction', { id: b.id, act: 'contract', contract_date: '2026-10-01', contract_no: 'SPA-QA-380' })
   const d = await one('select contract_date::text, contract_no from portal.deals where booking_id = $1', [b.id])
   assert.equal(d?.contract_no, 'SPA-QA-380'); assert.equal(d?.contract_date, '2026-10-01')
+  // О99: файл договора отдаётся команде клиента, партнёру — нет; ссылка — в карточке клиента
+  const src = await one(`select id from portal.files where mime = 'application/pdf' or mime like 'image/%' order by created_at limit 1`)
+  if (src) {
+    const fid = (await one(`insert into portal.files (filename, mime, size, disk_name) select 'QA договор', mime, size, disk_name from portal.files where id = $1 returning id`, [src.id])).id
+    await q('update portal.deals set contract_file_id = $2 where booking_id = $1', [b.id, fid])
+    assert.equal((await get(OF, `/files/${fid}`)).status, 200, 'файл договора не отдаётся офису')
+    assert.equal((await get(S, `/files/${fid}`)).status, 200, 'файл договора не отдаётся сейлзу клиента')
+    const ag = await agency('DE'), P = await user('agency_head', { agency_id: ag.id })
+    assert.equal((await get(P, `/files/${fid}`)).status, 404, 'файл договора отдан партнёру')
+    assert.ok((await get(S, `/clients/${cl}`)).html.includes(`/files/${fid}`), 'в карточке клиента нет ссылки на файл договора')
+  }
   void pr
 })

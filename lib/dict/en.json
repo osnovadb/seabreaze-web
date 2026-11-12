@@ -2834,5 +2834,6 @@
 "Договор № {n}": "Contract No. {n}",
 "от {d}": "dated {d}",
 "возврат комиссии при расторжении — до {d}": "commission clawback on termination — until {d}",
-"договор {n} от {d}": "contract {n} dated {d}"
+"договор {n} от {d}": "contract {n} dated {d}",
+"Файл договора": "Contract file"
 }

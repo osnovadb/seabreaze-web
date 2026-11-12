@@ -8,7 +8,7 @@ import { Top, Pill } from '@/components/ui'
 import { bookingAction, dealPaid, refuseClient } from '@/lib/actions'
 import { kycLink } from '@/lib/kycActions'
 import { B24_LOST } from '@/lib/stages'
-import { canApproveDiscount, canConfirmBooking } from '@/lib/perm'
+import { canApproveDiscount, canConfirmBooking, isExternal } from '@/lib/perm'
 import { setEscort, terminateDeal } from '@/lib/moneyActions'
 import { ActionForm } from '@/components/ActionForm'
 import { ConfirmBtn } from '@/components/ConfirmBtn'
@@ -20,7 +20,7 @@ import { calcViewProps } from '@/lib/calcView'
 import { VariantCalc } from '@/components/VariantCalc'
 
 // 2.2 · Units в Bitrix24 (вариант B, экраны Сейлз 02–04): подбор по шахматке → квартиры клиента → условия покупки
-type U = { contract_no?: string | null; contract_date?: string | null; claw_until?: string | null; unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; deal_stage?: string | null; escort_id?: string | null }
+type U = { contract_file_id?: string | null; contract_no?: string | null; contract_date?: string | null; claw_until?: string | null; unit_id: string; no: string; project: string; slug: string; status: string | null; booking_id: string | null; ends_at: string | null; final: number | null; liked: boolean; in_sel: boolean; usd: number | null; mine: boolean; spa_approval_at: string | null; approval?: string | null; plan_pool?: number | null; disc?: number; dev_no?: string | null; deal_id?: string | null; paid?: number | null; deal_stage?: string | null; escort_id?: string | null }
 const ST: Record<string, [string, 'ok' | 'warn' | 'bad' | 'off' | 'ink']> = { hold: ['холд 24 ч', 'ink'], queued: ['в очереди у застройщика', 'warn'], requested: ['запрос брони', 'warn'], confirmed: ['бронь', 'ok'], release_pending: ['снять у застройщика', 'warn'], converted: ['договор', 'ok'] }
 
 // М7 (ревью 10.11): метка квартиры после договора — по стадии сделки (один источник): расторгнута; «до …» у договора не показываем
@@ -48,7 +48,7 @@ export default async function Units(
       s as (select si.unit_id, bool_or(coalesce(si.liked, false)) liked from portal.selection_items si join portal.selections x on x.id = si.selection_id where x.client_id = $1 group by si.unit_id)
     select u.id unit_id, portal.unit_no(bl.external_id, u.number) no, p.name project, p.slug, b.status, b.id booking_id, b.ends_at::text, b.final_price::float final,
       coalesce(s.liked, false) liked, s.unit_id is not null in_sel, u.price_list::float usd, b.agent_id = $2 mine, b.approval, (b.snapshot->>'plan_pool')::float plan_pool, b.discount_pct::float disc, b.dev_booking_no dev_no, b.escort_id, b.spa_approval_at,
-      d.id deal_id, d.paid_pct::float paid, d.contract_no, d.contract_date::text contract_date,
+      d.id deal_id, d.paid_pct::float paid, d.contract_no, d.contract_date::text contract_date, d.contract_file_id,
       -- 380: окно возврата комиссии — от даты договора, как в clawbackDeal (календарные месяцы)
       (coalesce(d.contract_date, d.created_at::date) + coalesce((b.snapshot->>'clawback_months')::int, (portal.cur_conditions(b.project_id)).clawback_months, 3) * interval '1 month')::date::text claw_until,
       (select dd.stage from portal.deals dd where dd.booking_id = b.id order by dd.created_at desc limit 1) deal_stage
@@ -154,7 +154,7 @@ export default async function Units(
                 <label className="field"><span>{T('Сопровождающий в Баку')}</span><select key={`escort:${String(u.escort_id || '')}`} name="escort" className="in" defaultValue={u.escort_id || ''}><option value="">{T('без сопровождающего')}</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 <button className="btn btn--sm">{T('Сохранить')}</button></form>}
               {u.status === 'release_pending' && office && <form action={bookingAction}>{h('release_confirm')}<button className="btn btn--sm btn--p">{T('Снято у застройщика')}</button></form>}
-              {u.status === 'converted' && u.deal_id && <div className="small muted">{[u.contract_no ? T('Договор № {n}', { n: u.contract_no }) : '', u.contract_date ? T('от {d}', { d: date(L, u.contract_date) }) : '', u.claw_until && u.deal_stage !== 'cancelled' ? T('возврат комиссии при расторжении — до {d}', { d: date(L, u.claw_until) }) : ''].filter(Boolean).join(' · ')}</div>}
+              {u.status === 'converted' && u.deal_id && <div className="small muted">{[u.contract_no ? T('Договор № {n}', { n: u.contract_no }) : '', u.contract_date ? T('от {d}', { d: date(L, u.contract_date) }) : '', u.claw_until && u.deal_stage !== 'cancelled' ? T('возврат комиссии при расторжении — до {d}', { d: date(L, u.claw_until) }) : ''].filter(Boolean).join(' · ')}{u.contract_file_id && !isExternal(c.user.role) && <> · <a className="bronze" href={`/files/${u.contract_file_id}`} target="_blank">{T('Файл договора')}</a></>}</div>}
               {u.status === 'converted' && u.deal_id && (['owner', 'finance'].includes(c.user.role)
                 ? <form action={dealPaid} className="row" style={{ gap: 6, alignItems: 'flex-end' }}><input type="hidden" name="id" value={u.deal_id} />
                     <label className="field"><span>{T('Оплачено клиентом, %')}</span><input name="paid" type="number" min={0} max={100} step="0.01" defaultValue={u.paid ?? 0} className="in" style={{ width: 90 }} /></label>

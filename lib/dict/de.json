@@ -2834,5 +2834,6 @@
 "Договор № {n}": "Vertrag Nr. {n}",
 "от {d}": "vom {d}",
 "возврат комиссии при расторжении — до {d}": "Provisionsrückforderung bei Kündigung — bis {d}",
-"договор {n} от {d}": "Vertrag {n} vom {d}"
+"договор {n} от {d}": "Vertrag {n} vom {d}",
+"Файл договора": "Vertragsdatei"
 }

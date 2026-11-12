@@ -2834,5 +2834,6 @@
 "Договор № {n}": "Müqavilə № {n}",
 "от {d}": "{d} tarixli",
 "возврат комиссии при расторжении — до {d}": "ləğv zamanı komissiyanın qaytarılması — {d} tarixinədək",
-"договор {n} от {d}": "{d} tarixli {n} müqavilə"
+"договор {n} от {d}": "{d} tarixli {n} müqavilə",
+"Файл договора": "Müqavilə faylı"
 }
